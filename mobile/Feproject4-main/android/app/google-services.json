@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "371316595943",
+    "project_id": "notifigation-d7a54",
+    "storage_bucket": "notifigation-d7a54.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:371316595943:android:79ccb304b740a4493d9642",
+        "android_client_info": {
+          "package_name": "com.example.playerduo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOR651OlL80wJxx01W1YMgFcFqAxvPj4o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
