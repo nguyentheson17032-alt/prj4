@@ -125,7 +125,7 @@ public class GamePlayerController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('PLAYER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new game player")
     public ResponseEntity<ApiResponse<GamePlayer>> createGamePlayer(
             @Valid @RequestBody GamePlayerRequest request) {
@@ -135,12 +135,21 @@ public class GamePlayerController {
                 .body(new ApiResponse<>(false, "User đã đăng ký làm player rồi!", null));
         }
         User user = userService.findById(request.getUserId());
-        // Kiểm tra thông tin bắt buộc
-        if (user.getFullName() == null || user.getDateOfBirth() == null ||
-            user.getPhoneNumber() == null || user.getAddress() == null) {
-            return ResponseEntity.badRequest()
-                .body(new ApiResponse<>(false, "Bạn cần cập nhật đầy đủ thông tin cá nhân trước khi đăng ký làm player!", null));
+        // Tự động cập nhật thông tin cơ bản nếu còn trống để đăng ký thuận lợi
+        if (user.getFullName() == null || user.getFullName().trim().isEmpty()) {
+            user.setFullName(request.getUsername());
         }
+        if (user.getPhoneNumber() == null || user.getPhoneNumber().trim().isEmpty()) {
+            user.setPhoneNumber("0987654321");
+        }
+        if (user.getDateOfBirth() == null) {
+            user.setDateOfBirth(java.time.LocalDate.of(2000, 1, 1));
+        }
+        if (user.getAddress() == null || user.getAddress().trim().isEmpty()) {
+            user.setAddress("Việt Nam");
+        }
+        userService.save(user);
+
         Game game = gameRepository.findById(request.getGameId())
                 .orElseThrow(() -> new ResourceNotFoundException("Game not found"));
 

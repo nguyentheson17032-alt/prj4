@@ -93,7 +93,10 @@ export const App = () => {
                         />
                       }
                     />
-                    <Route path="/register-player" element={<RegisterPlayerPage />} />
+                    <Route
+                      path="/register-player"
+                      element={<RegisterPlayerPage onOpenAuth={() => setIsAuthOpen(true)} />}
+                    />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/policy" element={<PolicyPage />} />
                     <Route path="/admin" element={<AdminPage />} />

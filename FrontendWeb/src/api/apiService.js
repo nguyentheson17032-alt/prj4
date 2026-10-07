@@ -80,6 +80,11 @@ export const api = {
     return res.data;
   },
 
+  async registerPlayer(playerData) {
+    const res = await client.post('/api/game-players', playerData);
+    return res.data;
+  },
+
   // Moments
   async getMoments() {
     const res = await client.get('/api/moments');

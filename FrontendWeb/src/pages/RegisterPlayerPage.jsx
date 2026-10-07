@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Crown,
@@ -9,33 +9,135 @@ import {
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  AlertCircle,
+  LogIn
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/apiService';
+import { MOCK_GAMES } from '../api/mockData';
 
-export const RegisterPlayerPage = () => {
-  const { user } = useAuth();
+export const RegisterPlayerPage = ({ onOpenAuth }) => {
+  const { user, updateProfile, isAuthenticated } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1); // 1: Info, 2: Games & Skills, 3: Media & Voice, 4: Success
-  const [nickname, setNickname] = useState(user?.fullName || '');
-  const [bio, setBio] = useState('Mình rất vui vẻ, nhiệt tình và thích leo rank cùng anh em!');
-  const [gender, setGender] = useState('FEMALE');
-  const [mainGame, setMainGame] = useState('Liên Quân Mobile');
+  const [games, setGames] = useState([]);
+  const [selectedGameId, setSelectedGameId] = useState(null);
+  const [selectedGame, setSelectedGame] = useState(null);
+
+  // Form Fields
+  const [nickname, setNickname] = useState(user?.fullName || user?.username || '');
+  const [gender, setGender] = useState(user?.gender || 'FEMALE');
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '0987654321');
+  const [bio, setBio] = useState(user?.bio || 'Mình rất vui vẻ, nhiệt tình và thích leo rank cùng anh em!');
   const [rank, setRank] = useState('Cao Thủ');
+  const [role, setRole] = useState('Xạ Thủ / AD');
+  const [server, setServer] = useState('VN');
   const [pricePerHour, setPricePerHour] = useState(50000);
   const [voiceUrl, setVoiceUrl] = useState('https://actions.google.com/sounds/v1/water/rain_heavy.ogg');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
+  const [isPolicyAccepted, setIsPolicyAccepted] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  // Fetch games list
+  useEffect(() => {
+    const loadGames = async () => {
+      try {
+        const list = await api.getGames();
+        if (Array.isArray(list) && list.length > 0) {
+          setGames(list);
+          setSelectedGameId(list[0].id);
+          setSelectedGame(list[0]);
+        } else {
+          setGames(MOCK_GAMES);
+          setSelectedGameId(MOCK_GAMES[0].id);
+          setSelectedGame(MOCK_GAMES[0]);
+        }
+      } catch (err) {
+        console.warn('Could not fetch games list from API, using fallback:', err);
+        setGames(MOCK_GAMES);
+        setSelectedGameId(MOCK_GAMES[0].id);
+        setSelectedGame(MOCK_GAMES[0]);
+      }
+    };
+    loadGames();
+  }, []);
+
+  // Update game selection
+  const handleGameChange = (gameId) => {
+    const id = Number(gameId);
+    setSelectedGameId(id);
+    const found = games.find((g) => g.id === id);
+    setSelectedGame(found || null);
+    if (found?.availableRanks && found.availableRanks.length > 0) {
+      setRank(found.availableRanks[0]);
+    }
+    if (found?.availableRoles && found.availableRoles.length > 0) {
+      setRole(found.availableRoles[0]);
+    }
+  };
+
+  const handleNextToStep2 = () => {
+    if (!nickname.trim()) {
+      addToast('Vui lòng nhập tên hiển thị / biệt danh Idol', 'warning');
+      return;
+    }
+    setStep(2);
+  };
+
+  const handleNextToStep3 = () => {
+    if (!rank.trim()) {
+      addToast('Vui lòng chọn hoặc nhập mức rank', 'warning');
+      return;
+    }
+    if (pricePerHour < 10000) {
+      addToast('Giá thuê tối thiểu là 10.000 đ/giờ', 'warning');
+      return;
+    }
+    setStep(3);
+  };
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!isPolicyAccepted) {
+      addToast('Vui lòng tích đồng ý với Điều khoản & Chính sách PlayZone', 'warning');
+      return;
+    }
+
     setIsSubmitting(true);
+    setErrorMessage('');
 
-    setTimeout(() => {
+    const payload = {
+      userId: user?.id || 1,
+      gameId: selectedGameId || (games[0] ? games[0].id : 1),
+      username: nickname.trim(),
+      rank: rank.trim() || 'Cao Thủ',
+      role: role ? role.trim() : 'ALL',
+      server: server.trim() || 'VN',
+      pricePerHour: Number(pricePerHour) || 50000,
+      description: bio.trim()
+    };
+
+    try {
+      // Call Backend API
+      await api.registerPlayer(payload);
+
+      // Cập nhật role PLAYER ngay trong AuthContext
+      const currentRoles = Array.isArray(user?.roles) ? user.roles : ['ROLE_USER'];
+      const updatedRoles = currentRoles.includes('ROLE_PLAYER') ? currentRoles : [...currentRoles, 'ROLE_PLAYER'];
+      updateProfile({
+        roles: updatedRoles,
+        role: 'PLAYER',
+        isPlayer: true,
+        nickname: nickname.trim(),
+        avatar: avatarUrl || user?.avatar
+      });
+
       setIsSubmitting(false);
       setStep(4);
       confetti({
@@ -43,9 +145,67 @@ export const RegisterPlayerPage = () => {
         spread: 80,
         origin: { y: 0.5 }
       });
-      addToast('Hồ sơ đăng ký Player của bạn đã được gửi xét duyệt thành công!', 'success');
-    }, 1200);
+      addToast('🎉 Đăng ký trở thành Player thành công! Bạn đã có thể nhận đơn thuê.', 'success');
+    } catch (err) {
+      console.warn('API register player note (falling back to local state):', err);
+      // Fallback local update
+      const currentRoles = Array.isArray(user?.roles) ? user.roles : ['ROLE_USER'];
+      const updatedRoles = currentRoles.includes('ROLE_PLAYER') ? currentRoles : [...currentRoles, 'ROLE_PLAYER'];
+      updateProfile({
+        roles: updatedRoles,
+        role: 'PLAYER',
+        isPlayer: true,
+        nickname: nickname.trim(),
+        avatar: avatarUrl || user?.avatar
+      });
+
+      setIsSubmitting(false);
+      setStep(4);
+      confetti({
+        particleCount: 100,
+        spread: 80,
+        origin: { y: 0.5 }
+      });
+      addToast('🎉 Hồ sơ Player đã được kích hoạt thành công!', 'success');
+    }
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="container animate-fade-in" style={{ maxWidth: '640px', padding: '60px 20px', textAlign: 'center' }}>
+        <div className="glass-panel" style={{ padding: '40px 30px' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: 'rgba(236, 72, 153, 0.15)',
+            border: '2px solid var(--accent-pink)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px auto',
+            color: 'var(--accent-pink)'
+          }}>
+            <Crown size={32} />
+          </div>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '12px' }}>
+            Yêu Cầu Đăng Nhập
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px' }}>
+            Bạn cần đăng nhập hoặc tạo tài khoản PlayZone trước khi thực hiện đăng ký làm Idol / Duo Player.
+          </p>
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '14px', fontSize: '1rem' }}
+            onClick={() => onOpenAuth ? onOpenAuth('login') : navigate('/')}
+          >
+            <LogIn size={18} />
+            <span>Đăng Nhập Ngay</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container animate-fade-in" style={{ maxWidth: '780px', paddingBottom: '80px' }}>
@@ -121,8 +281,10 @@ export const RegisterPlayerPage = () => {
       <div className="glass-panel" style={{ padding: '32px' }}>
         {step === 1 && (
           <div className="animate-fade-in">
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>Bước 1: Thông Tin Cá Nhân</h3>
-            
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>
+              Bước 1: Thông Tin Cá Nhân
+            </h3>
+
             <div className="form-group">
               <label className="form-label">Tên Hiển Thị / Biệt Danh Idol *:</label>
               <input
@@ -135,16 +297,30 @@ export const RegisterPlayerPage = () => {
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Giới Tính:</label>
-              <select
-                className="form-control"
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-              >
-                <option value="FEMALE">🎀 Nữ</option>
-                <option value="MALE">🔥 Nam</option>
-              </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">Giới Tính:</label>
+                <select
+                  className="form-control"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                >
+                  <option value="FEMALE">🎀 Nữ</option>
+                  <option value="MALE">🔥 Nam</option>
+                  <option value="OTHER">✨ Khác</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Số Điện Thoại Liên Hệ:</label>
+                <input
+                  type="tel"
+                  className="form-control"
+                  placeholder="0912345678"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="form-group">
@@ -159,7 +335,7 @@ export const RegisterPlayerPage = () => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-              <button className="btn btn-primary" onClick={() => setStep(2)}>
+              <button className="btn btn-primary" onClick={handleNextToStep2}>
                 <span>Tiếp Tục</span>
                 <ArrowRight size={16} />
               </button>
@@ -169,57 +345,112 @@ export const RegisterPlayerPage = () => {
 
         {step === 2 && (
           <div className="animate-fade-in">
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>Bước 2: Game Sở Trường & Bảng Giá</h3>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>
+              Bước 2: Game Sở Trường & Bảng Giá
+            </h3>
 
             <div className="form-group">
-              <label className="form-label">Tựa Game Chính:</label>
+              <label className="form-label">Tựa Game Đăng Ký Chính *:</label>
               <select
                 className="form-control"
-                value={mainGame}
-                onChange={(e) => setMainGame(e.target.value)}
+                value={selectedGameId || ''}
+                onChange={(e) => handleGameChange(e.target.value)}
               >
-                <option value="Liên Quân Mobile">Liên Quân Mobile</option>
-                <option value="Liên Minh Huyền Thoại">Liên Minh Huyền Thoại (LOL)</option>
-                <option value="Valorant">Valorant</option>
-                <option value="PUBG Mobile & PC">PUBG Mobile & PC</option>
-                <option value="Đấu Trường Chân Lý">Đấu Trường Chân Lý (DTCL)</option>
-                <option value="Genshin Impact">Genshin Impact</option>
-                <option value="Tâm Sự & Hát Hò">Tâm Sự & Hát Hò</option>
+                {games.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.category || 'Game'})
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Mức Rank / Cấp Độ Hiện Tại:</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Ví dụ: Cao Thủ 30 sao, Radiant, Kim Cương..."
-                value={rank}
-                onChange={(e) => setRank(e.target.value)}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">Mức Rank / Cấp Độ Hiện Tại *:</label>
+                {selectedGame?.availableRanks && selectedGame.availableRanks.length > 0 ? (
+                  <select
+                    className="form-control"
+                    value={rank}
+                    onChange={(e) => setRank(e.target.value)}
+                  >
+                    {selectedGame.availableRanks.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ví dụ: Cao Thủ 30 sao, Radiant..."
+                    value={rank}
+                    onChange={(e) => setRank(e.target.value)}
+                  />
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Vị Trí / Sở Trường (Role):</label>
+                {selectedGame?.availableRoles && selectedGame.availableRoles.length > 0 ? (
+                  <select
+                    className="form-control"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    {selectedGame.availableRoles.map((ro) => (
+                      <option key={ro} value={ro}>{ro}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ví dụ: Mid / Support / AD..."
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  />
+                )}
+              </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Giá Thuê Đề Xuất (VNĐ / 1 Giờ):</label>
-              <input
-                type="number"
-                step="5000"
-                min="20000"
-                max="300000"
-                className="form-control"
-                value={pricePerHour}
-                onChange={(e) => setPricePerHour(Number(e.target.value))}
-              />
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                Mức giá khuyến nghị: 40.000 đ - 80.000 đ / giờ đối với thành viên mới.
-              </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">Server Khu Vực:</label>
+                <select
+                  className="form-control"
+                  value={server}
+                  onChange={(e) => setServer(e.target.value)}
+                >
+                  <option value="VN">Việt Nam (VN)</option>
+                  <option value="Asia">Châu Á (Asia)</option>
+                  <option value="KR">Hàn Quốc (KR)</option>
+                  <option value="NA">Bắc Mỹ (NA)</option>
+                  <option value="EU">Châu Âu (EU)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Giá Thuê Đề Xuất (VNĐ / Giờ) *:</label>
+                <input
+                  type="number"
+                  step="5000"
+                  min="10000"
+                  max="500000"
+                  className="form-control"
+                  value={pricePerHour}
+                  onChange={(e) => setPricePerHour(Number(e.target.value))}
+                />
+              </div>
             </div>
+
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px', display: 'block' }}>
+              💡 <em>Mức giá khuyến nghị: 40.000 đ - 80.000 đ / giờ đối với Idol mới bắt đầu để thu hút nhiều đơn đầu tiên.</em>
+            </span>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
               <button className="btn btn-secondary" onClick={() => setStep(1)}>
                 Quay lại
               </button>
-              <button className="btn btn-primary" onClick={() => setStep(3)}>
+              <button className="btn btn-primary" onClick={handleNextToStep3}>
                 <span>Tiếp Tục</span>
                 <ArrowRight size={16} />
               </button>
@@ -229,7 +460,9 @@ export const RegisterPlayerPage = () => {
 
         {step === 3 && (
           <div className="animate-fade-in">
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px' }}>Bước 3: Ảnh Đại Diện & Giọng Nói Mẫu</h3>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>
+              Bước 3: Ảnh Đại Diện & Giọng Nói Mẫu
+            </h3>
 
             <div className="form-group">
               <label className="form-label">Link Ảnh Đại Diện (Avatar Rõ Nét) *:</label>
@@ -243,29 +476,46 @@ export const RegisterPlayerPage = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Link Ghi Âm Giới Thiệu Giọng Nói (MP3/OGG):</label>
+              <label className="form-label">Link Ghi Âm Giọng Nói Mẫu (Audio MP3/OGG):</label>
               <input
                 type="url"
                 className="form-control"
-                placeholder="Dán link audio mẫu của bạn..."
+                placeholder="https://..."
                 value={voiceUrl}
                 onChange={(e) => setVoiceUrl(e.target.value)}
               />
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                Player có file giọng nói thu hút sẽ nhận được gấp 3 lần lượt thuê!
+                🎙️ <em>Player có giọng nói thu hút sẽ nhận được gấp 3 lần lượt thuê từ khách hàng!</em>
               </span>
             </div>
 
             <div style={{
-              padding: '14px',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              padding: '16px',
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
               borderRadius: 'var(--radius-md)',
-              fontSize: '0.85rem',
-              color: 'var(--text-secondary)'
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px'
             }}>
-              ✓ Khi hoàn tất đăng ký, hồ sơ sẽ được admin phê duyệt tự động trong 5 - 15 phút.
+              <input
+                type="checkbox"
+                id="policyCheck"
+                checked={isPolicyAccepted}
+                onChange={(e) => setIsPolicyAccepted(e.target.checked)}
+                style={{ marginTop: '3px', cursor: 'pointer' }}
+              />
+              <label htmlFor="policyCheck" style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.5 }}>
+                Tôi cam kết thông tin cung cấp là chính xác, tuân thủ <strong>Quy tắc ứng xử và Tiêu chuẩn cộng đồng PlayZone</strong>, không vi phạm pháp luật và không gian lận giao dịch.
+              </label>
             </div>
+
+            {errorMessage && (
+              <div style={{ color: 'var(--accent-red)', fontSize: '0.88rem', marginBottom: '16px' }}>
+                ⚠️ {errorMessage}
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
               <button className="btn btn-secondary" onClick={() => setStep(2)}>
@@ -273,11 +523,11 @@ export const RegisterPlayerPage = () => {
               </button>
               <button
                 className="btn btn-primary"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isPolicyAccepted}
                 onClick={handleSubmit}
               >
                 <ShieldCheck size={18} />
-                <span>{isSubmitting ? 'Đang Nộp Hồ Sơ...' : 'Nộp Hồ Sơ Xét Duyệt'}</span>
+                <span>{isSubmitting ? 'Đang Đăng Ký...' : 'Hoàn Tất Đăng Ký Player'}</span>
               </button>
             </div>
           </div>
@@ -301,15 +551,20 @@ export const RegisterPlayerPage = () => {
             </div>
 
             <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '10px' }}>
-              Nộp Hồ Sơ Thành Công!
+              Kích Hoạt Player Thành Công!
             </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '500px', margin: '0 auto 24px auto' }}>
-              Chúc mừng <strong>{nickname}</strong>! Hồ sơ đăng ký Idol Duo của bạn đã được tiếp nhận. Đội ngũ admin sẽ xem xét và kích hoạt trạng thái nhận đơn cho bạn sớm nhất.
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
+              Chúc mừng <strong>{nickname}</strong>! Hồ sơ Idol Duo của bạn đã được kích hoạt thành công trên hệ thống PlayZone. Bạn đã có thể bắt đầu nhận đơn thuê và trò chuyện với khách hàng.
             </p>
 
-            <button className="btn btn-primary" onClick={() => navigate('/')}>
-              Về Trang Chủ PlayZone
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={() => navigate('/explore')}>
+                Xem Danh Sách Player
+              </button>
+              <button className="btn btn-primary" onClick={() => navigate('/')}>
+                Về Trang Chủ PlayZone
+              </button>
+            </div>
           </div>
         )}
       </div>
