@@ -16,7 +16,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
   const [gender, setGender] = useState('ALL');
   const [status, setStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState('RATING'); // RATING, PRICE_ASC, PRICE_DESC, POPULAR
-  const [priceMax, setPriceMax] = useState(150000);
+  const [priceMax, setPriceMax] = useState(300000);
 
   useEffect(() => {
     const queryParam = searchParams.get('q');
@@ -28,13 +28,18 @@ export const ExplorePage = ({ onHirePlayer }) => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [pData, gData] = await Promise.all([
-        api.getPlayers(),
-        api.getGames()
-      ]);
-      setPlayers(pData || []);
-      setGames(gData || []);
-      setLoading(false);
+      try {
+        const [pData, gData] = await Promise.all([
+          api.getPlayers(),
+          api.getGames()
+        ]);
+        setPlayers(Array.isArray(pData) ? pData : []);
+        setGames(Array.isArray(gData) ? gData : []);
+      } catch (err) {
+        console.error('Error fetching explore data:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, []);
@@ -45,23 +50,32 @@ export const ExplorePage = ({ onHirePlayer }) => {
       // Query
       if (query.trim()) {
         const q = query.toLowerCase();
-        const matchName = p.fullName?.toLowerCase().includes(q) || p.username?.toLowerCase().includes(q);
-        const matchGame = p.primaryGame?.toLowerCase().includes(q) || p.games?.some(g => g.name.toLowerCase().includes(q));
-        const matchBio = p.bio?.toLowerCase().includes(q);
-        if (!matchName && !matchGame && !matchBio) return false;
+        const matchName = (p.fullName || p.name || p.username || '').toLowerCase().includes(q);
+        const matchGame = (p.primaryGame || '').toLowerCase().includes(q) || p.games?.some(g => (g.name || '').toLowerCase().includes(q));
+        const matchBio = (p.bio || '').toLowerCase().includes(q);
+        const matchRank = (p.rank || '').toLowerCase().includes(q);
+        if (!matchName && !matchGame && !matchBio && !matchRank) return false;
       }
       // Game
       if (selectedGame !== 'ALL') {
-        const matchGame = p.primaryGame?.toLowerCase().includes(selectedGame.toLowerCase()) ||
-                          p.games?.some(g => g.name.toLowerCase().includes(selectedGame.toLowerCase()));
+        const sg = selectedGame.toLowerCase();
+        const matchGame = (p.primaryGame || '').toLowerCase().includes(sg) ||
+                          p.games?.some(g => (g.name || '').toLowerCase().includes(sg));
         if (!matchGame) return false;
       }
       // Gender
-      if (gender !== 'ALL' && p.gender !== gender) return false;
+      if (gender !== 'ALL') {
+        const pGender = (p.gender || 'FEMALE').toUpperCase();
+        if (pGender !== gender.toUpperCase()) return false;
+      }
       // Status
-      if (status === 'ONLINE' && p.status !== 'ONLINE') return false;
+      if (status === 'ONLINE') {
+        const isOnline = p.status === 'ONLINE' || p.status === 'AVAILABLE' || p.status === 'ACTIVE' || !p.status;
+        if (!isOnline) return false;
+      }
       // Price
-      if ((p.pricePerHour || 50000) > priceMax) return false;
+      const playerPrice = Number(p.pricePerHour || p.price || 50000);
+      if (playerPrice > priceMax) return false;
 
       return true;
     })
@@ -69,7 +83,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
       if (sortBy === 'RATING') return (b.rating || 0) - (a.rating || 0);
       if (sortBy === 'PRICE_ASC') return (a.pricePerHour || 0) - (b.pricePerHour || 0);
       if (sortBy === 'PRICE_DESC') return (b.pricePerHour || 0) - (a.pricePerHour || 0);
-      if (sortBy === 'POPULAR') return (b.orderCount || 0) - (a.orderCount || 0);
+      if (sortBy === 'POPULAR') return (b.orderCount || b.reviewCount || 0) - (a.orderCount || a.reviewCount || 0);
       return 0;
     });
 
@@ -79,7 +93,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
     setGender('ALL');
     setStatus('ALL');
     setSortBy('RATING');
-    setPriceMax(150000);
+    setPriceMax(300000);
     setSearchParams({});
   };
 

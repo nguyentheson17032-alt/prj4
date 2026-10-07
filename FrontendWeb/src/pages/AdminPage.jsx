@@ -116,16 +116,42 @@ export const AdminPage = () => {
   // Approve / Reject Player application
   const handleApprovePlayer = (playerId) => {
     setPlayersList(prev => prev.map(p => {
-      if (p.id === playerId) {
-        addToast(`Đã phê duyệt hồ sơ Idol "${p.name}"!`, 'success');
-        return { ...p, status: 'ACTIVE' };
+      if (p.id === playerId || String(p.id) === String(playerId)) {
+        addToast(`Đã phê duyệt hồ sơ Idol "${p.fullName || p.name}"!`, 'success');
+        return { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' };
       }
       return p;
     }));
+
+    try {
+      const stored = localStorage.getItem('local_registered_players');
+      if (stored) {
+        const list = JSON.parse(stored);
+        const updated = list.map(p => {
+          if (p.id === playerId || String(p.id) === String(playerId)) {
+            return { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' };
+          }
+          return p;
+        });
+        localStorage.setItem('local_registered_players', JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleRejectPlayer = (playerId) => {
-    setPlayersList(prev => prev.filter(p => p.id !== playerId));
+    setPlayersList(prev => prev.filter(p => p.id !== playerId && String(p.id) !== String(playerId)));
+    try {
+      const stored = localStorage.getItem('local_registered_players');
+      if (stored) {
+        const list = JSON.parse(stored);
+        const updated = list.filter(p => p.id !== playerId && String(p.id) !== String(playerId));
+        localStorage.setItem('local_registered_players', JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.error(e);
+    }
     addToast('Đã từ chối hồ sơ đăng ký!', 'info');
   };
 
@@ -147,7 +173,7 @@ export const AdminPage = () => {
 
   const totalOrdersCount = ordersList.length;
   const totalUsersCount = usersList.length;
-  const pendingPlayersCount = playersList.filter(p => p.status === 'PENDING').length;
+  const pendingPlayersCount = playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING').length;
   const pendingReportsCount = reportsList.filter(r => r.status === 'PENDING').length;
 
   const completedOrdersCount = useMemo(() => {
@@ -688,13 +714,13 @@ export const AdminPage = () => {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                {playersList.filter(p => p.status === 'PENDING').map(player => (
+                {playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING').map(player => (
                   <div key={player.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px' }}>
                     <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: '12px' }}>
                       <img src={getUserAvatar(player)} alt={player.name} style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover' }} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{player.name}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{player.nickname || player.name} • {player.rank || 'Kim Cương'}</div>
+                        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{player.fullName || player.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{player.primaryGame || 'Liên Quân'} • {player.rank || 'Kim Cương'}</div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Gửi lúc: {player.submittedAt || 'Mới đây'}</div>
                       </div>
                     </div>
@@ -734,18 +760,20 @@ export const AdminPage = () => {
 
           {/* Active Idols List */}
           <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 16px' }}>Danh Sách Idol Đang Hoạt Động ({playersList.filter(p => p.status !== 'PENDING').length})</h3>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 16px' }}>
+              Danh Sách Idol Đang Hoạt Động ({playersList.filter(p => p.status !== 'PENDING' && p.adminStatus !== 'PENDING').length})
+            </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-              {playersList.filter(p => p.status !== 'PENDING').map(player => {
+              {playersList.filter(p => p.status !== 'PENDING' && p.adminStatus !== 'PENDING').map(player => {
                 const playerOrdersCount = ordersList.filter(o => o.playerId === player.id || o.playerName === player.name).length;
 
                 return (
                   <div key={player.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
                     <img src={getUserAvatar(player)} alt={player.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.name}</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.fullName || player.name}</div>
                       <div style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }}>{(player.pricePerHour || player.price || 0).toLocaleString('vi-VN')} đ/h</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>⭐ {player.rating || 5.0} ({playerOrdersCount} đơn)</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>⭐ {player.rating || 5.0} • {player.primaryGame || 'Game'}</div>
                     </div>
                     <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 700 }}>
                       Sẵn sàng
