@@ -47,6 +47,9 @@ export const ExplorePage = ({ onHirePlayer }) => {
   // Filter and Sort logic
   const filteredPlayers = players
     .filter((p) => {
+      // Exclude pending and banned players
+      if (p.status === 'PENDING' || p.status === 'BANNED' || p.adminStatus === 'PENDING') return false;
+
       // Query
       if (query.trim()) {
         const q = query.toLowerCase();

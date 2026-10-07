@@ -208,6 +208,41 @@ public class GamePlayerController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Game player updated successfully", gamePlayer));
     }
 
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Approve a game player application")
+    public ResponseEntity<ApiResponse<GamePlayer>> approveGamePlayer(@PathVariable Long id) {
+        GamePlayer gamePlayer = gamePlayerService.findById(id);
+        gamePlayer.setStatus("AVAILABLE");
+        User user = gamePlayer.getUser();
+        if (user != null && !user.getRoles().contains("ROLE_PLAYER")) {
+            user.getRoles().add("ROLE_PLAYER");
+            userService.save(user);
+        }
+        gamePlayerService.save(gamePlayer);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Game player approved successfully", gamePlayer));
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update game player status")
+    public ResponseEntity<ApiResponse<GamePlayer>> updatePlayerStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
+        GamePlayer gamePlayer = gamePlayerService.findById(id);
+        gamePlayer.setStatus(status.toUpperCase());
+        if ("AVAILABLE".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status)) {
+            gamePlayer.setStatus("AVAILABLE");
+            User user = gamePlayer.getUser();
+            if (user != null && !user.getRoles().contains("ROLE_PLAYER")) {
+                user.getRoles().add("ROLE_PLAYER");
+                userService.save(user);
+            }
+        }
+        gamePlayerService.save(gamePlayer);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Game player status updated successfully", gamePlayer));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete a game player")

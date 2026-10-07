@@ -53,15 +53,9 @@ public class GamePlayerService {
         gamePlayer.setServer(server);
         gamePlayer.setPricePerHour(pricePerHour);
         gamePlayer.setDescription(description);
-        gamePlayer.setStatus("AVAILABLE");
+        gamePlayer.setStatus("PENDING");
         gamePlayer.setTotalGames(0);
         gamePlayer.setWinRate(0);
-        // Thêm ROLE_PLAYER cho user nếu chưa có
-        if (!user.getRoles().contains("ROLE_PLAYER")) {
-            user.getRoles().remove("ROLE_USER"); // Xóa ROLE_USER nếu có
-            user.getRoles().add("ROLE_PLAYER");
-            userRepository.save(user);
-        }
         return gamePlayerRepository.save(gamePlayer);
     }
 

@@ -127,17 +127,6 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       // Call Backend API
       await api.registerPlayer(payload);
 
-      // Cập nhật role PLAYER ngay trong AuthContext
-      const currentRoles = Array.isArray(user?.roles) ? user.roles : ['ROLE_USER'];
-      const updatedRoles = currentRoles.includes('ROLE_PLAYER') ? currentRoles : [...currentRoles, 'ROLE_PLAYER'];
-      updateProfile({
-        roles: updatedRoles,
-        role: 'PLAYER',
-        isPlayer: true,
-        nickname: nickname.trim(),
-        avatar: avatarUrl || user?.avatar
-      });
-
       setIsSubmitting(false);
       setStep(4);
       confetti({
@@ -145,20 +134,9 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
         spread: 80,
         origin: { y: 0.5 }
       });
-      addToast('🎉 Đăng ký trở thành Player thành công! Bạn đã có thể nhận đơn thuê.', 'success');
+      addToast('🎉 Gửi hồ sơ đăng ký Idol thành công! Hồ sơ đang chờ Quản Trị Viên xét duyệt.', 'success');
     } catch (err) {
-      console.warn('API register player note (falling back to local state):', err);
-      // Fallback local update
-      const currentRoles = Array.isArray(user?.roles) ? user.roles : ['ROLE_USER'];
-      const updatedRoles = currentRoles.includes('ROLE_PLAYER') ? currentRoles : [...currentRoles, 'ROLE_PLAYER'];
-      updateProfile({
-        roles: updatedRoles,
-        role: 'PLAYER',
-        isPlayer: true,
-        nickname: nickname.trim(),
-        avatar: avatarUrl || user?.avatar
-      });
-
+      console.warn('API register player note:', err);
       setIsSubmitting(false);
       setStep(4);
       confetti({
@@ -166,7 +144,7 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
         spread: 80,
         origin: { y: 0.5 }
       });
-      addToast('🎉 Hồ sơ Player đã được kích hoạt thành công!', 'success');
+      addToast('🎉 Hồ sơ đăng ký Idol đã được lưu và đang chờ xét duyệt!', 'success');
     }
   };
 
@@ -551,18 +529,22 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
             </div>
 
             <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '10px' }}>
-              Kích Hoạt Player Thành Công!
+              Đăng Ký Hồ Sơ Idol Thành Công!
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
-              Chúc mừng <strong>{nickname}</strong>! Hồ sơ Idol Duo của bạn đã được kích hoạt thành công trên hệ thống PlayZone. Bạn đã có thể bắt đầu nhận đơn thuê và trò chuyện với khách hàng.
+              Chúc mừng <strong>{nickname}</strong>! Hồ sơ Idol Duo của bạn đã được gửi thành công và đang được lưu vào <strong>"Hồ Sơ Đăng Ký Idol Mới Chờ Xét Duyệt"</strong>. Quản Trị Viên (Admin) sẽ phê duyệt hồ sơ của bạn để xuất hiện trên trang Khám Phá và bắt đầu nhận đơn thuê!
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-              <button className="btn btn-secondary" onClick={() => navigate('/explore')}>
-                Xem Danh Sách Player
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={() => navigate('/admin')}>
+                <ShieldCheck size={16} />
+                <span>Vào Trang Quản Trị Duyệt Hồ Sơ</span>
               </button>
-              <button className="btn btn-primary" onClick={() => navigate('/')}>
-                Về Trang Chủ PlayZone
+              <button className="btn btn-secondary" onClick={() => navigate('/explore')}>
+                Xem Danh Sách Khám Phá
+              </button>
+              <button className="btn btn-outline" onClick={() => navigate('/')}>
+                Về Trang Chủ
               </button>
             </div>
           </div>

@@ -46,13 +46,15 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
     fetchData();
   }, []);
 
+  const activePlayers = players.filter(p => p.status !== 'PENDING' && p.status !== 'BANNED' && p.adminStatus !== 'PENDING');
+
   const filteredPlayers = selectedCategory === 'ALL'
-    ? players
-    : players.filter(p => p.primaryGame?.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+    ? activePlayers
+    : activePlayers.filter(p => p.primaryGame?.toLowerCase().includes(selectedCategory.toLowerCase()) ||
                           p.games?.some(g => g.name.toLowerCase().includes(selectedCategory.toLowerCase())));
 
-  const vipPlayers = players.filter(p => p.isVip);
-  const hotPlayers = players.filter(p => p.isHot);
+  const vipPlayers = activePlayers.filter(p => p.isVip);
+  const hotPlayers = activePlayers.filter(p => p.isHot);
 
   return (
     <div className="container animate-fade-in" style={{ paddingBottom: '60px' }}>

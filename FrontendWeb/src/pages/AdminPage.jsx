@@ -114,7 +114,7 @@ export const AdminPage = () => {
   };
 
   // Approve / Reject Player application
-  const handleApprovePlayer = (playerId) => {
+  const handleApprovePlayer = async (playerId) => {
     setPlayersList(prev => prev.map(p => {
       if (p.id === playerId || String(p.id) === String(playerId)) {
         addToast(`Đã phê duyệt hồ sơ Idol "${p.fullName || p.name}"!`, 'success');
@@ -123,36 +123,13 @@ export const AdminPage = () => {
       return p;
     }));
 
-    try {
-      const stored = localStorage.getItem('local_registered_players');
-      if (stored) {
-        const list = JSON.parse(stored);
-        const updated = list.map(p => {
-          if (p.id === playerId || String(p.id) === String(playerId)) {
-            return { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' };
-          }
-          return p;
-        });
-        localStorage.setItem('local_registered_players', JSON.stringify(updated));
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    await api.approvePlayer(playerId);
   };
 
-  const handleRejectPlayer = (playerId) => {
+  const handleRejectPlayer = async (playerId) => {
     setPlayersList(prev => prev.filter(p => p.id !== playerId && String(p.id) !== String(playerId)));
-    try {
-      const stored = localStorage.getItem('local_registered_players');
-      if (stored) {
-        const list = JSON.parse(stored);
-        const updated = list.filter(p => p.id !== playerId && String(p.id) !== String(playerId));
-        localStorage.setItem('local_registered_players', JSON.stringify(updated));
-      }
-    } catch (e) {
-      console.error(e);
-    }
     addToast('Đã từ chối hồ sơ đăng ký!', 'info');
+    await api.rejectPlayer(playerId);
   };
 
   // Resolve Report

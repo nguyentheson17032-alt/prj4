@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getUserAvatar } from '../utils/avatarUtils';
-import { MOCK_GAMES, MOCK_PLAYERS } from './mockData';
+import { MOCK_GAMES } from './mockData';
 
 const BASE_URL = 'http://localhost:8080';
 
@@ -27,8 +27,9 @@ export const normalizeGamePlayer = (gp) => {
   const user = gp.user || {};
   const game = gp.game || {};
   const fullName = gp.username || user.fullName || user.username || 'Idol PlayZone';
-  const avatar = getUserAvatar(user || { username: fullName });
+  const avatar = gp.avatarUrl || user.avatarUrl || gp.avatar || getUserAvatar(user || { username: fullName });
   const price = Number(gp.pricePerHour || gp.price || 50000);
+  const status = (gp.status || 'PENDING').toUpperCase();
 
   return {
     id: gp.id,
@@ -44,7 +45,8 @@ export const normalizeGamePlayer = (gp) => {
     rating: Number(gp.rating || 5.0),
     reviewCount: Number(gp.totalGames || gp.reviewCount || 0),
     orderCount: Number(gp.totalGames || gp.orderCount || 0),
-    status: gp.status || 'AVAILABLE',
+    status: status,
+    adminStatus: gp.adminStatus || (status === 'PENDING' ? 'PENDING' : 'APPROVED'),
     gender: user.gender || gp.gender || 'FEMALE',
     isVip: gp.isVip ?? true,
     isHot: gp.isHot ?? true,
@@ -140,7 +142,7 @@ export const api = {
       }
       backendPlayers = rawList.map(normalizeGamePlayer).filter(Boolean);
     } catch (err) {
-      console.warn('Backend getPlayers error, using local & mock data:', err.message);
+      console.warn('Backend getPlayers error:', err.message);
     }
 
     // Lấy danh sách player đăng ký local
@@ -154,17 +156,20 @@ export const api = {
       console.error('Error reading local_registered_players:', e);
     }
 
-    // Kết hợp local + backend + mockData
-    const all = [...localPlayers, ...backendPlayers];
-
-    // Bổ sung seed mock data nếu chưa có
-    MOCK_PLAYERS.forEach(mp => {
-      if (!all.some(p => p.id === mp.id || (p.username && p.username === mp.username))) {
-        all.push(mp);
-      }
+    // Gộp backend + local (không mock data)
+    const map = new Map();
+    // 1. Thêm từ local
+    localPlayers.forEach(p => {
+      map.set(String(p.id), p);
+      if (p.username) map.set(`user_${p.username}`, p);
+    });
+    // 2. Thêm từ backend (ghi đè đồng bộ chính xác từ DB)
+    backendPlayers.forEach(p => {
+      map.set(String(p.id), p);
+      if (p.username) map.set(`user_${p.username}`, p);
     });
 
-    return all;
+    return Array.from(new Set(map.values()));
   },
 
   async getPlayerById(id) {
@@ -173,55 +178,54 @@ export const api = {
       const raw = res.data?.data || res.data;
       if (raw) return normalizeGamePlayer(raw);
     } catch (e) {
-      // Fallback local or mock
+      // Fallback local
     }
     const all = await this.getPlayers();
     return all.find(p => String(p.id) === String(id)) || null;
   },
 
   async registerPlayer(playerData) {
-    // 1. Lưu vào localStorage ngay lập tức để đồng bộ UI
+    const newPlayer = {
+      id: Date.now(),
+      userId: playerData.userId || 1,
+      username: playerData.username,
+      name: playerData.username,
+      fullName: playerData.username,
+      avatar: playerData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+      avatarUrl: playerData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+      coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
+      bio: playerData.description || 'Sẵn sàng duo leo rank cùng anh em!',
+      pricePerHour: Number(playerData.pricePerHour) || 50000,
+      rating: 5.0,
+      reviewCount: 0,
+      orderCount: 0,
+      status: 'PENDING', // Mặc định PENDING để chờ Admin phê duyệt!
+      adminStatus: 'PENDING',
+      gender: playerData.gender || 'FEMALE',
+      isVip: true,
+      isHot: true,
+      voiceIntroUrl: playerData.voiceUrl || 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg',
+      voiceDuration: '0:15',
+      rank: playerData.rank || 'Cao Thủ',
+      role: playerData.role || 'ALL',
+      server: playerData.server || 'VN',
+      primaryGame: playerData.primaryGame || 'Liên Quân Mobile',
+      games: [
+        {
+          name: playerData.primaryGame || 'Liên Quân Mobile',
+          rank: playerData.rank || 'Cao Thủ',
+          role: playerData.role || 'ALL',
+          price: Number(playerData.pricePerHour) || 50000
+        }
+      ],
+      submittedAt: new Date().toLocaleString('vi-VN'),
+      createdAt: new Date().toISOString()
+    };
+
+    // 1. Lưu vào localStorage để Admin duyệt ngay
     try {
       const stored = localStorage.getItem('local_registered_players');
       const existing = stored ? JSON.parse(stored) : [];
-      
-      const newPlayer = {
-        id: Date.now(),
-        userId: playerData.userId || 1,
-        username: playerData.username,
-        name: playerData.username,
-        fullName: playerData.username,
-        avatar: playerData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-        coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
-        bio: playerData.description || 'Sẵn sàng duo leo rank cùng anh em!',
-        pricePerHour: Number(playerData.pricePerHour) || 50000,
-        rating: 5.0,
-        reviewCount: 0,
-        orderCount: 0,
-        status: 'AVAILABLE', // Sẵn sàng để xuất hiện ngay trong Khám Phá & Admin
-        adminStatus: 'PENDING', // Đánh dấu để Admin có thể duyệt
-        gender: playerData.gender || 'FEMALE',
-        isVip: true,
-        isHot: true,
-        voiceIntroUrl: playerData.voiceUrl || 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg',
-        voiceDuration: '0:15',
-        rank: playerData.rank || 'Cao Thủ',
-        role: playerData.role || 'ALL',
-        server: playerData.server || 'VN',
-        primaryGame: playerData.primaryGame || 'Liên Quân Mobile',
-        games: [
-          {
-            name: playerData.primaryGame || 'Liên Quân Mobile',
-            rank: playerData.rank || 'Cao Thủ',
-            role: playerData.role || 'ALL',
-            price: Number(playerData.pricePerHour) || 50000
-          }
-        ],
-        submittedAt: new Date().toLocaleString('vi-VN'),
-        createdAt: new Date().toISOString()
-      };
-
-      // Xóa bản ghi cũ nếu cùng username/userId
       const filtered = existing.filter(p => p.username !== newPlayer.username && p.userId !== newPlayer.userId);
       filtered.unshift(newPlayer);
       localStorage.setItem('local_registered_players', JSON.stringify(filtered));
@@ -232,10 +236,73 @@ export const api = {
     // 2. Gọi Backend API
     try {
       const res = await client.post('/api/game-players', playerData);
+      if (res.data && (res.data.data || res.data.id)) {
+        const raw = res.data.data || res.data;
+        const normalized = normalizeGamePlayer(raw);
+        normalized.status = 'PENDING';
+        normalized.adminStatus = 'PENDING';
+        const stored = localStorage.getItem('local_registered_players');
+        const existing = stored ? JSON.parse(stored) : [];
+        const filtered = existing.filter(p => p.username !== normalized.username && p.id !== newPlayer.id);
+        filtered.unshift(normalized);
+        localStorage.setItem('local_registered_players', JSON.stringify(filtered));
+      }
       return res.data;
     } catch (err) {
       console.warn('Backend registerPlayer endpoint note:', err.message);
-      return { success: true, message: 'Đăng ký thành công (local mode)' };
+      return { success: true, message: 'Đăng ký thành công, đang chờ Admin duyệt' };
+    }
+  },
+
+  async approvePlayer(playerId) {
+    // Cập nhật local storage
+    try {
+      const stored = localStorage.getItem('local_registered_players');
+      if (stored) {
+        const list = JSON.parse(stored);
+        const updated = list.map(p => {
+          if (String(p.id) === String(playerId) || String(p.userId) === String(playerId)) {
+            return { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' };
+          }
+          return p;
+        });
+        localStorage.setItem('local_registered_players', JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    // Cập nhật backend DB
+    try {
+      const res = await client.post(`/api/game-players/${playerId}/approve`);
+      return res.data;
+    } catch (err) {
+      try {
+        const res = await client.put(`/api/game-players/${playerId}/status?status=AVAILABLE`);
+        return res.data;
+      } catch (e) {
+        return { success: true, message: 'Đã phê duyệt' };
+      }
+    }
+  },
+
+  async rejectPlayer(playerId) {
+    try {
+      const stored = localStorage.getItem('local_registered_players');
+      if (stored) {
+        const list = JSON.parse(stored);
+        const updated = list.filter(p => String(p.id) !== String(playerId) && String(p.userId) !== String(playerId));
+        localStorage.setItem('local_registered_players', JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    try {
+      const res = await client.delete(`/api/game-players/${playerId}`);
+      return res.data;
+    } catch (err) {
+      return { success: true, message: 'Đã từ chối hồ sơ' };
     }
   },
 
