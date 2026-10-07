@@ -31,6 +31,13 @@ export const normalizeGamePlayer = (gp) => {
   const price = Number(gp.pricePerHour || gp.price || 50000);
   const status = (gp.status || 'PENDING').toUpperCase();
 
+  const rating = gp.rating !== null && gp.rating !== undefined ? Number(gp.rating) : 0;
+  const reviewCount = Number(gp.reviewCount || gp.totalReviews || 0);
+  const totalGames = Number(gp.totalGames || 0);
+  const orderCount = Number(gp.orderCount || gp.totalOrders || totalGames || 0);
+  const isVip = Boolean(gp.isVip === true || (orderCount >= 50 && rating >= 4.8));
+  const isHot = Boolean(gp.isHot === true || (orderCount >= 20 && rating >= 4.5));
+
   return {
     id: gp.id,
     userId: user.id || gp.userId || gp.id,
@@ -42,14 +49,14 @@ export const normalizeGamePlayer = (gp) => {
     coverImage: user.coverImageUrl || gp.coverImage || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
     bio: gp.description || user.bio || gp.bio || 'Sẵn sàng duo leo rank cùng anh em!',
     pricePerHour: price,
-    rating: Number(gp.rating || 5.0),
-    reviewCount: Number(gp.totalGames || gp.reviewCount || 0),
-    orderCount: Number(gp.totalGames || gp.orderCount || 0),
+    rating: rating,
+    reviewCount: reviewCount,
+    orderCount: orderCount,
     status: status,
     adminStatus: gp.adminStatus || (status === 'PENDING' ? 'PENDING' : 'APPROVED'),
     gender: user.gender || gp.gender || 'FEMALE',
-    isVip: gp.isVip ?? true,
-    isHot: gp.isHot ?? true,
+    isVip: isVip,
+    isHot: isHot,
     voiceIntroUrl: gp.voiceIntroUrl || 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg',
     voiceDuration: gp.voiceDuration || '0:15',
     rank: gp.rank || 'Cao Thủ',
@@ -196,14 +203,14 @@ export const api = {
       coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
       bio: playerData.description || 'Sẵn sàng duo leo rank cùng anh em!',
       pricePerHour: Number(playerData.pricePerHour) || 50000,
-      rating: 5.0,
+      rating: 0,
       reviewCount: 0,
       orderCount: 0,
       status: 'PENDING', // Mặc định PENDING để chờ Admin phê duyệt!
       adminStatus: 'PENDING',
       gender: playerData.gender || 'FEMALE',
-      isVip: true,
-      isHot: true,
+      isVip: false,
+      isHot: false,
       voiceIntroUrl: playerData.voiceUrl || 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg',
       voiceDuration: '0:15',
       rank: playerData.rank || 'Cao Thủ',

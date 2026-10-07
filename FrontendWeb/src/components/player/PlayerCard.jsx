@@ -55,8 +55,8 @@ export const PlayerCard = ({ player, onHire, onDonate }) => {
           <div className="player-name-row">
             <h3 className="player-name">{player.fullName || player.username}</h3>
             <div className="player-rating">
-              <Star size={14} fill="#f59e0b" color="#f59e0b" />
-              <span>{player.rating || 5.0}</span>
+              <Star size={14} fill={player.rating > 0 ? "#f59e0b" : "none"} color="#f59e0b" />
+              <span>{player.rating > 0 ? Number(player.rating).toFixed(1) : 'Chưa có'}</span>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 400 }}>({player.reviewCount || 0})</span>
             </div>
           </div>

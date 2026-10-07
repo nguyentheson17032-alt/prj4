@@ -201,21 +201,39 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
               <span>Top Player Yêu Thích</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {players.slice(0, 4).map((p, idx) => (
-                <div key={p.id} className="leaderboard-item" onClick={() => navigate(`/player/${p.id}`)} style={{ cursor: 'pointer' }}>
-                  <div className={`rank-badge-num ${idx === 0 ? 'rank-top1' : idx === 1 ? 'rank-top2' : idx === 2 ? 'rank-top3' : 'rank-topother'}`}>
-                    {idx + 1}
-                  </div>
-                  <img src={p.avatar} alt={p.fullName} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{p.fullName}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{p.orderCount || 100}+ đơn • ⭐ {p.rating}</div>
-                  </div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-pink)' }}>
-                    {((p.orderCount || 100) * 1.5).toFixed(0)}k Exp
-                  </span>
+              {activePlayers.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '12px 0' }}>
+                  Chưa có player nào
                 </div>
-              ))}
+              ) : (
+                activePlayers
+                  .slice()
+                  .sort((a, b) => ((b.orderCount || 0) * 10 + (b.rating || 0)) - ((a.orderCount || 0) * 10 + (a.rating || 0)))
+                  .slice(0, 4)
+                  .map((p, idx) => {
+                    const realOrders = p.orderCount || 0;
+                    const realExp = realOrders * 150;
+                    const expLabel = realExp >= 1000 ? `${(realExp / 1000).toFixed(1)}k Exp` : `${realExp} Exp`;
+
+                    return (
+                      <div key={p.id} className="leaderboard-item" onClick={() => navigate(`/player/${p.id}`)} style={{ cursor: 'pointer' }}>
+                        <div className={`rank-badge-num ${idx === 0 ? 'rank-top1' : idx === 1 ? 'rank-top2' : idx === 2 ? 'rank-top3' : 'rank-topother'}`}>
+                          {idx + 1}
+                        </div>
+                        <img src={p.avatar} alt={p.fullName} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{p.fullName}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            {realOrders} đơn • ⭐ {p.rating > 0 ? Number(p.rating).toFixed(1) : 'Chưa có'}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-pink)' }}>
+                          {expLabel}
+                        </span>
+                      </div>
+                    );
+                  })
+              )}
             </div>
           </div>
 

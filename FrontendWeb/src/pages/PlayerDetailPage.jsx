@@ -168,7 +168,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   <span>•</span>
                   <span>Server: {player.server || 'VN'}</span>
                   <span>•</span>
-                  <span>Tỉ lệ hoàn thành: <strong style={{ color: 'var(--accent-green)' }}>{player.completionRate || 99}%</strong></span>
+                  <span>Đơn hoàn tất: <strong style={{ color: 'var(--accent-green)' }}>{player.orderCount || 0} đơn</strong></span>
                 </div>
               </div>
             </div>
@@ -369,34 +369,41 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               {/* Rating Summary */}
               <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '32px' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '3rem', fontWeight: 900, lineHeight: 1, color: 'var(--accent-amber)' }}>
-                    {player.rating || 5.0}
+                  <div style={{ fontSize: '3rem', fontWeight: 900, lineHeight: 1, color: player.rating > 0 ? 'var(--accent-amber)' : 'var(--text-muted)' }}>
+                    {player.rating > 0 ? Number(player.rating).toFixed(1) : '0.0'}
                   </div>
                   <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', margin: '6px 0' }}>
                     {[1, 2, 3, 4, 5].map(s => (
-                      <Star key={s} size={16} fill="#f59e0b" color="#f59e0b" />
+                      <Star key={s} size={16} fill={s <= Math.round(player.rating || 0) && player.rating > 0 ? "#f59e0b" : "none"} color="#f59e0b" />
                     ))}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    {player.reviewCount || reviews.length} lượt đánh giá
+                    {reviews.length || player.reviewCount || 0} lượt đánh giá
                   </div>
                 </div>
 
                 <div style={{ flex: 1, borderLeft: '1px solid var(--border-color)', paddingLeft: '28px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', marginBottom: '6px' }}>
-                    <span>5 ⭐</span>
-                    <div style={{ flex: 1, height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: '95%', height: '100%', background: 'var(--accent-amber)' }} />
+                  {reviews.length === 0 ? (
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      Idol chưa có lượt đánh giá nào từ khách hàng thuê.
                     </div>
-                    <span>95%</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem' }}>
-                    <span>4 ⭐</span>
-                    <div style={{ flex: 1, height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: '5%', height: '100%', background: 'var(--accent-amber)' }} />
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[5, 4, 3, 2, 1].map(star => {
+                        const count = reviews.filter(r => Math.round(r.rating || 5) === star).length;
+                        const pct = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
+                        return (
+                          <div key={star} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem' }}>
+                            <span style={{ minWidth: '35px' }}>{star} ⭐</span>
+                            <div style={{ flex: 1, height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent-amber)', borderRadius: '4px' }} />
+                            </div>
+                            <span style={{ minWidth: '35px', textAlign: 'right', color: 'var(--text-muted)' }}>{pct}%</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <span>5%</span>
-                  </div>
+                  )}
                 </div>
               </div>
 
