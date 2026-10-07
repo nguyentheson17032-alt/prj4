@@ -13,30 +13,46 @@ export const DepositModal = ({ isOpen, onClose }) => {
   const [paymentMethod, setPaymentMethod] = useState('VIETQR'); // VIETQR, VNPAY, MOMO
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lastDepositInfo, setLastDepositInfo] = useState(null);
 
   if (!isOpen) return null;
 
   const presetAmounts = [
-    { value: 50000, label: '50.000 đ' },
-    { value: 100000, label: '100.000 đ', bonus: '+5%' },
-    { value: 200000, label: '200.000 đ', bonus: '+8%' },
-    { value: 500000, label: '500.000 đ', bonus: '+10%' },
-    { value: 1000000, label: '1.000.000 đ', bonus: '+15%' },
-    { value: 2000000, label: '2.000.000 đ', bonus: '+20%' }
+    { value: 50000, label: '50.000 đ', percent: 0 },
+    { value: 100000, label: '100.000 đ', bonus: '+5%', percent: 0.05 },
+    { value: 200000, label: '200.000 đ', bonus: '+8%', percent: 0.08 },
+    { value: 500000, label: '500.000 đ', bonus: '+10%', percent: 0.10 },
+    { value: 1000000, label: '1.000.000 đ', bonus: '+15%', percent: 0.15 },
+    { value: 2000000, label: '2.000.000 đ', bonus: '+20%', percent: 0.20 }
   ];
+
+  const selectedPreset = presetAmounts.find((p) => p.value === amount) || {
+    value: amount,
+    percent: 0,
+    bonus: null
+  };
+  const bonusAmount = Math.round(amount * (selectedPreset.percent || 0));
+  const totalReceived = amount + bonusAmount;
 
   const handleDeposit = async () => {
     setIsProcessing(true);
     try {
-      await deposit(amount);
+      await deposit(totalReceived);
+      setLastDepositInfo({
+        amount,
+        bonusAmount,
+        bonusLabel: selectedPreset.bonus,
+        totalReceived
+      });
       setIsProcessing(false);
       setIsSuccess(true);
       confetti({
-        particleCount: 70,
-        spread: 60,
+        particleCount: 80,
+        spread: 70,
         origin: { y: 0.6 }
       });
-      addToast(`Nạp thành công ${amount.toLocaleString('vi-VN')} đ vào ví!`, 'success');
+      const bonusText = bonusAmount > 0 ? ` (+${bonusAmount.toLocaleString('vi-VN')} đ thưởng)` : '';
+      addToast(`Nạp thành công! Đã cộng ${totalReceived.toLocaleString('vi-VN')} đ${bonusText} vào ví.`, 'success');
     } catch (err) {
       setIsProcessing(false);
       addToast(err.message || 'Nạp tiền thất bại, vui lòng thử lại', 'error');
@@ -45,6 +61,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
 
   const handleClose = () => {
     setIsSuccess(false);
+    setLastDepositInfo(null);
     onClose();
   };
 
@@ -64,7 +81,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
 
         {/* Body */}
         {isSuccess ? (
-          <div className="modal-body animate-fade-in" style={{ textAlign: 'center', padding: '36px 24px' }}>
+          <div className="modal-body animate-fade-in" style={{ textAlign: 'center', padding: '32px 24px' }}>
             <div style={{
               width: '68px',
               height: '68px',
@@ -79,21 +96,60 @@ export const DepositModal = ({ isOpen, onClose }) => {
             }}>
               <Check size={36} />
             </div>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '6px' }}>
               Nạp Tiền Thành Công!
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Số tiền <strong>+{amount.toLocaleString('vi-VN')} đ</strong> đã được cộng vào tài khoản của bạn.
+              Coin đã được nạp tự động vào ví PlayZone của bạn.
             </p>
+
+            {/* Detailed summary receipt */}
+            <div style={{
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              padding: '16px 18px',
+              marginBottom: '20px',
+              textAlign: 'left',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                <span>Mệnh giá nạp:</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{(lastDepositInfo?.amount || amount).toLocaleString('vi-VN')} đ</span>
+              </div>
+              {lastDepositInfo?.bonusAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--accent-pink)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Sparkles size={14} /> Thưởng khuyến mãi ({lastDepositInfo?.bonusLabel}):
+                  </span>
+                  <span style={{ fontWeight: 700 }}>+{lastDepositInfo?.bonusAmount.toLocaleString('vi-VN')} đ</span>
+                </div>
+              )}
+              <div style={{
+                borderTop: '1px dashed var(--border-color)',
+                paddingTop: '10px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '1rem',
+                fontWeight: 800
+              }}>
+                <span>Tổng coin thực nhận:</span>
+                <span style={{ color: 'var(--accent-green)' }}>+{(lastDepositInfo?.totalReceived || totalReceived).toLocaleString('vi-VN')} đ</span>
+              </div>
+            </div>
+
             <div style={{
               padding: '14px',
-              background: 'var(--bg-tertiary)',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
               borderRadius: 'var(--radius-md)',
               marginBottom: '24px',
               fontSize: '1rem',
               fontWeight: 700
             }}>
-              <span>Số dư ví hiện tại: </span>
+              <span style={{ color: 'var(--text-secondary)' }}>Số dư ví hiện tại: </span>
               <span className="gradient-text">{(user?.balance || 0).toLocaleString('vi-VN')} đ</span>
             </div>
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleClose}>
@@ -133,6 +189,44 @@ export const DepositModal = ({ isOpen, onClose }) => {
                     <span>{p.label}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Promotion / Total calculation preview */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(236, 72, 153, 0.08))',
+              border: '1px solid rgba(236, 72, 153, 0.3)',
+              borderRadius: 'var(--radius-md)',
+              padding: '14px 18px',
+              marginBottom: '20px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                <span>Mệnh giá thanh toán:</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{amount.toLocaleString('vi-VN')} đ</span>
+              </div>
+              {bonusAmount > 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--accent-pink)', marginBottom: '8px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Sparkles size={14} /> Thưởng thêm ({selectedPreset.bonus}):
+                  </span>
+                  <span style={{ fontWeight: 700 }}>+{bonusAmount.toLocaleString('vi-VN')} đ</span>
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  💡 <em>Chọn gói từ 100.000 đ để nhận thêm ưu đãi thưởng đến +20% coin</em>
+                </div>
+              )}
+              <div style={{
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                paddingTop: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>Thực nhận vào ví:</span>
+                <span style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--accent-green)' }}>
+                  +{totalReceived.toLocaleString('vi-VN')} đ
+                </span>
               </div>
             </div>
 
@@ -214,7 +308,13 @@ export const DepositModal = ({ isOpen, onClose }) => {
               onClick={handleDeposit}
             >
               <ShieldCheck size={18} />
-              <span>{isProcessing ? 'Đang Xử Lý...' : `Nạp ${amount.toLocaleString('vi-VN')} đ`}</span>
+              <span>
+                {isProcessing
+                  ? 'Đang Xử Lý...'
+                  : bonusAmount > 0
+                    ? `Nạp ${amount.toLocaleString('vi-VN')} đ (Nhận ${totalReceived.toLocaleString('vi-VN')} đ)`
+                    : `Nạp ${amount.toLocaleString('vi-VN')} đ`}
+              </span>
             </button>
           </div>
         )}
