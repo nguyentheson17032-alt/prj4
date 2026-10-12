@@ -8,7 +8,7 @@ import api from '../../api/apiService';
 import '../../styles/modals.css';
 
 export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
-  const { user, deductBalance } = useAuth();
+  const { user, deductBalance, refreshUser } = useAuth();
   const { addToast } = useToast();
   
   const [selectedGame, setSelectedGame] = useState(player?.games?.[0]?.name || player?.primaryGame || 'Liên Quân Mobile');
@@ -86,6 +86,9 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
 
       // Deduct balance locally after successful backend call
       deductBalance(finalTotal);
+      if (typeof refreshUser === 'function') {
+        refreshUser();
+      }
 
       setIsSuccess(true);
 

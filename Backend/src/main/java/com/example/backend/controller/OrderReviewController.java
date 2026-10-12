@@ -26,6 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.example.backend.service.GamePlayerService;
+import com.example.backend.entity.GamePlayer;
+
 @RestController
 @RequestMapping("/api/order-reviews")
 @Tag(name = "Order Review", description = "Order review management APIs")
@@ -35,15 +38,18 @@ public class OrderReviewController {
     private final OrderRepository orderRepository;
     private final UserService userService;
     private final NotificationService notificationService;
+    private final GamePlayerService gamePlayerService;
 
     public OrderReviewController(PlayerReviewRepository playerReviewRepository, 
                                OrderRepository orderRepository, 
                                UserService userService, 
-                               NotificationService notificationService) {
+                               NotificationService notificationService,
+                               GamePlayerService gamePlayerService) {
         this.playerReviewRepository = playerReviewRepository;
         this.orderRepository = orderRepository;
         this.userService = userService;
         this.notificationService = notificationService;
+        this.gamePlayerService = gamePlayerService;
     }
 
     @PostMapping("/{orderId}")
@@ -61,7 +67,7 @@ public class OrderReviewController {
             // Kiểm tra quyền đánh giá (chỉ người thuê mới được đánh giá)
             if (!order.getRenter().getId().equals(user.getId())) {
                 return ResponseEntity.status(403)
-                    .body(new ApiResponse<>(false, "Bạn không có quyền đánh giá đơn hàng này", null));
+                    .body(new ApiResponse<>(false, "Chỉ người thuê mới có quyền đánh giá đơn hàng này", null));
             }
 
             // Kiểm tra trạng thái đơn hàng
@@ -86,6 +92,16 @@ public class OrderReviewController {
             review.setCreatedAt(LocalDateTime.now());
             
             PlayerReview savedReview = playerReviewRepository.save(review);
+
+            // Cập nhật rating vào GamePlayer
+            if (order.getPlayer() != null) {
+                GamePlayer gp = order.getPlayer();
+                Double avg = playerReviewRepository.getAverageRatingByGamePlayerId(gp.getId());
+                if (avg != null) {
+                    gp.setRating(Math.round(avg * 10.0) / 10.0);
+                    gamePlayerService.save(gp);
+                }
+            }
 
             // Gửi thông báo cho player
             if (order.getPlayer() != null && order.getPlayer().getUser() != null) {
@@ -218,16 +234,42 @@ public class OrderReviewController {
                 reviewData.put("id", review.getId());
                 reviewData.put("rating", review.getRating());
                 reviewData.put("comment", review.getComment());
-                reviewData.put("reviewerName", review.getUser().getUsername());
-                reviewData.put("reviewerAvatar", review.getUser().getAvatarUrl());
-                reviewData.put("orderId", review.getOrder().getId());
-                reviewData.put("createdAt", review.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                String reviewerName = review.getUser() != null 
+                    ? (review.getUser().getFullName() != null && !review.getUser().getFullName().isEmpty() 
+                        ? review.getUser().getFullName() 
+                        : review.getUser().getUsername()) 
+                    : "Khách hàng";
+                String reviewerAvatar = review.getUser() != null ? review.getUser().getAvatarUrl() : null;
+                reviewData.put("reviewerName", reviewerName);
+                reviewData.put("reviewerAvatar", reviewerAvatar);
+
+                Map<String, Object> userMap = new HashMap<>();
+                userMap.put("name", reviewerName);
+                userMap.put("avatar", reviewerAvatar);
+                reviewData.put("user", userMap);
+
+                reviewData.put("orderId", review.getOrder() != null ? review.getOrder().getId() : null);
+                reviewData.put("createdAt", review.getCreatedAt() != null ? review.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "");
+
+                if (review.getOrder() != null) {
+                    reviewData.put("gameName", review.getOrder().getPlayer() != null && review.getOrder().getPlayer().getGame() != null ? review.getOrder().getPlayer().getGame().getName() : "Game Duo");
+                    if (review.getOrder().getStartTime() != null && review.getOrder().getEndTime() != null) {
+                        long hours = java.time.Duration.between(review.getOrder().getStartTime(), review.getOrder().getEndTime()).toHours();
+                        reviewData.put("hours", Math.max(1, hours));
+                    } else {
+                        reviewData.put("hours", 1);
+                    }
+                } else {
+                    reviewData.put("gameName", "Game Duo");
+                    reviewData.put("hours", 1);
+                }
+
                 return reviewData;
             }).collect(Collectors.toList());
 
             Map<String, Object> response = new HashMap<>();
             response.put("reviews", reviewList);
-            response.put("averageRating", averageRating != null ? averageRating : 0.0);
+            response.put("averageRating", averageRating != null ? Math.round(averageRating * 10.0) / 10.0 : 0.0);
             response.put("totalReviews", reviews.size());
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Lấy đánh giá player thành công", response));

@@ -1,16 +1,31 @@
 import React, { useState } from 'react';
 import { X, Star, Send } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/modals.css';
 
 export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
+  const { user } = useAuth();
   const { addToast } = useToast();
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [selectedTags, setSelectedTags] = useState(['Gánh team cực tốt', 'Giọng nói dễ thương']);
 
-  if (!isOpen || !order) return null;
+  const isCurrentRenter = Boolean(
+    order && (
+      (user?.id && (
+        String(user.id) === String(order.renterId) ||
+        String(user.id) === String(order.renter?.id)
+      )) ||
+      (user?.username && (
+        user.username.toLowerCase() === (order.renterName || '').toLowerCase() ||
+        user.username.toLowerCase() === (order.renter?.username || '').toLowerCase()
+      ))
+    )
+  );
+
+  if (!isOpen || !order || !isCurrentRenter) return null;
 
   const sampleTags = [
     'Gánh team cực tốt',
@@ -31,7 +46,6 @@ export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    addToast('Cảm ơn bạn đã gửi đánh giá cho Player!', 'success');
     if (onReviewed) onReviewed(order.id, rating, comment);
     onClose();
   };

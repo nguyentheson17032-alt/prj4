@@ -90,8 +90,40 @@ public class User {
     private Boolean isOnline = false;
 
     @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+    @PreUpdate
+    protected void onCreateOrUpdate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.coin == null) this.coin = 0L;
+        if (this.walletBalance == null || this.walletBalance.longValue() != this.coin) {
+            this.walletBalance = java.math.BigDecimal.valueOf(this.coin);
+        }
+    }
+
+    @PostLoad
+    protected void onPostLoad() {
+        if (this.coin == null) this.coin = 0L;
+        if (this.walletBalance == null) {
+            this.walletBalance = java.math.BigDecimal.valueOf(this.coin);
+        } else {
+            // If coin is 0 but walletBalance is positive (e.g. initial seeded accounts), adopt walletBalance
+            if (this.coin == 0L && this.walletBalance.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                this.coin = this.walletBalance.longValue();
+            } else {
+                this.walletBalance = java.math.BigDecimal.valueOf(this.coin);
+            }
+        }
+    }
+
+    public void setCoin(Long coin) {
+        this.coin = coin != null ? Math.max(0L, coin) : 0L;
+        this.walletBalance = java.math.BigDecimal.valueOf(this.coin);
+    }
+
+    public void setWalletBalance(java.math.BigDecimal walletBalance) {
+        this.walletBalance = walletBalance != null ? walletBalance : java.math.BigDecimal.ZERO;
+        this.coin = this.walletBalance.longValue();
     }
 
     public boolean isEnabled() {

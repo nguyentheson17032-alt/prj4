@@ -15,10 +15,16 @@ import api from '../api/apiService';
 import '../styles/wallet.css';
 
 export const WalletPage = ({ onOpenDeposit }) => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [filterType, setFilterType] = useState('ALL');
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (typeof refreshUser === 'function') {
+      refreshUser();
+    }
+  }, []);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -30,18 +36,90 @@ export const WalletPage = ({ onOpenDeposit }) => {
         ]);
 
         const list = [];
+        const currentUserId = user?.id ? String(user.id) : (localStorage.getItem('userId') || null);
+        const currentUsername = (user?.username || localStorage.getItem('username') || '').toLowerCase().trim();
 
         if (ordersData.status === 'fulfilled' && Array.isArray(ordersData.value)) {
           ordersData.value.forEach(o => {
-            list.push({
-              id: `ORD-${o.id}`,
-              type: 'PAYMENT',
-              amount: -(o.totalPrice || 0),
-              description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
-              date: o.createdAt || 'Hôm nay',
-              status: o.status || 'COMPLETED',
-              rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
-            });
+            const orderPlayerUserId = o.playerUserId || o.player?.userId || o.player?.user?.id;
+            const orderPlayerId = o.playerId || o.player?.id;
+            const orderPlayerName = (o.playerName || o.player?.username || o.player?.fullName || '').toLowerCase().trim();
+
+            const isPlayer = Boolean(
+              (currentUserId && (String(orderPlayerUserId) === currentUserId || String(orderPlayerId) === currentUserId)) ||
+              (currentUsername && orderPlayerName === currentUsername)
+            );
+
+            const orderRenterId = o.renterId || o.renter?.id;
+            const orderRenterName = (o.renterName || o.renter?.username || o.renter?.fullName || '').toLowerCase().trim();
+
+            const isRenter = Boolean(
+              (currentUserId && String(orderRenterId) === currentUserId) ||
+              (currentUsername && orderRenterName === currentUsername)
+            );
+
+            // Nếu là người được thuê (Player/Idol)
+            if (isPlayer && !isRenter) {
+              let earnedAmount = Math.round((o.totalPrice || 0) * 0.9);
+              if (o.status === 'CONFIRMED') {
+                earnedAmount = Math.round((o.totalPrice || 0) * 0.5);
+              } else if (o.status === 'CANCELED' || o.status === 'REJECTED') {
+                earnedAmount = 0;
+              }
+
+              list.push({
+                id: `ORD-${o.id}`,
+                type: 'RECEIVE',
+                amount: +earnedAmount,
+                description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)`,
+                date: o.createdAt || 'Hôm nay',
+                status: o.status || 'COMPLETED',
+                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+              });
+            } else if (isRenter && !isPlayer) {
+              // Nếu là người thuê (Renter)
+              list.push({
+                id: `ORD-${o.id}`,
+                type: 'PAYMENT',
+                amount: -(o.totalPrice || 0),
+                description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
+                date: o.createdAt || 'Hôm nay',
+                status: o.status || 'COMPLETED',
+                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+              });
+            } else if (isPlayer && isRenter) {
+              // Trường hợp tự thuê bản thân trong thử nghiệm
+              let earnedAmount = Math.round((o.totalPrice || 0) * 0.9);
+              list.push({
+                id: `ORD-${o.id}-IN`,
+                type: 'RECEIVE',
+                amount: +earnedAmount,
+                description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)`,
+                date: o.createdAt || 'Hôm nay',
+                status: o.status || 'COMPLETED',
+                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+              });
+              list.push({
+                id: `ORD-${o.id}-OUT`,
+                type: 'PAYMENT',
+                amount: -(o.totalPrice || 0),
+                description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
+                date: o.createdAt || 'Hôm nay',
+                status: o.status || 'COMPLETED',
+                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+              });
+            } else {
+              // Mặc định
+              list.push({
+                id: `ORD-${o.id}`,
+                type: 'PAYMENT',
+                amount: -(o.totalPrice || 0),
+                description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
+                date: o.createdAt || 'Hôm nay',
+                status: o.status || 'COMPLETED',
+                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+              });
+            }
           });
         }
 
@@ -68,7 +146,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
       }
     };
     fetchTransactions();
-  }, []);
+  }, [user?.id, user?.username]);
 
   const filteredTransactions = transactions.filter(t => {
     if (filterType === 'ALL') return true;
@@ -152,6 +230,13 @@ export const WalletPage = ({ onOpenDeposit }) => {
               >
                 Thuê Player
               </button>
+              <button
+                className={`order-tab-btn ${filterType === 'RECEIVE' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                onClick={() => setFilterType('RECEIVE')}
+              >
+                Nhận Tiền Thuê
+              </button>
             </div>
           </div>
 
@@ -175,6 +260,11 @@ export const WalletPage = ({ onOpenDeposit }) => {
                       <td>
                         {tx.type === 'DEPOSIT' && <span className="badge badge-online">+ Nạp Tiền</span>}
                         {tx.type === 'PAYMENT' && <span className="badge badge-primary">- Thuê Duo</span>}
+                        {tx.type === 'RECEIVE' && (
+                          <span className="badge badge-online" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                            + Nhận Tiền Thuê
+                          </span>
+                        )}
                         {tx.type === 'DONATE' && <span className="badge badge-vip">🎁 Tặng Quà</span>}
                         {tx.type === 'REFUND' && <span className="badge badge-online">↺ Hoàn Tiền</span>}
                       </td>
@@ -187,7 +277,17 @@ export const WalletPage = ({ onOpenDeposit }) => {
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{tx.date}</td>
                       <td>
-                        <span className="badge badge-online">Thành Công</span>
+                        {tx.status === 'COMPLETED' ? (
+                          <span className="badge badge-online">Thành Công</span>
+                        ) : tx.status === 'CONFIRMED' ? (
+                          <span className="badge badge-primary">Đã Xác Nhận</span>
+                        ) : tx.status === 'PENDING' ? (
+                          <span className="badge badge-warning" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>Chờ Xử Lý</span>
+                        ) : tx.status === 'CANCELED' || tx.status === 'REJECTED' ? (
+                          <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>Đã Hủy</span>
+                        ) : (
+                          <span className="badge badge-online">{tx.status}</span>
+                        )}
                       </td>
                     </tr>
                   ))

@@ -338,15 +338,28 @@ export const api = {
   },
 
   // Orders
-  async getOrders() {
+  async getOrders(params = {}) {
     try {
-      const res = await client.get('/api/orders');
+      const res = await client.get('/api/orders', { params });
       let rawList = [];
       if (Array.isArray(res.data)) rawList = res.data;
       else if (res.data && Array.isArray(res.data.data)) rawList = res.data.data;
       return rawList.map(normalizeOrder).filter(Boolean);
     } catch (e) {
       console.warn('Backend getOrders error:', e.message);
+      return [];
+    }
+  },
+
+  async getAllOrdersAdmin() {
+    try {
+      const res = await client.get('/api/orders', { params: { all: true } });
+      let rawList = [];
+      if (Array.isArray(res.data)) rawList = res.data;
+      else if (res.data && Array.isArray(res.data.data)) rawList = res.data.data;
+      return rawList.map(normalizeOrder).filter(Boolean);
+    } catch (e) {
+      console.warn('Backend getAllOrdersAdmin error:', e.message);
       return [];
     }
   },
@@ -410,16 +423,38 @@ export const api = {
     }
   },
 
+  async getPlayerStats(gamePlayerId) {
+    try {
+      const res = await client.get(`/api/game-players/${gamePlayerId}/stats`);
+      return res.data?.data || res.data || null;
+    } catch (e) {
+      console.warn('getPlayerStats error:', e.message);
+      return null;
+    }
+  },
+
+  async updatePlayerPrice(gamePlayerId, pricePerHour) {
+    const res = await client.patch(`/api/game-players/${gamePlayerId}/price`, { pricePerHour });
+    return res.data;
+  },
+
   // Reviews
   async getReviewsByPlayerId(playerId) {
     try {
-      const res = await client.get(`/api/reviews/player/${playerId}`);
-      if (Array.isArray(res.data)) return res.data;
-      if (res.data && Array.isArray(res.data.data)) return res.data.data;
-      return [];
+      const res = await client.get(`/api/order-reviews/player/${playerId}`);
+      const data = res.data?.data || res.data;
+      if (data && Array.isArray(data.reviews)) return data.reviews;
+      if (Array.isArray(data)) return data;
     } catch (e) {
-      return [];
+      console.warn('Backend getReviewsByPlayerId error:', e.message);
     }
+    try {
+      const res2 = await client.get(`/api/reviews/player/${playerId}`);
+      const data2 = res2.data?.data || res2.data;
+      if (data2 && Array.isArray(data2.reviews)) return data2.reviews;
+      if (Array.isArray(data2)) return data2;
+    } catch (e2) {}
+    return [];
   },
 
   // Users & Admin Management

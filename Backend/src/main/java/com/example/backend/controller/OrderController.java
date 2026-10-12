@@ -162,19 +162,25 @@ public class OrderController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<OrderResponseDTO>> getAllOrders(Authentication authentication) {
+    public ResponseEntity<List<OrderResponseDTO>> getAllOrders(
+            @RequestParam(required = false, defaultValue = "false") boolean all,
+            Authentication authentication) {
         User currentUser = null;
         if (authentication != null) {
             currentUser = userService.findByUsername(authentication.getName());
         }
 
+        boolean isAdmin = currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+
         List<Order> orders;
-        if (currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN")) {
+        if (all && isAdmin) {
+            // Xem toàn bộ đơn trong hệ thống (dành cho PlayZone Admin)
             orders = orderRepository.findAll();
         } else if (currentUser != null) {
+            // Xem đơn của chính người dùng (người thuê hoặc Idol được thuê)
             orders = orderRepository.findAllByUserId(currentUser.getId());
         } else {
-            orders = orderRepository.findAll();
+            orders = new ArrayList<>();
         }
 
         orders.sort((o1, o2) -> {
@@ -184,6 +190,19 @@ public class OrderController {
             return Long.compare(o2.getId(), o1.getId());
         });
 
+        return ResponseEntity.ok(mapOrdersToDTO(orders));
+    }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<OrderResponseDTO>> getAllOrdersAdmin() {
+        List<Order> orders = orderRepository.findAll();
+        orders.sort((o1, o2) -> {
+            if (o1.getStartTime() != null && o2.getStartTime() != null) {
+                return o2.getStartTime().compareTo(o1.getStartTime());
+            }
+            return Long.compare(o2.getId(), o1.getId());
+        });
         return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
@@ -636,6 +655,18 @@ public class OrderController {
         dto.setPrice(order.getPrice());
         dto.setStartTime(order.getStartTime());
         dto.setEndTime(order.getEndTime());
+
+        if (playerReviewRepository != null && order.getId() != null) {
+            com.example.backend.entity.PlayerReview rev = playerReviewRepository.findByOrderId(order.getId());
+            if (rev != null) {
+                dto.setIsReviewed(true);
+                dto.setReviewRating(rev.getRating() != null ? rev.getRating().doubleValue() : null);
+                dto.setReviewComment(rev.getComment());
+            } else {
+                dto.setIsReviewed(false);
+            }
+        }
+
         return dto;
     }
 

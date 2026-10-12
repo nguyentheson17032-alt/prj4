@@ -39,6 +39,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT COALESCE(SUM(o.price), 0) FROM Order o WHERE o.player.id = :playerId AND o.status = 'COMPLETED'")
     long sumCompletedRevenueByPlayerId(@Param("playerId") Long playerId);
 
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.player.id = :playerId AND o.status = 'COMPLETED'")
+    long countCompletedOrdersByPlayerId(@Param("playerId") Long playerId);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.player.id = :playerId AND (o.status = 'CANCELED' OR o.status = 'REJECTED')")
+    long countCanceledOrdersByPlayerId(@Param("playerId") Long playerId);
+
     @Query("SELECT o FROM Order o WHERE o.player.id = :playerId AND (o.status = 'PENDING' OR o.status = 'CONFIRMED')")
     List<Order> findActiveOrdersByPlayerId(@Param("playerId") Long playerId);
 } 

@@ -189,12 +189,9 @@ public class PaymentController {
                 return ResponseEntity.badRequest().body("Số coin phải lớn hơn 0");
             }
 
-            // Cộng coin và walletBalance vào tài khoản
-            user.setCoin(user.getCoin() + request.getCoin());
-            if (user.getWalletBalance() == null) {
-                user.setWalletBalance(BigDecimal.ZERO);
-            }
-            user.setWalletBalance(user.getWalletBalance().add(BigDecimal.valueOf(request.getCoin())));
+            // Cộng coin vào tài khoản (setCoin tự động đồng bộ walletBalance)
+            long currentCoin = user.getCoin() != null ? user.getCoin() : 0L;
+            user.setCoin(currentCoin + request.getCoin());
             user = userService.save(user);
 
             // Tạo bản ghi thanh toán

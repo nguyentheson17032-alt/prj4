@@ -27,6 +27,9 @@ public class OrderResponseDTO {
     private String createdAt;
     private java.time.LocalDateTime startTime;
     private java.time.LocalDateTime endTime;
+    private Boolean isReviewed;
+    private Double reviewRating;
+    private String reviewComment;
 
     public OrderResponseDTO(Long id, String renterName, String playerName, String hireTime, String status, Long price) {
         this.id = id;

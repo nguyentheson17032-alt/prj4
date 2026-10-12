@@ -43,6 +43,7 @@ public class DataInitializer implements CommandLineRunner {
             admin.setPhoneNumber("0987654321");
             admin.setAddress("Hà Nội, Việt Nam");
             admin.setWalletBalance(new java.math.BigDecimal("99999999"));
+            admin.setCoin(99999999L);
             Set<String> roles = new HashSet<>();
             roles.add("ROLE_ADMIN");
             roles.add("ROLE_PLAYER");
@@ -71,6 +72,7 @@ public class DataInitializer implements CommandLineRunner {
             normalUser.setPhoneNumber("0912345678");
             normalUser.setAddress("Hồ Chí Minh, Việt Nam");
             normalUser.setWalletBalance(new java.math.BigDecimal("500000"));
+            normalUser.setCoin(500000L);
             Set<String> roles = new HashSet<>();
             roles.add("ROLE_USER");
             normalUser.setRoles(roles);

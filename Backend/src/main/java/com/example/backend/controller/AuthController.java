@@ -172,9 +172,11 @@ public class AuthController {
             response.put("username", user.getUsername());
             response.put("fullName", user.getFullName() != null ? user.getFullName() : user.getUsername());
             response.put("email", user.getEmail() != null ? user.getEmail() : "");
+            Long userBalance = user.getCoin() != null ? user.getCoin() : 0L;
             response.put("roles", user.getRoles());
-            response.put("coin", user.getCoin());
-            response.put("balance", user.getWalletBalance() != null ? user.getWalletBalance() : java.math.BigDecimal.ZERO);
+            response.put("coin", userBalance);
+            response.put("balance", userBalance);
+            response.put("walletBalance", userBalance);
             response.put("id", user.getId());
             response.put("avatar", avatar);
             response.put("avatarUrl", avatar);
@@ -235,13 +237,11 @@ public class AuthController {
             avatar = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + user.getUsername() + "&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf";
         }
 
-        java.math.BigDecimal balance = user.getWalletBalance();
-        if (balance == null || balance.compareTo(java.math.BigDecimal.ZERO) == 0) {
-            if (user.getCoin() != null && user.getCoin() > 0) {
-                balance = java.math.BigDecimal.valueOf(user.getCoin());
-            } else {
-                balance = java.math.BigDecimal.ZERO;
-            }
+        Long userBalance = user.getCoin() != null ? user.getCoin() : 0L;
+        // If out of sync with DB walletBalance, persist synced value
+        if (user.getWalletBalance() == null || user.getWalletBalance().longValue() != userBalance) {
+            user.setCoin(userBalance);
+            userService.save(user);
         }
 
         java.util.Map<String, Object> response = new java.util.HashMap<>();
@@ -254,9 +254,9 @@ public class AuthController {
         response.put("bio", user.getBio());
         response.put("gender", user.getGender());
         response.put("roles", user.getRoles());
-        response.put("coin", user.getCoin());
-        response.put("walletBalance", balance);
-        response.put("balance", balance);
+        response.put("coin", userBalance);
+        response.put("walletBalance", userBalance);
+        response.put("balance", userBalance);
         response.put("avatar", avatar);
         response.put("avatarUrl", avatar);
 

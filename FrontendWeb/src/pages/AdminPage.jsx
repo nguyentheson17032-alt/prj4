@@ -231,7 +231,7 @@ const UsersTab = ({ usersList, loading }) => {
                     </div>
                   </td>
                   <td style={{ padding: '14px', color: 'var(--text-muted)' }}>{u.email || '—'}</td>
-                  <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>{((u.walletBalance || u.coin || 0)).toLocaleString('vi-VN')} đ</td>
+                  <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>{((u.coin ?? u.walletBalance ?? u.balance ?? 0)).toLocaleString('vi-VN')} đ</td>
                   <td style={{ padding: '14px' }}>
                     <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: isAdmin ? 'rgba(244,63,94,0.15)' : isPlayer ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.08)', color: isAdmin ? '#f43f5e' : isPlayer ? '#06b6d4' : 'var(--text-muted)' }}>
                       {isAdmin ? '🛡️ Admin' : isPlayer ? '🎮 Game thủ' : '👤 Thành viên'}
@@ -863,7 +863,7 @@ export const AdminPage = () => {
     setLoading(true);
     try {
       const [usersR, playersR, ordersR, gamesR, reportsR] = await Promise.allSettled([
-        api.getUsers(), api.getPlayers(), api.getOrders(), api.getGames(), api.getReports()
+        api.getUsers(), api.getPlayers(), api.getAllOrdersAdmin(), api.getGames(), api.getReports()
       ]);
       if (usersR.status === 'fulfilled' && Array.isArray(usersR.value)) setUsersList(usersR.value);
       if (playersR.status === 'fulfilled' && Array.isArray(playersR.value)) setPlayersList(playersR.value);

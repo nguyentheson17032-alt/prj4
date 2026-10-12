@@ -6,10 +6,15 @@ const AuthContext = createContext(null);
 
 const normalizeUser = (userData) => {
   if (!userData) return null;
-  const bVal = Number(userData.balance) || 0;
-  const wbVal = Number(userData.walletBalance) || 0;
-  const cVal = Number(userData.coin) || 0;
-  const finalBalance = Math.max(bVal, wbVal, cVal);
+  let finalBalance = 0;
+  // Hệ thống dùng coin làm đơn vị tiền tệ thực tế cho mọi giao dịch (thuê, hoàn thành, nạp, donate)
+  if (userData.coin !== undefined && userData.coin !== null) {
+    finalBalance = Number(userData.coin);
+  } else if (userData.balance !== undefined && userData.balance !== null) {
+    finalBalance = Number(userData.balance);
+  } else if (userData.walletBalance !== undefined && userData.walletBalance !== null) {
+    finalBalance = Number(userData.walletBalance);
+  }
 
   return {
     ...userData,
@@ -24,6 +29,21 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('jwt_token') || null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = async () => {
+    try {
+      const freshUser = await api.getCurrentUser();
+      if (freshUser) {
+        const normalized = normalizeUser(freshUser);
+        setUser(normalized);
+        localStorage.setItem('current_user', JSON.stringify(normalized));
+        return normalized;
+      }
+    } catch (e) {
+      console.warn('Could not refresh user from server:', e.message);
+    }
+    return user;
+  };
 
   // Initialize user
   useEffect(() => {
@@ -47,12 +67,6 @@ export const AuthProvider = ({ children }) => {
             const freshUser = await api.getCurrentUser();
             if (freshUser) {
               const normalized = normalizeUser(freshUser);
-              // Bảo toàn số dư nếu local có số dư mới hơn backend chưa kịp cập nhật
-              if (localUser && localUser.balance > 0 && normalized.balance === 0) {
-                normalized.balance = localUser.balance;
-                normalized.walletBalance = localUser.balance;
-                normalized.coin = localUser.balance;
-              }
               setUser(normalized);
               localStorage.setItem('current_user', JSON.stringify(normalized));
             }
@@ -181,6 +195,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         deposit,
         deductBalance,
+        refreshUser,
         updateProfile
       }}
     >

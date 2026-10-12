@@ -19,6 +19,7 @@ import StatusBadge from '../components/common/StatusBadge';
 import AudioWave from '../components/common/AudioWave';
 import api from '../api/apiService';
 import { useToast } from '../context/ToastContext';
+import { getUserAvatar } from '../utils/avatarUtils';
 
 export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
   const { id } = useParams();
@@ -39,8 +40,21 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
         api.getPlayerById(id),
         api.getReviewsByPlayerId(id)
       ]);
-      setPlayer(pData);
-      setReviews(rData || []);
+      const reviewList = Array.isArray(rData) ? rData : [];
+      let finalRating = pData?.rating || 0;
+      if (!finalRating && reviewList.length > 0) {
+        const sum = reviewList.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
+        finalRating = Math.round((sum / reviewList.length) * 10) / 10;
+      }
+      const finalReviewCount = Math.max(pData?.reviewCount || 0, reviewList.length);
+      if (pData) {
+        setPlayer({
+          ...pData,
+          rating: finalRating,
+          reviewCount: finalReviewCount
+        });
+      }
+      setReviews(reviewList);
       setLoading(false);
     };
     fetchDetail();
@@ -163,12 +177,18 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   )}
                   <StatusBadge status={player.status} />
                 </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span>@{player.username}</span>
                   <span>•</span>
                   <span>Server: {player.server || 'VN'}</span>
                   <span>•</span>
                   <span>Đơn hoàn tất: <strong style={{ color: 'var(--accent-green)' }}>{player.orderCount || 0} đơn</strong></span>
+                  <span>•</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontWeight: 700 }}>
+                    <Star size={16} fill="#f59e0b" color="#f59e0b" />
+                    <span>{player.rating > 0 ? Number(player.rating).toFixed(1) : (reviews.length > 0 ? '5.0' : 'Chưa có')}</span>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({reviews.length || player.reviewCount || 0} đánh giá)</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -260,7 +280,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               style={{ fontSize: '1rem', padding: '10px 18px' }}
               onClick={() => setActiveTab('REVIEWS')}
             >
-              ⭐ Đánh Giá ({player.reviewCount || reviews.length})
+              ⭐ Đánh Giá ({reviews.length || player.reviewCount || 0})
             </button>
           </div>
 
@@ -421,27 +441,33 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
 
               {/* Reviews List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {reviews.map((rev) => (
-                  <div key={rev.id} className="glass-panel" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <img src={rev.user?.avatar} alt={rev.user?.name} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{rev.user?.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{rev.createdAt} • Đã thuê {rev.hours}h ({rev.gameName})</div>
+                {reviews.map((rev) => {
+                  const revName = rev.user?.name || rev.reviewerName || 'Khách Hàng';
+                  const revAvatar = rev.user?.avatar || rev.reviewerAvatar || getUserAvatar({ username: revName });
+                  return (
+                    <div key={rev.id} className="glass-panel" style={{ padding: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <img src={revAvatar} alt={revName} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{revName}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {rev.createdAt} • Đã thuê {rev.hours || 1}h ({rev.gameName || player.primaryGame || 'Game Duo'})
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '2px' }}>
+                          {[...Array(Math.round(rev.rating || 5))].map((_, i) => (
+                            <Star key={i} size={14} fill="#f59e0b" color="#f59e0b" />
+                          ))}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        {[...Array(rev.rating || 5)].map((_, i) => (
-                          <Star key={i} size={14} fill="#f59e0b" color="#f59e0b" />
-                        ))}
-                      </div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                        "{rev.comment}"
+                      </p>
                     </div>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                      "{rev.comment}"
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

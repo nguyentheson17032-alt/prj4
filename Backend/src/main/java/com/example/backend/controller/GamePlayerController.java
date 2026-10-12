@@ -259,9 +259,13 @@ public class GamePlayerController {
 
     @GetMapping("/user/{userId}")
     @Operation(summary = "Get game players by user")
-    public ResponseEntity<ApiResponse<List<GamePlayer>>> getGamePlayersByUser(@PathVariable Long userId) {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getGamePlayersByUser(@PathVariable Long userId) {
         List<GamePlayer> gamePlayers = gamePlayerService.getGamePlayersByUser(userId);
-        return ResponseEntity.ok(new ApiResponse<>(true, "Game players retrieved successfully", gamePlayers));
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (GamePlayer gp : gamePlayers) {
+            result.add(enrichGamePlayerData(gp));
+        }
+        return ResponseEntity.ok(new ApiResponse<>(true, "Game players retrieved successfully", result));
     }
 
     @GetMapping("/status/{status}")
@@ -294,9 +298,13 @@ public class GamePlayerController {
 
     @GetMapping("/available")
     @Operation(summary = "Get available game players")
-    public ResponseEntity<ApiResponse<List<GamePlayer>>> getAvailableGamePlayers() {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAvailableGamePlayers() {
         List<GamePlayer> gamePlayers = gamePlayerService.getAvailableGamePlayers();
-        return ResponseEntity.ok(new ApiResponse<>(true, "Available game players retrieved successfully", gamePlayers));
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (GamePlayer gp : gamePlayers) {
+            result.add(enrichGamePlayerData(gp));
+        }
+        return ResponseEntity.ok(new ApiResponse<>(true, "Available game players retrieved successfully", result));
     }
 
     @PostMapping("/{id}/hire")
@@ -518,10 +526,94 @@ public class GamePlayerController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Game player stats updated successfully", gamePlayer));
     }
 
+    public Map<String, Object> enrichGamePlayerData(GamePlayer gp) {
+        Map<String, Object> map = new HashMap<>();
+        if (gp == null) return map;
+
+        long completedOrders = orderRepository.countCompletedOrdersByPlayerId(gp.getId());
+        Double avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gp.getId());
+        if (avgRating == null && gp.getUser() != null) {
+            avgRating = playerReviewRepository.getAverageRatingByPlayerId(gp.getUser().getId());
+        }
+        int reviewCount = playerReviewRepository.findByGamePlayerId(gp.getId()).size();
+
+        // Đồng bộ ngược lại DB nếu có sai lệch
+        boolean dirty = false;
+        if (gp.getTotalGames() == null || gp.getTotalGames() != (int) completedOrders) {
+            gp.setTotalGames((int) completedOrders);
+            dirty = true;
+        }
+        if (avgRating != null) {
+            Double rounded = Math.round(avgRating * 10.0) / 10.0;
+            if (gp.getRating() == null || !gp.getRating().equals(rounded)) {
+                gp.setRating(rounded);
+                dirty = true;
+            }
+        }
+        if (dirty) {
+            gamePlayerService.save(gp);
+        }
+
+        map.put("id", gp.getId());
+        map.put("username", gp.getUsername());
+        map.put("game", gp.getGame());
+        map.put("rank", gp.getRank());
+        map.put("role", gp.getRole());
+        map.put("server", gp.getServer());
+        map.put("pricePerHour", gp.getPricePerHour());
+        map.put("status", gp.getStatus());
+        map.put("description", gp.getDescription());
+        map.put("rating", gp.getRating() != null ? gp.getRating() : (avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0));
+        map.put("totalGames", gp.getTotalGames() != null ? gp.getTotalGames() : (int) completedOrders);
+        map.put("orderCount", (int) completedOrders);
+        map.put("totalOrders", (int) completedOrders);
+        map.put("reviewCount", reviewCount);
+        map.put("totalReviews", reviewCount);
+        map.put("winRate", gp.getWinRate());
+        map.put("hiredBy", gp.getHiredBy());
+        map.put("user", gp.getUser());
+        map.put("hireDate", gp.getHireDate());
+        map.put("returnDate", gp.getReturnDate());
+        map.put("hoursHired", gp.getHoursHired());
+        map.put("totalMinutesHired", gp.getTotalMinutesHired());
+        map.put("lastRewardMilestone", gp.getLastRewardMilestone());
+        map.put("createdAt", gp.getCreatedAt());
+
+        // Tính tổng giờ chơi đã được thuê dựa trên số đơn đã hoàn thành
+        List<Order> completedOrderList = orderRepository.findByPlayer_IdAndStatus(gp.getId(), "COMPLETED");
+        long totalHours = completedOrderList.stream()
+            .mapToLong(o -> {
+                if (o.getStartTime() != null && o.getEndTime() != null) {
+                    long h = java.time.Duration.between(o.getStartTime(), o.getEndTime()).toHours();
+                    if (h > 0) return h;
+                }
+                if (o.getPrice() != null && gp.getPricePerHour() != null && gp.getPricePerHour().compareTo(BigDecimal.ZERO) > 0) {
+                    long h = Math.round((double) o.getPrice() / gp.getPricePerHour().doubleValue());
+                    if (h > 0) return h;
+                }
+                return 1L;
+            })
+            .sum();
+        map.put("totalHours", totalHours);
+
+        return map;
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get game player by ID")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getGamePlayerById(@PathVariable Long id) {
+        GamePlayer gamePlayer = gamePlayerService.findById(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Game player retrieved successfully", enrichGamePlayerData(gamePlayer)));
+    }
+
     @GetMapping
-    public ResponseEntity<ApiResponse<List<GamePlayer>>> getAllGamePlayers() {
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllGamePlayers() {
         List<GamePlayer> gamePlayers = gamePlayerService.getAllGamePlayers();
-        return ResponseEntity.ok(new ApiResponse<>(true, "All game players retrieved successfully", gamePlayers));
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (GamePlayer gp : gamePlayers) {
+            result.add(enrichGamePlayerData(gp));
+        }
+        return ResponseEntity.ok(new ApiResponse<>(true, "All game players retrieved successfully", result));
     }
 
     @GetMapping("/{playerId}/status")
@@ -936,6 +1028,11 @@ public class GamePlayerController {
             gamePlayer.setHireDate(null);
             gamePlayer.setReturnDate(null);
             gamePlayer.setHoursHired(null);
+            
+            // Cập nhật số đơn hoàn tất cho player
+            long completedOrders = orderRepository.countCompletedOrdersByPlayerId(gamePlayer.getId());
+            gamePlayer.setTotalGames((int) completedOrders);
+
             gamePlayerService.save(gamePlayer);
 
             // Gửi notification cho user và player
@@ -990,7 +1087,7 @@ public class GamePlayerController {
             // Kiểm tra user là người thuê
             if (!order.getRenter().getId().equals(user.getId())) {
                 return ResponseEntity.status(403)
-                    .body(new ApiResponse<>(false, "Không có quyền đánh giá đơn này", null));
+                    .body(new ApiResponse<>(false, "Chỉ người thuê mới có quyền đánh giá đơn này", null));
             }
 
             // Kiểm tra đã đánh giá chưa
@@ -1007,6 +1104,13 @@ public class GamePlayerController {
             review.setComment(request.getComment());
             review.setCreatedAt(java.time.LocalDateTime.now());
             playerReviewRepository.save(review);
+
+            // Cập nhật rating trung bình cho player
+            Double avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gamePlayer.getId());
+            if (avgRating != null) {
+                gamePlayer.setRating(Math.round(avgRating * 10.0) / 10.0);
+                gamePlayerService.save(gamePlayer);
+            }
 
             // Gửi notification cho player
             notificationService.createNotification(
@@ -1133,6 +1237,77 @@ public class GamePlayerController {
             log.error("Error unbanning player: {}", e.getMessage());
             return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Error unbanning player: " + e.getMessage(), null));
         }
+    }
+
+    @GetMapping("/{id}/stats")
+    @Operation(summary = "Get player stats for profile page")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPlayerStats(@PathVariable Long id) {
+        GamePlayer gp = gamePlayerService.findById(id);
+        long completedOrders = orderRepository.countCompletedOrdersByPlayerId(gp.getId());
+        long canceledOrders = orderRepository.countCanceledOrdersByPlayerId(gp.getId());
+        Double avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gp.getId());
+        int reviewCount = playerReviewRepository.findByGamePlayerId(gp.getId()).size();
+
+        // Tính tổng giờ chơi đã được thuê dựa trên số đơn đã hoàn thành
+        List<Order> completedOrderList = orderRepository.findByPlayer_IdAndStatus(gp.getId(), "COMPLETED");
+        long totalHours = completedOrderList.stream()
+            .mapToLong(o -> {
+                if (o.getStartTime() != null && o.getEndTime() != null) {
+                    long h = java.time.Duration.between(o.getStartTime(), o.getEndTime()).toHours();
+                    if (h > 0) return h;
+                }
+                if (o.getPrice() != null && gp.getPricePerHour() != null && gp.getPricePerHour().compareTo(BigDecimal.ZERO) > 0) {
+                    long h = Math.round((double) o.getPrice() / gp.getPricePerHour().doubleValue());
+                    if (h > 0) return h;
+                }
+                return 1L;
+            })
+            .sum();
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("id", gp.getId());
+        stats.put("username", gp.getUsername());
+        stats.put("pricePerHour", gp.getPricePerHour());
+        stats.put("rating", avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : (gp.getRating() != null ? gp.getRating() : 0.0));
+        stats.put("reviewCount", reviewCount);
+        stats.put("completedOrders", completedOrders);
+        stats.put("canceledOrders", canceledOrders);
+        stats.put("totalHours", totalHours);
+        stats.put("status", gp.getStatus());
+        stats.put("rank", gp.getRank());
+        stats.put("game", gp.getGame() != null ? gp.getGame().getName() : "");
+        stats.put("description", gp.getDescription());
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Player stats retrieved successfully", stats));
+    }
+
+    @Data
+    public static class UpdatePriceRequest {
+        @NotNull(message = "Price per hour is required")
+        @DecimalMin(value = "0.0", message = "Price must be greater than 0")
+        private BigDecimal pricePerHour;
+    }
+
+    @PatchMapping("/{id}/price")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Update player price per hour")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updatePlayerPrice(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdatePriceRequest request,
+            Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        GamePlayer gp = gamePlayerService.findById(id);
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        if (!isAdmin && !gp.getUser().getId().equals(currentUser.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponse<>(false, "Bạn không có quyền cập nhật giá này", null));
+        }
+        gp.setPricePerHour(request.getPricePerHour());
+        gamePlayerService.save(gp);
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", gp.getId());
+        result.put("pricePerHour", gp.getPricePerHour());
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cập nhật giá thành công", result));
     }
 
     @GetMapping("/summary")

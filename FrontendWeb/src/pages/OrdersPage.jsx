@@ -159,13 +159,42 @@ export const OrdersPage = () => {
   const handleReviewed = async (orderId, rating, comment) => {
     try {
       await api.reviewOrder(orderId, rating, comment);
+      addToast('Cảm ơn bạn đã gửi đánh giá cho Player!', 'success');
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, isReviewed: true, reviewRating: rating } : o));
     } catch (e) {
       console.warn('Backend review order warning:', e.message);
+      const errMsg = e.response?.data?.message || e.message || 'Lỗi khi gửi đánh giá!';
+      addToast(typeof errMsg === 'string' ? errMsg : 'Lỗi khi gửi đánh giá!', 'error');
     }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, isReviewed: true, reviewRating: rating } : o));
   };
 
   const filteredOrders = orders.filter(o => {
+    // Chỉ hiển thị đơn thuộc về chính người dùng (người thuê hoặc người được thuê)
+    const isRenter = Boolean(
+      (user?.id && (
+        String(user.id) === String(o.renterId) ||
+        String(user.id) === String(o.renter?.id)
+      )) ||
+      (user?.username && (
+        user.username.toLowerCase() === (o.renterName || '').toLowerCase() ||
+        user.username.toLowerCase() === (o.renter?.username || '').toLowerCase()
+      ))
+    );
+
+    const isPlayer = Boolean(
+      (user?.id && (
+        String(user.id) === String(o.playerUserId) ||
+        String(user.id) === String(o.player?.userId) ||
+        String(user.id) === String(o.player?.user?.id)
+      )) ||
+      (user?.username && (
+        user.username.toLowerCase() === (o.playerName || '').toLowerCase() ||
+        user.username.toLowerCase() === (o.player?.username || '').toLowerCase()
+      ))
+    );
+
+    if (!isRenter && !isPlayer) return false;
+
     const s = o.status?.toUpperCase();
     if (activeFilter === 'ALL') return true;
     if (activeFilter === 'IN_PROGRESS') return s === 'IN_PROGRESS' || s === 'PENDING' || s === 'CONFIRMED';
@@ -262,8 +291,18 @@ export const OrdersPage = () => {
               ))
             );
 
-            // Nếu không phải người đi thuê thì là Idol / Player (người được thuê)
-            const isCurrentPlayer = !isCurrentRenter;
+            // Kiểm tra xem người dùng hiện tại có phải là người được thuê (Player/Idol) của đơn này hay không
+            const isCurrentPlayer = Boolean(
+              (user?.id && (
+                String(user.id) === String(order.playerUserId) ||
+                String(user.id) === String(order.player?.userId) ||
+                String(user.id) === String(order.player?.user?.id)
+              )) ||
+              (user?.username && (
+                user.username.toLowerCase() === (order.playerName || '').toLowerCase() ||
+                user.username.toLowerCase() === (order.player?.username || '').toLowerCase()
+              ))
+            );
 
             const displayName = order.player?.fullName || order.playerName || 'Idol PlayZone';
             const displayAvatar = order.player?.avatar || order.playerAvatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${displayName}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
@@ -437,21 +476,36 @@ export const OrdersPage = () => {
                         })()
                       )}
 
-                      {/* Trạng thái COMPLETED: Có nút Đánh Giá */}
+                      {/* Trạng thái COMPLETED: Chỉ người thuê mới được đánh giá */}
                       {statusUpper === 'COMPLETED' && (
-                        order.isReviewed ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.88rem', fontWeight: 700 }}>
-                            <Star size={16} fill="#f59e0b" color="#f59e0b" />
-                            <span>Đã Đánh Giá {order.reviewRating || 5} ⭐</span>
-                          </div>
+                        isCurrentRenter ? (
+                          order.isReviewed ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.88rem', fontWeight: 700 }}>
+                              <Star size={16} fill="#f59e0b" color="#f59e0b" />
+                              <span>Đã Đánh Giá {order.reviewRating || 5} ⭐</span>
+                            </div>
+                          ) : (
+                            <button
+                              className="btn btn-cyan btn-sm"
+                              onClick={() => setSelectedOrderForReview(order)}
+                              title="Chỉ người thuê mới được đánh giá dịch vụ"
+                            >
+                              <Star size={16} />
+                              <span>Đánh Giá Player</span>
+                            </button>
+                          )
                         ) : (
-                          <button
-                            className="btn btn-cyan btn-sm"
-                            onClick={() => setSelectedOrderForReview(order)}
-                          >
-                            <Star size={16} />
-                            <span>Đánh Giá Player</span>
-                          </button>
+                          // Người được thuê (Idol / Player) chỉ xem kết quả đánh giá từ khách
+                          order.isReviewed ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.85rem', fontWeight: 600 }}>
+                              <Star size={15} fill="#f59e0b" color="#f59e0b" />
+                              <span>Khách đã đánh giá {order.reviewRating || 5} ⭐</span>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontStyle: 'italic' }}>
+                              Chờ khách đánh giá
+                            </span>
+                          )
                         )
                       )}
                     </div>
