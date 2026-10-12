@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -38,6 +39,7 @@ public class DataInitializer implements CommandLineRunner {
     private GameStatusRepository gameStatusRepository;
 
     @Override
+    @Transactional
     public void run(String... args) {
         // Khởi tạo hoặc cập nhật tài khoản admin
         User admin = userRepository.findByUsername("admin").orElse(null);

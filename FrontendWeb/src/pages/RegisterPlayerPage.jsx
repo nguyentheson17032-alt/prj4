@@ -40,9 +40,10 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   const [gender, setGender] = useState(user?.gender || 'FEMALE');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || user?.phone || '');
   const [bio, setBio] = useState(user?.bio || 'Mình rất vui vẻ, nhiệt tình và thích leo rank cùng anh em!');
-  const [rank, setRank] = useState('Cao Thủ');
-  const [role, setRole] = useState('Xạ Thủ / AD');
-  const [server, setServer] = useState('VN');
+  const [rankMin, setRankMin] = useState('Cao Thủ');
+  const [rankMax, setRankMax] = useState('Cao Thủ');
+  const [roles, setRoles] = useState([]);
+  const [servers, setServers] = useState(['VN']);
   const [pricePerHour, setPricePerHour] = useState(50000);
   const [voiceUrl, setVoiceUrl] = useState('https://actions.google.com/sounds/v1/water/rain_heavy.ogg');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
@@ -101,6 +102,14 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
           setGames(list);
           setSelectedGameId(list[0].id);
           setSelectedGame(list[0]);
+          const firstRank = list[0].availableRanks?.[0] || '';
+          setRankMin(firstRank);
+          setRankMax(firstRank);
+          if (list[0].availableRoles?.length > 0) {
+            setRoles([list[0].availableRoles[0]]);
+          } else {
+            setRoles([]);
+          }
         } else {
           setGames([]);
           setSelectedGameId(null);
@@ -123,14 +132,16 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
     const found = games.find((g) => g.id === id);
     setSelectedGame(found || null);
     if (found?.availableRanks && found.availableRanks.length > 0) {
-      setRank(found.availableRanks[0]);
+      setRankMin(found.availableRanks[0]);
+      setRankMax(found.availableRanks[0]);
     } else {
-      setRank('');
+      setRankMin('');
+      setRankMax('');
     }
     if (found?.availableRoles && found.availableRoles.length > 0) {
-      setRole(found.availableRoles[0]);
+      setRoles([found.availableRoles[0]]);
     } else {
-      setRole('Không có');
+      setRoles([]);
     }
   };
 
@@ -147,7 +158,7 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       addToast('Chưa có game trong hệ thống. Admin cần thêm game trước.', 'error');
       return;
     }
-    if (!rank.trim()) {
+    if (!rankMin.trim()) {
       addToast('Vui lòng chọn hoặc nhập mức rank', 'warning');
       return;
     }
@@ -178,9 +189,15 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       userId: user?.id,
       gameId: selectedGameId || (games[0] ? games[0].id : 1),
       username: nickname.trim(),
-      rank: rank.trim() || 'Cao Thủ',
-      role: role ? role.trim() : 'ALL',
-      server: server.trim() || 'VN',
+      rank: (() => {
+        const rMin = rankMin.trim();
+        const rMax = rankMax.trim();
+        if (!rMin) return 'Cao Thủ';
+        if (!rMax || rMin === rMax) return rMin;
+        return `${rMin} - ${rMax}`;
+      })(),
+      role: roles.length > 0 ? roles.join(' / ') : 'Không có',
+      server: servers.length > 0 ? servers.join(' / ') : 'VN',
       pricePerHour: Number(pricePerHour) || 50000,
       description: bio.trim()
     };
@@ -207,13 +224,15 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
     } catch (err) {
       setIsSubmitting(false);
       const errMsg = err.response?.data?.message || err.response?.data || err.message || 'Đăng ký thất bại';
-      const isGameNotFound = typeof errMsg === 'string' && errMsg.toLowerCase().includes('game');
+      const errStr = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
+      console.error('[RegisterPlayer] payload:', payload, 'error:', err.response?.status, errMsg);
+      const isGameNotFound = err.response?.status === 404 && errStr.toLowerCase().includes('game');
       if (isGameNotFound) {
         setErrorMessage('Game được chọn chưa tồn tại trong hệ thống. Admin cần thêm game trước khi bạn có thể đăng ký.');
       } else {
-        setErrorMessage(typeof errMsg === 'string' ? errMsg : 'Có lỗi xảy ra khi gửi hồ sơ. Vui lòng thử lại.');
+        setErrorMessage(errStr || 'Có lỗi xảy ra khi gửi hồ sơ. Vui lòng thử lại.');
       }
-      addToast('Đăng ký thất bại: ' + (isGameNotFound ? 'Game chưa được thêm vào hệ thống.' : errMsg), 'error');
+      addToast('Đăng ký thất bại: ' + (isGameNotFound ? 'Game chưa được thêm vào hệ thống.' : errStr), 'error');
 
       // Nếu hệ thống báo tài khoản đã đăng ký rồi, đồng bộ lại hồ sơ ngay lập tức
       if (typeof errMsg === 'string' && (errMsg.includes('đăng ký') || errMsg.includes('Idol'))) {
@@ -685,42 +704,88 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Rank range */}
+            {selectedGame?.availableRanks && selectedGame.availableRanks.length > 0 ? (
               <div className="form-group">
-                <label className="form-label">Mức Rank / Cấp Độ Hiện Tại *:</label>
-                {selectedGame?.availableRanks && selectedGame.availableRanks.length > 0 ? (
+                <label className="form-label">Chấp Nhận Rank Từ - Đến *:</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
                   <select
                     className="form-control"
-                    value={rank}
-                    onChange={(e) => setRank(e.target.value)}
+                    value={rankMin}
+                    onChange={(e) => {
+                      const newMin = e.target.value;
+                      setRankMin(newMin);
+                      const ranks = selectedGame.availableRanks;
+                      const minIdx = ranks.indexOf(newMin);
+                      const maxIdx = ranks.indexOf(rankMax);
+                      if (maxIdx < minIdx) setRankMax(newMin);
+                    }}
                   >
                     {selectedGame.availableRanks.map((r) => (
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
-                ) : (
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Ví dụ: Cao Thủ 30 sao, Radiant..."
-                    value={rank}
-                    onChange={(e) => setRank(e.target.value)}
-                  />
-                )}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Vị Trí / Sở Trường (Role):</label>
-                {selectedGame?.availableRoles && selectedGame.availableRoles.length > 0 ? (
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>→</span>
                   <select
                     className="form-control"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
+                    value={rankMax}
+                    onChange={(e) => setRankMax(e.target.value)}
                   >
-                    {selectedGame.availableRoles.map((ro) => (
-                      <option key={ro} value={ro}>{ro}</option>
-                    ))}
+                    {selectedGame.availableRanks
+                      .slice(selectedGame.availableRanks.indexOf(rankMin))
+                      .map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
                   </select>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  {rankMin === rankMax ? `Hiển thị: ${rankMin}` : `Hiển thị: ${rankMin} - ${rankMax}`}
+                </span>
+              </div>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">Mức Rank / Cấp Độ *:</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Ví dụ: Cao Thủ 30 sao, Radiant..."
+                  value={rankMin}
+                  onChange={(e) => { setRankMin(e.target.value); setRankMax(e.target.value); }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Vị Trí / Role:</span>
+                  {selectedGame?.availableRoles && selectedGame.availableRoles.length > 0 && (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Giữ Ctrl/Shift</span>
+                  )}
+                </label>
+                {selectedGame?.availableRoles && selectedGame.availableRoles.length > 0 ? (
+                  <>
+                    <select
+                      className="form-control"
+                      multiple
+                      size={Math.min(selectedGame.availableRoles.length, 5)}
+                      value={roles}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                        setRoles(selected);
+                      }}
+                      style={{ height: 'auto' }}
+                    >
+                      {selectedGame.availableRoles.map((ro) => (
+                        <option key={ro} value={ro}>{ro}</option>
+                      ))}
+                    </select>
+                    {roles.length > 0 && (
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                        Đã chọn: {roles.join(' / ')}
+                      </span>
+                    )}
+                  </>
                 ) : (
                   <input
                     type="text"
@@ -731,15 +796,22 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
                   />
                 )}
               </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
-                <label className="form-label">Server Khu Vực:</label>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Server Khu Vực:</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Giữ Ctrl/Shift</span>
+                </label>
                 <select
                   className="form-control"
-                  value={server}
-                  onChange={(e) => setServer(e.target.value)}
+                  multiple
+                  size={5}
+                  value={servers}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                    setServers(selected);
+                  }}
+                  style={{ height: 'auto' }}
                 >
                   <option value="VN">Việt Nam (VN)</option>
                   <option value="Asia">Châu Á (Asia)</option>
@@ -747,20 +819,25 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
                   <option value="NA">Bắc Mỹ (NA)</option>
                   <option value="EU">Châu Âu (EU)</option>
                 </select>
+                {servers.length > 0 && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    Đã chọn: {servers.join(', ')}
+                  </span>
+                )}
               </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Giá Thuê Đề Xuất (VNĐ / Giờ) *:</label>
-                <input
-                  type="number"
-                  step="5000"
-                  min="10000"
-                  max="500000"
-                  className="form-control"
-                  value={pricePerHour}
-                  onChange={(e) => setPricePerHour(Number(e.target.value))}
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label">Giá Thuê Đề Xuất (VNĐ / Giờ) *:</label>
+              <input
+                type="number"
+                step="5000"
+                min="10000"
+                max="500000"
+                className="form-control"
+                value={pricePerHour}
+                onChange={(e) => setPricePerHour(Number(e.target.value))}
+              />
             </div>
 
             <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px', display: 'block' }}>

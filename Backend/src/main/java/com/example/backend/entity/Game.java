@@ -40,10 +40,10 @@ public class Game {
     @Column(nullable = false)
     private Boolean hasRoles; // Xác định game có cần role hay không
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     private List<String> availableRoles; // Danh sách role có sẵn cho game (nếu có)
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     private List<String> availableRanks; // Danh sách rank cho từng game
 
     @ManyToMany(mappedBy = "applicableGames")

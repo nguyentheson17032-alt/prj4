@@ -157,20 +157,24 @@ public class GamePlayerController {
                 return ResponseEntity.badRequest()
                     .body(new ApiResponse<>(false, "Role is required for this game", null));
             }
-            // Normalize role by trimming and converting to uppercase
-            String normalizedRole = request.getRole().trim().toUpperCase();
-            if (game.getAvailableRoles() != null) {
-                boolean isValidRole = game.getAvailableRoles().stream()
-                    .map(String::trim)
-                    .map(String::toUpperCase)
-                    .anyMatch(role -> role.equals(normalizedRole));
-                if (!isValidRole) {
-                return ResponseEntity.badRequest()
-                        .body(new ApiResponse<>(false, "Invalid role for this game. Available roles: " + 
-                            String.join(", ", game.getAvailableRoles()), null));
+            if (game.getAvailableRoles() != null && !game.getAvailableRoles().isEmpty()) {
+                java.util.List<String> availableUpper = game.getAvailableRoles().stream()
+                    .map(r -> r.trim().toUpperCase())
+                    .collect(java.util.stream.Collectors.toList());
+                // Support multiple roles separated by " / "
+                String[] parts = request.getRole().split("\\s*/\\s*");
+                for (String part : parts) {
+                    if (!availableUpper.contains(part.trim().toUpperCase())) {
+                        return ResponseEntity.badRequest()
+                            .body(new ApiResponse<>(false, "Invalid role for this game. Available roles: " +
+                                String.join(", ", game.getAvailableRoles()), null));
+                    }
                 }
-                // Use normalized role for saving
-                request.setRole(normalizedRole);
+                // Preserve original casing joined
+                String joined = java.util.Arrays.stream(parts)
+                    .map(String::trim)
+                    .collect(java.util.stream.Collectors.joining(" / "));
+                request.setRole(joined);
             }
         }
         // Tạo player từ thông tin user
