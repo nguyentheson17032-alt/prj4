@@ -141,10 +141,32 @@ export const api = {
 
   async register(userData) {
     try {
-      const res = await client.post('/api/auth/register', userData);
+      const phoneValue = userData.phoneNumber || userData.phone || '';
+      const payload = {
+        ...userData,
+        phoneNumber: phoneValue,
+        phone: phoneValue
+      };
+      const res = await client.post('/api/auth/register', payload);
       return { success: true, data: res.data };
     } catch (err) {
       const message = err.response?.data?.message || err.response?.data || err.message || 'Đăng ký thất bại';
+      return { success: false, error: message };
+    }
+  },
+
+  async updateUser(updateData) {
+    try {
+      const phoneValue = updateData.phoneNumber || updateData.phone || '';
+      const payload = {
+        ...updateData,
+        phoneNumber: phoneValue,
+        phone: phoneValue
+      };
+      const res = await client.put('/api/auth/update', payload);
+      return { success: true, data: res.data };
+    } catch (err) {
+      const message = err.response?.data?.message || err.response?.data || err.message || 'Cập nhật thất bại';
       return { success: false, error: message };
     }
   },

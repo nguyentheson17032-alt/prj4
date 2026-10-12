@@ -38,7 +38,7 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   // Form Fields
   const [nickname, setNickname] = useState(user?.fullName || user?.username || '');
   const [gender, setGender] = useState(user?.gender || 'FEMALE');
-  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '0987654321');
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || user?.phone || '');
   const [bio, setBio] = useState(user?.bio || 'Mình rất vui vẻ, nhiệt tình và thích leo rank cùng anh em!');
   const [rank, setRank] = useState('Cao Thủ');
   const [role, setRole] = useState('Xạ Thủ / AD');
@@ -49,6 +49,19 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Tự động đồng bộ số điện thoại và thông tin từ tài khoản cá nhân khi user tải xong
+  useEffect(() => {
+    if (user) {
+      if (!nickname) setNickname(user.fullName || user.username || '');
+      const userPhone = user.phoneNumber || user.phone || '';
+      if (userPhone && (!phoneNumber || phoneNumber === '0987654321')) {
+        setPhoneNumber(userPhone);
+      }
+      if (user.gender) setGender(user.gender);
+      if (user.avatar) setAvatarUrl(user.avatar);
+    }
+  }, [user]);
 
   // Kiểm tra xem tài khoản này đã có hồ sơ Player chưa
   useEffect(() => {
@@ -173,6 +186,11 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       const res = await api.registerPlayer(payload);
       const created = res?.data || payload;
       setExistingPlayer(created);
+
+      // Đồng bộ số điện thoại vào hồ sơ cá nhân nếu có thay đổi hoặc chưa có
+      if (phoneNumber && phoneNumber !== (user?.phoneNumber || user?.phone)) {
+        updateProfile({ phoneNumber, phone: phoneNumber });
+      }
 
       setIsSubmitting(false);
       setStep(4);
@@ -598,7 +616,14 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Số Điện Thoại Liên Hệ:</label>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Số Điện Thoại Liên Hệ:</span>
+                  {(user?.phoneNumber || user?.phone) && (
+                    <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
+                      ✓ Đã tự động điền từ hồ sơ
+                    </span>
+                  )}
+                </label>
                 <input
                   type="tel"
                   className="form-control"

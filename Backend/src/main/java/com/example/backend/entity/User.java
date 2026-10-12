@@ -157,4 +157,12 @@ public class User {
     public void setAccountNonLocked(boolean accountNonLocked) {
         this.accountNonLocked = accountNonLocked;
     }
+
+    public String getPhone() {
+        return this.phoneNumber;
+    }
+
+    public void setPhone(String phone) {
+        this.phoneNumber = phone;
+    }
 } 

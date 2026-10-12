@@ -121,7 +121,14 @@ export const AuthModal = ({ isOpen, onClose }) => {
     if (!password.trim()) { setRegisterError('Mật khẩu không được để trống.'); return; }
 
     setIsLoading(true);
-    const res = await register({ username, password, fullName, email, phone });
+    const res = await register({
+      username,
+      password,
+      fullName: fullName || username,
+      email,
+      phoneNumber: phone,
+      phone
+    });
     setIsLoading(false);
 
     if (res.success) {

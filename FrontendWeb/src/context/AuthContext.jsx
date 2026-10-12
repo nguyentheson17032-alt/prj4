@@ -16,8 +16,12 @@ const normalizeUser = (userData) => {
     finalBalance = Number(userData.walletBalance);
   }
 
+  const phoneValue = userData.phoneNumber || userData.phone || '';
+
   return {
     ...userData,
+    phone: phoneValue,
+    phoneNumber: phoneValue,
     balance: finalBalance,
     walletBalance: finalBalance,
     coin: finalBalance,
@@ -158,10 +162,30 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  const updateProfile = (data) => {
-    const updated = { ...user, ...data };
+  const updateProfile = async (data) => {
+    const phoneValue = data.phoneNumber || data.phone || user?.phone || user?.phoneNumber || '';
+    const updated = {
+      ...user,
+      ...data,
+      phone: phoneValue,
+      phoneNumber: phoneValue
+    };
     setUser(updated);
     localStorage.setItem('current_user', JSON.stringify(updated));
+
+    try {
+      await api.updateUser({
+        fullName: updated.fullName || updated.username,
+        phoneNumber: phoneValue,
+        phone: phoneValue,
+        bio: updated.bio || '',
+        gender: updated.gender || 'MALE',
+        address: updated.address || ''
+      });
+    } catch (e) {
+      console.warn('Could not sync profile update to server:', e.message);
+    }
+    return updated;
   };
 
   const isAdmin = Boolean(

@@ -132,10 +132,22 @@ export const ProfilePage = () => {
   // Profile form state
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || '');
+  const [phone, setPhone] = useState(user?.phoneNumber || user?.phone || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [avatar, setAvatar] = useState(getUserAvatar(user));
   const [gender, setGender] = useState(user?.gender || 'MALE');
+
+  // Sync state when user object loads or updates
+  useEffect(() => {
+    if (user) {
+      setFullName(user.fullName || user.username || '');
+      setEmail(user.email || '');
+      setPhone(user.phoneNumber || user.phone || '');
+      setBio(user.bio || '');
+      setAvatar(getUserAvatar(user));
+      setGender(user.gender || 'MALE');
+    }
+  }, [user]);
 
   // Password state
   const [oldPassword, setOldPassword] = useState('');
@@ -184,9 +196,9 @@ export const ProfilePage = () => {
     addToast('Đã đổi avatar vui nhộn mới! Nhớ bấm Lưu Thay Đổi nhé.', 'success');
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    updateProfile({ fullName, email, phone, bio, avatar, gender });
+    await updateProfile({ fullName, email, phone, phoneNumber: phone, bio, avatar, gender });
     addToast('Đã lưu thông tin hồ sơ thành công!', 'success');
   };
 

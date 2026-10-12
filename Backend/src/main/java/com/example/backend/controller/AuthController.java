@@ -127,6 +127,8 @@ public class AuthController {
                 "message", "Đăng ký thành công",
                 "username", user.getUsername(),
                 "email", user.getEmail(),
+                "phoneNumber", user.getPhoneNumber() != null ? user.getPhoneNumber() : "",
+                "phone", user.getPhoneNumber() != null ? user.getPhoneNumber() : "",
                 "avatarUrl", user.getAvatarUrl()
             ));
         } catch (Exception e) {
@@ -172,6 +174,8 @@ public class AuthController {
             response.put("username", user.getUsername());
             response.put("fullName", user.getFullName() != null ? user.getFullName() : user.getUsername());
             response.put("email", user.getEmail() != null ? user.getEmail() : "");
+            response.put("phoneNumber", user.getPhoneNumber() != null ? user.getPhoneNumber() : "");
+            response.put("phone", user.getPhoneNumber() != null ? user.getPhoneNumber() : "");
             Long userBalance = user.getCoin() != null ? user.getCoin() : 0L;
             response.put("roles", user.getRoles());
             response.put("coin", userBalance);
@@ -249,7 +253,8 @@ public class AuthController {
         response.put("username", user.getUsername());
         response.put("fullName", user.getFullName() != null ? user.getFullName() : user.getUsername());
         response.put("email", user.getEmail() != null ? user.getEmail() : "");
-        response.put("phoneNumber", user.getPhoneNumber());
+        response.put("phoneNumber", user.getPhoneNumber() != null ? user.getPhoneNumber() : "");
+        response.put("phone", user.getPhoneNumber() != null ? user.getPhoneNumber() : "");
         response.put("address", user.getAddress());
         response.put("bio", user.getBio());
         response.put("gender", user.getGender());
@@ -494,13 +499,22 @@ class RegisterRequest {
     
     private LocalDate dateOfBirth;
     
-    @Pattern(regexp = "^\\d{10}$", message = "Số điện thoại phải có 10 chữ số")
     private String phoneNumber;
+    private String phone;
     
     private String address;
     
-    @Pattern(regexp = "^(MALE|FEMALE|OTHER)$", message = "Giới tính không hợp lệ")
     private String gender;
+
+    public String getPhoneNumber() {
+        if (phoneNumber != null && !phoneNumber.trim().isEmpty()) {
+            return phoneNumber.trim();
+        }
+        if (phone != null && !phone.trim().isEmpty()) {
+            return phone.trim();
+        }
+        return null;
+    }
 }
 
 @Data
@@ -516,15 +530,24 @@ class UpdateUserRequest {
     
     private LocalDate dateOfBirth;
     
-    @Pattern(regexp = "^\\d{10}$", message = "Số điện thoại phải có 10 chữ số")
     private String phoneNumber;
+    private String phone;
     
     private String address;
     
     private String bio;
     
-    @Pattern(regexp = "^(MALE|FEMALE|OTHER)$", message = "Giới tính không hợp lệ")
     private String gender;
+
+    public String getPhoneNumber() {
+        if (phoneNumber != null && !phoneNumber.trim().isEmpty()) {
+            return phoneNumber.trim();
+        }
+        if (phone != null && !phone.trim().isEmpty()) {
+            return phone.trim();
+        }
+        return null;
+    }
 }
 
 @Data
