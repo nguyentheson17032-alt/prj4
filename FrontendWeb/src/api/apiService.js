@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { getUserAvatar } from '../utils/avatarUtils';
-import { MOCK_GAMES } from './mockData';
 
 const BASE_URL = 'http://localhost:8080';
 
@@ -76,6 +75,58 @@ export const normalizeGamePlayer = (gp) => {
   };
 };
 
+export const normalizeOrder = (o) => {
+  if (!o) return null;
+  const price = Number(o.price || o.finalPrice || o.totalPrice || 0);
+  const playerName = o.playerName || o.player?.fullName || o.player?.username || 'Idol PlayZone';
+  const renterName = o.renterName || o.renter?.username || 'Khách Hàng';
+  const playerAvatar = o.playerAvatarUrl || o.player?.avatar || o.player?.avatarUrl || getUserAvatar({ username: playerName });
+  const renterAvatar = o.renterAvatarUrl || o.renter?.avatar || o.renter?.avatarUrl || getUserAvatar({ username: renterName });
+  const createdAt = o.createdAt || o.hireTime || o.startTime || 'Hôm nay';
+  const game = o.game || o.player?.game || 'Duo Game';
+  const hours = Number(o.hours || 1);
+  const status = (o.status || 'PENDING').toUpperCase();
+
+  const playerUserId = o.playerUserId || o.player?.userId || o.player?.user?.id;
+  const renterId = o.renterId || o.renter?.id;
+  const playerId = o.playerId || o.player?.id;
+
+  return {
+    ...o,
+    id: o.id,
+    renterId,
+    playerId,
+    playerUserId,
+    playerName,
+    renterName,
+    playerAvatarUrl: playerAvatar,
+    renterAvatarUrl: renterAvatar,
+    price,
+    finalPrice: price,
+    totalPrice: price,
+    createdAt,
+    hireTime: o.hireTime || createdAt,
+    game,
+    hours,
+    status,
+    statusLabel: o.statusLabel,
+    player: {
+      id: playerId,
+      userId: playerUserId,
+      fullName: playerName,
+      username: playerName,
+      avatar: playerAvatar,
+      rank: o.playerRank || o.player?.rank || 'Cao Thủ',
+    },
+    renter: {
+      id: renterId,
+      fullName: renterName,
+      username: renterName,
+      avatar: renterAvatar,
+    }
+  };
+};
+
 export const api = {
   // Auth
   async login(username, password) {
@@ -129,11 +180,20 @@ export const api = {
       } else if (res.data && Array.isArray(res.data.data)) {
         list = res.data.data;
       }
-      if (list.length > 0) return list;
-      return MOCK_GAMES;
+      return list;
     } catch (err) {
-      return MOCK_GAMES;
+      return [];
     }
+  },
+
+  async createGame(gameData) {
+    const res = await client.post('/api/games', gameData);
+    return res.data;
+  },
+
+  async hirePlayer(gamePlayerId, hireData) {
+    const res = await client.post(`/api/game-players/${gamePlayerId}/hire`, hireData);
+    return res.data;
   },
 
   // Players
@@ -189,6 +249,18 @@ export const api = {
     }
     const all = await this.getPlayers();
     return all.find(p => String(p.id) === String(id)) || null;
+  },
+
+  async getGamePlayersByUser(userId) {
+    if (!userId) return [];
+    try {
+      const res = await client.get(`/api/game-players/user/${userId}`);
+      const data = res.data?.data || res.data;
+      if (Array.isArray(data)) return data;
+    } catch (err) {
+      console.warn('Backend getGamePlayersByUser error:', err.message);
+    }
+    return [];
   },
 
   async registerPlayer(playerData) {
@@ -269,16 +341,43 @@ export const api = {
   async getOrders() {
     try {
       const res = await client.get('/api/orders');
-      if (Array.isArray(res.data)) return res.data;
-      if (res.data && Array.isArray(res.data.data)) return res.data.data;
-      return [];
+      let rawList = [];
+      if (Array.isArray(res.data)) rawList = res.data;
+      else if (res.data && Array.isArray(res.data.data)) rawList = res.data.data;
+      return rawList.map(normalizeOrder).filter(Boolean);
     } catch (e) {
+      console.warn('Backend getOrders error:', e.message);
       return [];
     }
   },
 
   async createOrder(orderData) {
     const res = await client.post('/api/orders', orderData);
+    return res.data;
+  },
+
+  async confirmOrder(orderId) {
+    const res = await client.post(`/api/game-players/order/${orderId}/confirm`);
+    return res.data;
+  },
+
+  async cancelOrder(orderId) {
+    const res = await client.post(`/api/game-players/order/${orderId}/cancel`);
+    return res.data;
+  },
+
+  async rejectOrder(orderId) {
+    const res = await client.post(`/api/game-players/order/${orderId}/reject`);
+    return res.data;
+  },
+
+  async completeOrder(orderId) {
+    const res = await client.post(`/api/game-players/order/${orderId}/complete`);
+    return res.data;
+  },
+
+  async reviewOrder(orderId, rating, comment) {
+    const res = await client.post(`/api/game-players/order/${orderId}/review`, { rating, comment });
     return res.data;
   },
 
@@ -298,9 +397,14 @@ export const api = {
   async getVouchers() {
     try {
       const res = await client.get('/api/promotions');
-      if (Array.isArray(res.data)) return res.data;
-      if (res.data && Array.isArray(res.data.data)) return res.data.data;
-      return [];
+      const list = Array.isArray(res.data) ? res.data
+        : (res.data && Array.isArray(res.data.data)) ? res.data.data : [];
+      // Normalize backend fields to what BookingModal expects
+      return list.map(v => ({
+        ...v,
+        discountPercent: v.discountType === 'PERCENTAGE' ? Number(v.discountAmount) : 100,
+        maxDiscount: v.discountType === 'FIXED_AMOUNT' ? Number(v.discountAmount) : 99999999,
+      }));
     } catch (e) {
       return [];
     }
@@ -410,6 +514,52 @@ export const api = {
       return [];
     } catch (e) {
       return [];
+    }
+  },
+
+  // Chat & Message APIs
+  async getConversations() {
+    try {
+      const res = await client.get('/api/messages/all-conversations');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch (err) {
+      console.warn('getConversations error:', err.message);
+      return [];
+    }
+  },
+
+  async getConversation(userId) {
+    if (!userId) return null;
+    try {
+      const res = await client.get(`/api/messages/conversation/${userId}`);
+      return res.data || null;
+    } catch (err) {
+      console.warn(`getConversation(${userId}) error:`, err.message);
+      return null;
+    }
+  },
+
+  async sendMessage(userId, content) {
+    if (!userId || !content) return null;
+    const res = await client.post(`/api/messages/send/${userId}`, { content });
+    return res.data;
+  },
+
+  async markAllMessagesAsRead(userId) {
+    if (!userId) return;
+    try {
+      await client.post(`/api/messages/read-all/${userId}`);
+    } catch (err) {
+      console.warn(`markAllMessagesAsRead(${userId}) error:`, err.message);
+    }
+  },
+
+  async getUnreadMessageCount() {
+    try {
+      const res = await client.get('/api/messages/unread/count');
+      return Number(res.data) || 0;
+    } catch (err) {
+      return 0;
     }
   }
 };

@@ -11,16 +11,18 @@ import {
   ArrowRight,
   Sparkles,
   AlertCircle,
-  LogIn
+  LogIn,
+  Clock,
+  Compass,
+  Home
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/apiService';
-import { MOCK_GAMES } from '../api/mockData';
 
 export const RegisterPlayerPage = ({ onOpenAuth }) => {
-  const { user, updateProfile, isAuthenticated } = useAuth();
+  const { user, updateProfile, isAuthenticated, isAdmin, isPlayer, loading: authLoading } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -28,6 +30,10 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   const [games, setGames] = useState([]);
   const [selectedGameId, setSelectedGameId] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
+
+  // Kiểm tra hồ sơ Idol hiện tại của user (mỗi user chỉ được đăng ký 1 lần)
+  const [existingPlayer, setExistingPlayer] = useState(null);
+  const [checkingExisting, setCheckingExisting] = useState(true);
 
   // Form Fields
   const [nickname, setNickname] = useState(user?.fullName || user?.username || '');
@@ -44,6 +50,35 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Kiểm tra xem tài khoản này đã có hồ sơ Player chưa
+  useEffect(() => {
+    let isMounted = true;
+    const checkUserPlayer = async () => {
+      if (!user?.id) {
+        setCheckingExisting(false);
+        return;
+      }
+      try {
+        const players = await api.getGamePlayersByUser(user.id);
+        if (isMounted && Array.isArray(players) && players.length > 0) {
+          setExistingPlayer(players[0]);
+        }
+      } catch (e) {
+        console.warn('Lỗi khi kiểm tra hồ sơ player:', e);
+      } finally {
+        if (isMounted) setCheckingExisting(false);
+      }
+    };
+
+    if (isAuthenticated && user?.id) {
+      checkUserPlayer();
+    } else if (!authLoading) {
+      setCheckingExisting(false);
+    }
+
+    return () => { isMounted = false; };
+  }, [user?.id, isAuthenticated, authLoading]);
+
   // Fetch games list
   useEffect(() => {
     const loadGames = async () => {
@@ -54,15 +89,15 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
           setSelectedGameId(list[0].id);
           setSelectedGame(list[0]);
         } else {
-          setGames(MOCK_GAMES);
-          setSelectedGameId(MOCK_GAMES[0].id);
-          setSelectedGame(MOCK_GAMES[0]);
+          setGames([]);
+          setSelectedGameId(null);
+          setSelectedGame(null);
         }
       } catch (err) {
-        console.warn('Could not fetch games list from API, using fallback:', err);
-        setGames(MOCK_GAMES);
-        setSelectedGameId(MOCK_GAMES[0].id);
-        setSelectedGame(MOCK_GAMES[0]);
+        console.warn('Could not fetch games list from API:', err);
+        setGames([]);
+        setSelectedGameId(null);
+        setSelectedGame(null);
       }
     };
     loadGames();
@@ -91,6 +126,10 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   };
 
   const handleNextToStep3 = () => {
+    if (!selectedGameId) {
+      addToast('Chưa có game trong hệ thống. Admin cần thêm game trước.', 'error');
+      return;
+    }
     if (!rank.trim()) {
       addToast('Vui lòng chọn hoặc nhập mức rank', 'warning');
       return;
@@ -109,11 +148,17 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       return;
     }
 
+    // Chặn nếu tài khoản đã đăng ký Idol trước đó
+    if (isPlayer || existingPlayer) {
+      addToast('Tài khoản của bạn đã gửi hồ sơ đăng ký Idol rồi. Mỗi tài khoản chỉ được đăng ký 1 lần!', 'warning');
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage('');
 
     const payload = {
-      userId: user?.id || 1,
+      userId: user?.id,
       gameId: selectedGameId || (games[0] ? games[0].id : 1),
       username: nickname.trim(),
       rank: rank.trim() || 'Cao Thủ',
@@ -125,7 +170,9 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
 
     try {
       // Call Backend API
-      await api.registerPlayer(payload);
+      const res = await api.registerPlayer(payload);
+      const created = res?.data || payload;
+      setExistingPlayer(created);
 
       setIsSubmitting(false);
       setStep(4);
@@ -136,17 +183,37 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       });
       addToast('🎉 Gửi hồ sơ đăng ký Idol thành công! Hồ sơ đang chờ Quản Trị Viên xét duyệt.', 'success');
     } catch (err) {
-      console.warn('API register player note:', err);
       setIsSubmitting(false);
-      setStep(4);
-      confetti({
-        particleCount: 100,
-        spread: 80,
-        origin: { y: 0.5 }
-      });
-      addToast('🎉 Hồ sơ đăng ký Idol đã được lưu và đang chờ xét duyệt!', 'success');
+      const errMsg = err.response?.data?.message || err.response?.data || err.message || 'Đăng ký thất bại';
+      const isGameNotFound = typeof errMsg === 'string' && errMsg.toLowerCase().includes('game');
+      if (isGameNotFound) {
+        setErrorMessage('Game được chọn chưa tồn tại trong hệ thống. Admin cần thêm game trước khi bạn có thể đăng ký.');
+      } else {
+        setErrorMessage(typeof errMsg === 'string' ? errMsg : 'Có lỗi xảy ra khi gửi hồ sơ. Vui lòng thử lại.');
+      }
+      addToast('Đăng ký thất bại: ' + (isGameNotFound ? 'Game chưa được thêm vào hệ thống.' : errMsg), 'error');
+
+      // Nếu hệ thống báo tài khoản đã đăng ký rồi, đồng bộ lại hồ sơ ngay lập tức
+      if (typeof errMsg === 'string' && (errMsg.includes('đăng ký') || errMsg.includes('Idol'))) {
+        try {
+          const players = await api.getGamePlayersByUser(user?.id);
+          if (Array.isArray(players) && players.length > 0) {
+            setExistingPlayer(players[0]);
+          }
+        } catch (_) {}
+      }
     }
   };
+
+  if (authLoading || checkingExisting) {
+    return (
+      <div className="container animate-fade-in" style={{ maxWidth: '640px', padding: '100px 20px', textAlign: 'center' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>
+          Đang kiểm tra thông tin hồ sơ...
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -180,6 +247,247 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
             <LogIn size={18} />
             <span>Đăng Nhập Ngay</span>
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // TRƯỜNG HỢP 1: Tài khoản đã là Idol Duo chính thức (AVAILABLE / ROLE_PLAYER)
+  if (isPlayer || existingPlayer?.status === 'AVAILABLE') {
+    return (
+      <div className="container animate-fade-in" style={{ maxWidth: '680px', padding: '60px 20px' }}>
+        <div className="glass-panel" style={{ padding: '40px 30px', textAlign: 'center' }}>
+          <div style={{
+            width: '76px',
+            height: '76px',
+            borderRadius: '50%',
+            background: 'rgba(236, 72, 153, 0.15)',
+            border: '2px solid var(--accent-pink)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px auto',
+            color: 'var(--accent-pink)',
+            boxShadow: '0 0 24px rgba(236, 72, 153, 0.25)'
+          }}>
+            <Crown size={40} />
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 14px',
+            borderRadius: '20px',
+            background: 'rgba(16, 185, 129, 0.15)',
+            color: 'var(--accent-green)',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            marginBottom: '16px'
+          }}>
+            <CheckCircle2 size={15} />
+            <span>IDOL DUO CHÍNH THỨC</span>
+          </div>
+
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>
+            Bạn Đã Là Idol Trên PlayZone!
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
+            Tài khoản <strong>{user?.fullName || user?.username}</strong> của bạn đã là Idol Duo chính thức. Mỗi tài khoản chỉ cần đăng ký <strong>1 lần duy nhất</strong> và hồ sơ của bạn đã sẵn sàng nhận đơn thuê.
+          </p>
+
+          {existingPlayer && (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              padding: '16px 20px',
+              maxWidth: '460px',
+              margin: '0 auto 28px auto',
+              display: 'flex',
+              justifyContent: 'space-around',
+              textAlign: 'center'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Biệt danh</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{existingPlayer.username || user?.username}</div>
+              </div>
+              <div style={{ borderLeft: '1px solid var(--border-color)' }} />
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tựa game</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{existingPlayer.game?.name || existingPlayer.gameName || 'Duo Game'}</div>
+              </div>
+              <div style={{ borderLeft: '1px solid var(--border-color)' }} />
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Giá thuê</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-green)' }}>
+                  {(existingPlayer.pricePerHour || 50000).toLocaleString('vi-VN')} đ/h
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={() => navigate('/explore')}>
+              <Compass size={18} />
+              <span>Xem Danh Sách Khám Phá</span>
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/')}>
+              <Home size={18} />
+              <span>Về Trang Chủ</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // TRƯỜNG HỢP 2: Tài khoản đã nộp hồ sơ trước đó và đang chờ Quản Trị Viên xét duyệt
+  if (existingPlayer && step !== 4) {
+    return (
+      <div className="container animate-fade-in" style={{ maxWidth: '680px', padding: '60px 20px' }}>
+        <div className="glass-panel" style={{ padding: '40px 30px', textAlign: 'center' }}>
+          <div style={{
+            width: '76px',
+            height: '76px',
+            borderRadius: '50%',
+            background: 'rgba(245, 158, 11, 0.15)',
+            border: '2px solid #f59e0b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px auto',
+            color: '#f59e0b',
+            boxShadow: '0 0 24px rgba(245, 158, 11, 0.25)'
+          }}>
+            <Clock size={40} />
+          </div>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 14px',
+            borderRadius: '20px',
+            background: 'rgba(245, 158, 11, 0.15)',
+            color: '#f59e0b',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            marginBottom: '16px'
+          }}>
+            <AlertCircle size={15} />
+            <span>HỒ SƠ ĐANG CHỜ XÉT DUYỆT</span>
+          </div>
+
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>
+            Hồ Sơ Đăng Ký Đang Được Xử Lý!
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
+            Tài khoản <strong>{user?.fullName || user?.username}</strong> đã gửi hồ sơ đăng ký Idol Duo. Mỗi tài khoản chỉ được nộp hồ sơ <strong>1 lần duy nhất</strong>. Ban quản trị đang trong quá trình xét duyệt hồ sơ của bạn.
+          </p>
+
+          {/* Quy trình tiến độ */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px',
+            maxWidth: '540px',
+            margin: '0 auto 28px auto',
+            textAlign: 'left'
+          }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Trạng thái xét duyệt hiện tại
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  color: 'var(--accent-green)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <CheckCircle2 size={16} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>1. Tiếp nhận hồ sơ</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Biệt danh: <strong>{existingPlayer.username || nickname}</strong> • Game: <strong>{existingPlayer.game?.name || existingPlayer.gameName || 'Game'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: 'rgba(245, 158, 11, 0.2)',
+                  color: '#f59e0b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Clock size={16} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f59e0b' }}>2. Đang chờ xét duyệt (Dự kiến 15 - 30 phút)</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Quản trị viên đang kiểm tra thông tin và hồ sơ</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.7 }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Sparkles size={16} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>3. Kích hoạt & Nhận đơn thuê</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Xuất hiện trên bảng Khám Phá sau khi hoàn tất xét duyệt</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={() => navigate('/explore')}>
+              <Compass size={18} />
+              <span>Khám Phá PlayZone</span>
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/')}>
+              <Home size={18} />
+              <span>Về Trang Chủ</span>
+            </button>
+          </div>
+
+          {isAdmin && (
+            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed var(--border-color)', display: 'inline-block' }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate('/admin')}
+                style={{ fontSize: '0.82rem', padding: '6px 14px', opacity: 0.8 }}
+              >
+                <ShieldCheck size={14} />
+                <span>[Admin Test] Vào Trang Quản Trị Duyệt Hồ Sơ</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -327,20 +635,26 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
               Bước 2: Game Sở Trường & Bảng Giá
             </h3>
 
-            <div className="form-group">
-              <label className="form-label">Tựa Game Đăng Ký Chính *:</label>
-              <select
-                className="form-control"
-                value={selectedGameId || ''}
-                onChange={(e) => handleGameChange(e.target.value)}
-              >
-                {games.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.category || 'Game'})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {games.length === 0 ? (
+              <div style={{ padding: '20px', borderRadius: 'var(--radius-md)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', marginBottom: '20px', color: 'var(--accent-red)', fontSize: '0.9rem' }}>
+                ⚠️ Hiện chưa có game nào trong hệ thống. Admin cần thêm game tại <strong>Trang Quản Trị → Danh Mục Game</strong> trước khi bạn có thể đăng ký.
+              </div>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">Tựa Game Đăng Ký Chính *:</label>
+                <select
+                  className="form-control"
+                  value={selectedGameId || ''}
+                  onChange={(e) => handleGameChange(e.target.value)}
+                >
+                  {games.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} ({g.category || 'Game'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
@@ -512,7 +826,7 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
         )}
 
         {step === 4 && (
-          <div className="animate-fade-in" style={{ textAlign: 'center', padding: '30px 10px' }}>
+          <div className="animate-fade-in" style={{ textAlign: 'center', padding: '24px 10px' }}>
             <div style={{
               width: '72px',
               height: '72px',
@@ -523,30 +837,121 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 16px auto',
-              color: 'var(--accent-green)'
+              color: 'var(--accent-green)',
+              boxShadow: '0 0 24px rgba(16, 185, 129, 0.25)'
             }}>
               <CheckCircle2 size={40} />
             </div>
 
-            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '10px' }}>
-              Đăng Ký Hồ Sơ Idol Thành Công!
+            <h2 style={{ fontSize: '1.65rem', fontWeight: 800, marginBottom: '10px' }}>
+              Gửi Hồ Sơ Idol Thành Công!
             </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
-              Chúc mừng <strong>{nickname}</strong>! Hồ sơ Idol Duo của bạn đã được gửi thành công và đang được lưu vào <strong>"Hồ Sơ Đăng Ký Idol Mới Chờ Xét Duyệt"</strong>. Quản Trị Viên (Admin) sẽ phê duyệt hồ sơ của bạn để xuất hiện trên trang Khám Phá và bắt đầu nhận đơn thuê!
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '540px', margin: '0 auto 24px auto' }}>
+              Chúc mừng <strong>{nickname}</strong>! Hồ sơ đăng ký trở thành Idol Duo của bạn đã được gửi thành công. Đội ngũ Quản Trị Viên sẽ xét duyệt hồ sơ trong thời gian sớm nhất.
             </p>
 
+            {/* Tiến trình phê duyệt trực quan cho người dùng */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '20px',
+              maxWidth: '540px',
+              margin: '0 auto 28px auto',
+              textAlign: 'left'
+            }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Tiến trình xử lý hồ sơ
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    color: 'var(--accent-green)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>1. Tiếp nhận hồ sơ</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Thông tin và hình ảnh đăng ký đã được lưu vào hệ thống</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    color: '#f59e0b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Clock size={16} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f59e0b' }}>2. Đang chờ xét duyệt (Dự kiến 15 - 30 phút)</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Quản trị viên sẽ kiểm tra nội dung giới thiệu, hình ảnh và âm thanh</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.7 }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Sparkles size={16} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>3. Kích hoạt & Nhận đơn thuê</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Xuất hiện trên bảng Khám Phá và sẵn sàng nhận đơn từ người thuê</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Các nút hành động chính cho người dùng */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <button className="btn btn-primary" onClick={() => navigate('/admin')}>
-                <ShieldCheck size={16} />
-                <span>Vào Trang Quản Trị Duyệt Hồ Sơ</span>
+              <button className="btn btn-primary" onClick={() => navigate('/explore')}>
+                <Compass size={18} />
+                <span>Khám Phá PlayZone</span>
               </button>
-              <button className="btn btn-secondary" onClick={() => navigate('/explore')}>
-                Xem Danh Sách Khám Phá
-              </button>
-              <button className="btn btn-outline" onClick={() => navigate('/')}>
-                Về Trang Chủ
+              <button className="btn btn-secondary" onClick={() => navigate('/')}>
+                <Home size={18} />
+                <span>Về Trang Chủ</span>
               </button>
             </div>
+
+            {/* Chỉ hiển thị cho Admin để tiện kiểm thử */}
+            {isAdmin && (
+              <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed var(--border-color)', display: 'inline-block' }}>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => navigate('/admin')}
+                  style={{ fontSize: '0.82rem', padding: '6px 14px', opacity: 0.8 }}
+                >
+                  <ShieldCheck size={14} />
+                  <span>[Admin Test] Vào Trang Quản Trị Duyệt Hồ Sơ</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

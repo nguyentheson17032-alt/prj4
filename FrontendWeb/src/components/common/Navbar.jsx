@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getUserAvatar } from '../../utils/avatarUtils';
+import api from '../../api/apiService';
 import '../../styles/navbar.css';
 
 export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
@@ -29,9 +30,27 @@ export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   const navigate = useNavigate();
+
+  // Poll unread messages count
+  useEffect(() => {
+    if (!user) {
+      setUnreadMsgCount(0);
+      return;
+    }
+    const fetchUnread = async () => {
+      try {
+        const count = await api.getUnreadMessageCount();
+        setUnreadMsgCount(count);
+      } catch (_) {}
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 5000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -133,8 +152,30 @@ export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
               </div>
 
               {/* Chat Icon */}
-              <Link to="/chat" className="nav-icon-btn" title="Tin nhắn">
+              <Link to="/chat" className="nav-icon-btn" title="Tin nhắn" style={{ position: 'relative' }}>
                 <MessageSquare size={18} />
+                {unreadMsgCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    background: 'var(--accent-red, #ef4444)',
+                    color: '#ffffff',
+                    borderRadius: '50%',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    minWidth: '16px',
+                    height: '16px',
+                    padding: '0 3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                    boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                  }}>
+                    {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
+                  </span>
+                )}
               </Link>
 
               {/* Notifications */}

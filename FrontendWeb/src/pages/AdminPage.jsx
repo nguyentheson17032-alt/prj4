@@ -460,14 +460,40 @@ const OrdersTab = ({ ordersList, loading }) => {
 const GamesTab = ({ gamesList, setGamesList, loading }) => {
   const { addToast } = useToast();
   const [search, setSearch] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [formName, setFormName] = useState('');
+  const [formCategory, setFormCategory] = useState('MOBA');
+  const [formPlatform, setFormPlatform] = useState('MOBILE');
+  const [formImageUrl, setFormImageUrl] = useState('');
+  const [formWebsiteUrl, setFormWebsiteUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const filtered = gamesList.filter(g => !search || g.name?.toLowerCase().includes(search.toLowerCase()));
 
-  const handleAdd = () => {
-    const name = prompt('Tên game mới:');
-    if (name?.trim()) {
-      setGamesList(prev => [...prev, { id: Date.now(), name: name.trim() }]);
-      addToast(`Đã thêm game "${name}"`, 'success');
+  const handleAdd = async () => {
+    if (!formName.trim()) return;
+    setSubmitting(true);
+    try {
+      const created = await api.createGame({
+        name: formName.trim(),
+        description: formName.trim(),
+        category: formCategory,
+        platform: formPlatform,
+        status: 'ACTIVE',
+        hasRoles: false,
+        imageUrl: formImageUrl.trim() || null,
+        websiteUrl: formWebsiteUrl.trim() || null
+      });
+      setGamesList(prev => [...prev, created]);
+      addToast(`Đã thêm game "${formName}"`, 'success');
+      setFormName('');
+      setFormImageUrl('');
+      setFormWebsiteUrl('');
+      setShowForm(false);
+    } catch (err) {
+      addToast(err.response?.data || 'Không thể thêm game. Kiểm tra lại quyền Admin.', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -480,19 +506,63 @@ const GamesTab = ({ gamesList, setGamesList, loading }) => {
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder="Tìm game..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <button className="btn btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleAdd}>
+          <button className="btn btn-primary" style={{ fontSize: '0.85rem' }} onClick={() => setShowForm(v => !v)}>
             <Plus size={15} /> <span>Thêm game</span>
           </button>
         </div>
       </div>
+      {showForm && (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'flex-end', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+          <div style={{ flex: 1, minWidth: '160px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tên game *</label>
+            <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="Ví dụ: PUBG Mobile" value={formName} onChange={e => setFormName(e.target.value)} />
+          </div>
+          <div style={{ minWidth: '130px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Thể loại</label>
+            <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={formCategory} onChange={e => setFormCategory(e.target.value)}>
+              <option value="MOBA">MOBA</option>
+              <option value="FPS">FPS</option>
+              <option value="RPG">RPG</option>
+              <option value="BATTLE_ROYALE">Battle Royale</option>
+              <option value="STRATEGY">Strategy</option>
+              <option value="SPORT">Sport</option>
+              <option value="OTHER">Khác</option>
+            </select>
+          </div>
+          <div style={{ minWidth: '120px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nền tảng</label>
+            <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={formPlatform} onChange={e => setFormPlatform(e.target.value)}>
+              <option value="MOBILE">Mobile</option>
+              <option value="PC">PC</option>
+              <option value="CONSOLE">Console</option>
+            </select>
+          </div>
+          <div style={{ flex: 2, minWidth: '200px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Link ảnh bìa (URL)</label>
+            <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="https://..." value={formImageUrl} onChange={e => setFormImageUrl(e.target.value)} />
+          </div>
+          <div style={{ flex: 2, minWidth: '200px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Website chính thức (URL)</label>
+            <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="https://..." value={formWebsiteUrl} onChange={e => setFormWebsiteUrl(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-primary" style={{ fontSize: '0.85rem', height: '36px' }} onClick={handleAdd} disabled={submitting || !formName.trim()}>
+              {submitting ? 'Đang lưu...' : 'Lưu'}
+            </button>
+            <button className="btn btn-secondary" style={{ fontSize: '0.85rem', height: '36px' }} onClick={() => { setShowForm(false); setFormName(''); }}>
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
       {loading ? (
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>Đang tải...</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
           {filtered.map(g => (
             <div key={g.id} style={{ borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
-              {g.image && <img src={g.image} alt={g.name} style={{ width: '100%', height: '100px', objectFit: 'cover' }} />}
-              {!g.image && <div style={{ width: '100%', height: '100px', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Gamepad2 size={32} style={{ color: '#fff', opacity: 0.7 }} /></div>}
+              {(g.imageUrl || g.image) && <img src={g.imageUrl || g.image} alt={g.name} style={{ width: '100%', height: '100px', objectFit: 'cover' }} />}
+              {!(g.imageUrl || g.image) && <div style={{ width: '100%', height: '100px', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Gamepad2 size={32} style={{ color: '#fff', opacity: 0.7 }} /></div>}
               <div style={{ padding: '12px' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{g.name}</div>
                 {g.status && <div style={{ marginTop: '6px' }}><StatusBadge status={g.status} /></div>}

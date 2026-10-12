@@ -300,7 +300,7 @@ public class GamePlayerController {
     }
 
     @PostMapping("/{id}/hire")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     @Operation(summary = "Hire a game player")
     public ResponseEntity<ApiResponse<?>> hireGamePlayer(
@@ -311,15 +311,6 @@ public class GamePlayerController {
             if (request.getStartTime().isAfter(request.getEndTime())) {
                 return ResponseEntity.badRequest()
                     .body(new ApiResponse<>(false, "Thời gian bắt đầu phải trước thời gian kết thúc", null));
-            }
-            if (request.getStartTime().isBefore(LocalDateTime.now())) {
-                return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Thời gian bắt đầu phải sau thời gian hiện tại", null));
-            }
-            // Thêm điều kiện cách ít nhất 15 phút
-            if (java.time.Duration.between(LocalDateTime.now(), request.getStartTime()).toMinutes() < 15) {
-                return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Thời gian bắt đầu thuê phải cách thời điểm hiện tại ít nhất 15 phút", null));
             }
 
             // Check if player is available
@@ -421,13 +412,14 @@ public class GamePlayerController {
     @Operation(summary = "Player xác nhận đơn thuê (Order)")
     public ResponseEntity<ApiResponse<?>> confirmOrder(@PathVariable Long orderId, Authentication authentication) {
         try {
-            User player = userService.findByUsername(authentication.getName());
+            User currentUser = userService.findByUsername(authentication.getName());
             Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
             GamePlayer gamePlayer = order.getPlayer();
 
-            // Kiểm tra quyền xác nhận (player phải là người được thuê)
-            if (!gamePlayer.getUser().getId().equals(player.getId())) {
+            boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+            // Kiểm tra quyền xác nhận (player phải là người được thuê hoặc admin)
+            if (!isAdmin && !gamePlayer.getUser().getId().equals(currentUser.getId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new ApiResponse<>(false, "Bạn không có quyền xác nhận đơn này", null));
             }
@@ -442,8 +434,9 @@ public class GamePlayerController {
             long playerReceive50 = Math.round(totalCoin * 0.5);
             
             // Cộng 50% cho player
-            player.setCoin(player.getCoin() + playerReceive50);
-            userService.save(player);
+            User playerUser = gamePlayer.getUser();
+            playerUser.setCoin(playerUser.getCoin() + playerReceive50);
+            userService.save(playerUser);
 
             // Tạo Payment record cho 50% đầu tiên
             Payment payment50 = new Payment();
@@ -546,20 +539,21 @@ public class GamePlayerController {
     }
 
     @PostMapping("/order/{orderId}/reject")
-    @PreAuthorize("hasRole('PLAYER')")
+    @PreAuthorize("isAuthenticated()")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     @Operation(summary = "Player từ chối đơn thuê (Order)")
     public ResponseEntity<ApiResponse<?>> rejectOrder(
             @PathVariable Long orderId,
             Authentication authentication) {
         try {
-            User player = userService.findByUsername(authentication.getName());
+            User currentUser = userService.findByUsername(authentication.getName());
             Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
             GamePlayer gamePlayer = order.getPlayer();
 
-            // Kiểm tra quyền từ chối (player phải là người được thuê)
-            if (!gamePlayer.getUser().getId().equals(player.getId())) {
+            boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+            // Kiểm tra quyền từ chối (player phải là người được thuê hoặc admin)
+            if (!isAdmin && !gamePlayer.getUser().getId().equals(currentUser.getId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new ApiResponse<>(false, "Bạn không có quyền từ chối đơn này", null));
             }
@@ -611,7 +605,7 @@ public class GamePlayerController {
     }
 
     @PostMapping("/order/{orderId}/cancel")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     @Operation(summary = "User hủy đơn thuê (Order)")
     public ResponseEntity<ApiResponse<?>> cancelOrder(
@@ -622,6 +616,15 @@ public class GamePlayerController {
             Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
             GamePlayer gamePlayer = order.getPlayer();
+
+            boolean isAdmin = user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN");
+            boolean isRenter = order.getRenter() != null && user.getId().equals(order.getRenter().getId());
+            boolean isPlayer = gamePlayer != null && gamePlayer.getUser() != null && user.getId().equals(gamePlayer.getUser().getId());
+
+            if (!isAdmin && !isRenter && !isPlayer) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse<>(false, "Bạn không có quyền hủy đơn này", null));
+            }
 
             // Chỉ cho phép hủy khi đơn đang chờ xác nhận
             if (!"PENDING".equals(order.getStatus())) {
@@ -645,10 +648,6 @@ public class GamePlayerController {
             // Cập nhật trạng thái đơn
             order.setStatus("CANCELED");
             orderRepository.save(order);
-
-            // Xác định ai là người hủy đơn
-            boolean isRenter = user.getId().equals(order.getRenter().getId());
-            boolean isPlayer = user.getId().equals(order.getPlayer().getUser().getId());
 
             // Gửi notification phù hợp
             if (isPlayer) {
@@ -859,7 +858,7 @@ public class GamePlayerController {
     }
 
     @PostMapping("/order/{orderId}/complete")
-    @PreAuthorize("hasRole('USER') or hasRole('PLAYER')")
+    @PreAuthorize("isAuthenticated()")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     @Operation(summary = "Hoàn thành đơn thuê (Order)")
     public ResponseEntity<ApiResponse<?>> completeOrder(@PathVariable Long orderId, Authentication authentication) {
@@ -868,10 +867,19 @@ public class GamePlayerController {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
             GamePlayer gamePlayer = order.getPlayer();
 
+            User currentUser = userService.findByUsername(authentication.getName());
+            boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+
             // Chỉ cho phép hoàn thành khi trạng thái là CONFIRMED
             if (!"CONFIRMED".equals(order.getStatus())) {
                 return ResponseEntity.badRequest()
                     .body(new ApiResponse<>(false, "Chỉ có thể hoàn thành đơn khi đã xác nhận", null));
+            }
+
+            // Chỉ cho phép hoàn thành khi đã hết giờ thuê (hoặc là Admin)
+            if (!isAdmin && order.getEndTime() != null && LocalDateTime.now().isBefore(order.getEndTime())) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Thời gian thuê chưa kết thúc! Chỉ có thể hoàn thành đơn sau khi hết giờ chơi.", null));
             }
 
             // Cập nhật trạng thái đơn và player

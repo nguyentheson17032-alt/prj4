@@ -16,7 +16,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
   const [gender, setGender] = useState('ALL');
   const [status, setStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState('RATING'); // RATING, PRICE_ASC, PRICE_DESC, POPULAR
-  const [priceMax, setPriceMax] = useState(300000);
+  const [priceMax, setPriceMax] = useState(200000);
 
   useEffect(() => {
     const queryParam = searchParams.get('q');

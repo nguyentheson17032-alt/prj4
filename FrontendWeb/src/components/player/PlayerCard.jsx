@@ -11,7 +11,17 @@ export const PlayerCard = ({ player, onHire, onDonate }) => {
   const handleChat = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/chat?player=${player.id}`);
+    const targetPartnerId = player.userId || player.id;
+    const query = new URLSearchParams({
+      partnerId: targetPartnerId,
+      player: player.id,
+      name: player.fullName || player.name || player.username || 'Idol PlayZone',
+      username: player.username || '',
+      avatar: player.avatar || '',
+      role: player.primaryGame || 'Idol Duo',
+      isPlayer: 'true'
+    });
+    navigate(`/chat?${query.toString()}`);
   };
 
   const handleHireClick = (e) => {

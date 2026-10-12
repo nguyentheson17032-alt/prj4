@@ -177,7 +177,19 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <button
                 className="btn btn-secondary"
-                onClick={() => navigate(`/chat?player=${player.id}`)}
+                onClick={() => {
+                  const targetPartnerId = player.userId || player.id;
+                  const query = new URLSearchParams({
+                    partnerId: targetPartnerId,
+                    player: player.id,
+                    name: player.fullName || player.name || player.username || 'Idol PlayZone',
+                    username: player.username || '',
+                    avatar: player.avatar || '',
+                    role: player.primaryGame || 'Idol Duo',
+                    isPlayer: 'true'
+                  });
+                  navigate(`/chat?${query.toString()}`);
+                }}
               >
                 <MessageSquare size={18} />
                 <span>Nhắn Tin</span>
@@ -483,7 +495,19 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               <button
                 className="btn btn-secondary"
                 style={{ width: '100%' }}
-                onClick={() => navigate(`/chat?player=${player.id}`)}
+                onClick={() => {
+                  const targetPartnerId = player.userId || player.id;
+                  const query = new URLSearchParams({
+                    partnerId: targetPartnerId,
+                    player: player.id,
+                    name: player.fullName || player.name || player.username || 'Idol PlayZone',
+                    username: player.username || '',
+                    avatar: player.avatar || '',
+                    role: player.primaryGame || 'Idol Duo',
+                    isPlayer: 'true'
+                  });
+                  navigate(`/chat?${query.toString()}`);
+                }}
               >
                 <MessageSquare size={18} />
                 <span>Trò Chuyện Trước Khi Thuê</span>

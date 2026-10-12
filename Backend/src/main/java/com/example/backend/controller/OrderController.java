@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.security.core.Authentication;
+import com.example.backend.entity.User;
+import com.example.backend.service.UserService;
 import com.example.backend.dto.OrderResponseDTO;
 import com.example.backend.dto.OrderSummaryDTO;
 import com.example.backend.dto.UserOrderDTO;
@@ -38,6 +41,10 @@ public class OrderController {
     private final PaymentRepository paymentRepository;
     @Autowired
     private OrderRepository orderRepository;
+    @Autowired
+    private UserService userService;
+    @Autowired(required = false)
+    private com.example.backend.repository.PlayerImageRepository playerImageRepository;
     private final PlayerReviewRepository playerReviewRepository;
     private final OrderService orderService;
 
@@ -154,20 +161,30 @@ public class OrderController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<OrderResponseDTO>> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
-        List<OrderResponseDTO> result = orders.stream().map(order -> new OrderResponseDTO(
-                order.getId(),
-                order.getRenter() != null ? order.getRenter().getUsername() : "",
-                order.getPlayer() != null ? order.getPlayer().getUsername() : "",
-                order.getStartTime() != null && order.getEndTime() != null
-                        ? order.getStartTime().format(formatter) + " - " + order.getEndTime().format(formatter)
-                        : "",
-                order.getStatus() != null ? order.getStatus() : "",
-                order.getPrice())).collect(Collectors.toList());
-        return ResponseEntity.ok(result);
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<OrderResponseDTO>> getAllOrders(Authentication authentication) {
+        User currentUser = null;
+        if (authentication != null) {
+            currentUser = userService.findByUsername(authentication.getName());
+        }
+
+        List<Order> orders;
+        if (currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN")) {
+            orders = orderRepository.findAll();
+        } else if (currentUser != null) {
+            orders = orderRepository.findAllByUserId(currentUser.getId());
+        } else {
+            orders = orderRepository.findAll();
+        }
+
+        orders.sort((o1, o2) -> {
+            if (o1.getStartTime() != null && o2.getStartTime() != null) {
+                return o2.getStartTime().compareTo(o1.getStartTime());
+            }
+            return Long.compare(o2.getId(), o1.getId());
+        });
+
+        return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
     @GetMapping("/user/{userId}")
@@ -562,17 +579,68 @@ public class OrderController {
         return ResponseEntity.ok("Order deleted successfully");
     }
 
+    private OrderResponseDTO mapOrderToDTO(Order order) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+        OrderResponseDTO dto = new OrderResponseDTO();
+        dto.setId(order.getId());
+        dto.setRenterId(order.getRenter() != null ? order.getRenter().getId() : null);
+        dto.setRenterName(order.getRenter() != null ? order.getRenter().getUsername() : "");
+        String renterAvatar = null;
+        if (order.getRenter() != null) {
+            renterAvatar = order.getRenter().getAvatarUrl();
+            if (renterAvatar == null || renterAvatar.trim().isEmpty()) {
+                renterAvatar = order.getRenter().getProfileImageUrl();
+            }
+        }
+        dto.setRenterAvatarUrl(renterAvatar);
+
+        dto.setPlayerId(order.getPlayer() != null ? order.getPlayer().getId() : null);
+        dto.setPlayerUserId(order.getPlayer() != null && order.getPlayer().getUser() != null ? order.getPlayer().getUser().getId() : null);
+        dto.setPlayerName(order.getPlayer() != null ? order.getPlayer().getUsername() : "");
+
+        String playerAvatar = null;
+        if (order.getPlayer() != null && order.getPlayer().getUser() != null) {
+            playerAvatar = order.getPlayer().getUser().getAvatarUrl();
+            if (playerAvatar == null || playerAvatar.trim().isEmpty()) {
+                playerAvatar = order.getPlayer().getUser().getProfileImageUrl();
+            }
+        }
+        if ((playerAvatar == null || playerAvatar.trim().isEmpty()) && order.getPlayer() != null && playerImageRepository != null) {
+            try {
+                var images = playerImageRepository.findByGamePlayerId(order.getPlayer().getId());
+                if (images != null && !images.isEmpty() && images.get(0).getImageUrl() != null) {
+                    playerAvatar = images.get(0).getImageUrl();
+                }
+            } catch (Exception ignored) {}
+        }
+        dto.setPlayerAvatarUrl(playerAvatar);
+        dto.setPlayerRank(order.getPlayer() != null ? order.getPlayer().getRank() : "");
+        dto.setGame(order.getPlayer() != null && order.getPlayer().getGame() != null ? order.getPlayer().getGame().getName() : "Duo Game");
+
+        if (order.getStartTime() != null && order.getEndTime() != null) {
+            dto.setHireTime(order.getStartTime().format(formatter) + " - " + order.getEndTime().format(formatter));
+            dto.setHours(java.time.Duration.between(order.getStartTime(), order.getEndTime()).toHours());
+            dto.setCreatedAt(order.getStartTime().format(formatter));
+        } else if (order.getStartTime() != null) {
+            dto.setHireTime(order.getStartTime().format(formatter));
+            dto.setCreatedAt(order.getStartTime().format(formatter));
+            dto.setHours(1L);
+        } else {
+            dto.setHireTime("");
+            dto.setCreatedAt("");
+            dto.setHours(0L);
+        }
+
+        dto.setStatus(order.getStatus() != null ? order.getStatus() : "PENDING");
+        dto.setStatusLabel(getStatusLabel(order.getStatus()));
+        dto.setPrice(order.getPrice());
+        dto.setStartTime(order.getStartTime());
+        dto.setEndTime(order.getEndTime());
+        return dto;
+    }
+
     private List<OrderResponseDTO> mapOrdersToDTO(List<Order> orders) {
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
-        return orders.stream().map(order -> new OrderResponseDTO(
-                order.getId(),
-                order.getRenter() != null ? order.getRenter().getUsername() : "",
-                order.getPlayer() != null ? order.getPlayer().getUsername() : "",
-                order.getStartTime() != null && order.getEndTime() != null
-                        ? order.getStartTime().format(formatter) + " - " + order.getEndTime().format(formatter)
-                        : "",
-                order.getStatus() != null ? order.getStatus() : "",
-                order.getPrice())).toList();
+        return orders.stream().map(this::mapOrderToDTO).collect(Collectors.toList());
     }
 
     private String getStatusLabel(String status) {

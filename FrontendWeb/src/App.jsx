@@ -102,6 +102,7 @@ const AppContent = ({
             player={selectedPlayerForHire}
             isOpen={!!selectedPlayerForHire}
             onClose={() => setSelectedPlayerForHire(null)}
+            onOpenDeposit={() => setIsDepositOpen(true)}
           />
           <DepositModal
             isOpen={isDepositOpen}
@@ -111,6 +112,7 @@ const AppContent = ({
             player={selectedPlayerForDonate}
             isOpen={!!selectedPlayerForDonate}
             onClose={() => setSelectedPlayerForDonate(null)}
+            onOpenDeposit={() => setIsDepositOpen(true)}
           />
           <AuthModal
             isOpen={isAuthOpen}

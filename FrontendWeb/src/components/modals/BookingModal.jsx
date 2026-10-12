@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { X, Clock, Gamepad2, Tag, Check, Sparkles, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../../context/AuthContext';
@@ -54,33 +55,40 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
       return;
     }
 
+    if (!user?.id) {
+      addToast('Vui lòng đăng nhập để thuê player!', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const successDeduct = deductBalance(finalTotal);
-      if (!successDeduct) {
-        addToast('Lỗi trừ tiền ví', 'error');
-        setIsSubmitting(false);
-        return;
-      }
+      const now = new Date();
+      const startTime = new Date(now.getTime() + 16 * 60000); // 16 minutes from now (backend requires ≥15 min)
+      const endTime = new Date(startTime.getTime() + hours * 3600000);
 
-      const orderData = {
-        player: player,
-        game: selectedGame,
-        hours: hours,
-        pricePerHour: basePrice,
-        totalPrice: subtotal,
-        discount: discountAmount,
-        finalPrice: finalTotal,
-        note: note || 'Duo leo rank',
-        scheduleType: scheduleType,
-        status: 'IN_PROGRESS'
+      // Format as local datetime (not UTC) to match backend LocalDateTime expectations
+      const fmt = (d) => {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       };
 
-      const res = await api.createOrder(orderData);
-      setCreatedOrder(res);
+      const hireData = {
+        userId: user.id,
+        hours: hours,
+        coin: finalTotal,
+        startTime: fmt(startTime),
+        endTime: fmt(endTime),
+        specialRequest: note || null
+      };
+
+      const res = await api.hirePlayer(player.id, hireData);
+      setCreatedOrder(res?.data || res);
+
+      // Deduct balance locally after successful backend call
+      deductBalance(finalTotal);
+
       setIsSuccess(true);
-      
-      // Fire celebration confetti
+
       confetti({
         particleCount: 80,
         spread: 70,
@@ -89,7 +97,8 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
 
       addToast(`Thuê thành công Player ${player.fullName}!`, 'success');
     } catch (err) {
-      addToast('Có lỗi xảy ra khi tạo đơn thuê!', 'error');
+      const msg = err.response?.data?.message || err.response?.data || err.message || 'Có lỗi xảy ra khi tạo đơn thuê!';
+      addToast(typeof msg === 'string' ? msg : 'Có lỗi xảy ra khi tạo đơn thuê!', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -159,10 +168,10 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={handleClose}>
                 Đóng
               </button>
-              <a href={`/chat?player=${player.id}`} className="btn btn-primary" style={{ flex: 1 }}>
+              <Link to={`/chat?player=${player.id}`} className="btn btn-primary" style={{ flex: 1 }}>
                 <span>Nhắn Tin Ngay</span>
                 <ArrowRight size={16} />
-              </a>
+              </Link>
             </div>
           </div>
         ) : (

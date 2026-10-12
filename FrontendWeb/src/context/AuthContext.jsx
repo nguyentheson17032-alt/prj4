@@ -158,6 +158,15 @@ export const AuthProvider = ({ children }) => {
     )
   );
 
+  const isPlayer = Boolean(
+    user && (
+      (Array.isArray(user.roles) && user.roles.some(r => typeof r === 'string' && (r.toUpperCase() === 'PLAYER' || r.toUpperCase() === 'ROLE_PLAYER'))) ||
+      user.role === 'PLAYER' ||
+      user.role === 'ROLE_PLAYER' ||
+      user.isPlayer
+    )
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -166,6 +175,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         isAuthenticated: !!user,
         isAdmin,
+        isPlayer,
         login,
         register,
         logout,

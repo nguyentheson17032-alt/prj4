@@ -108,6 +108,24 @@ export const MomentsPage = () => {
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
             Đang tải khoảnh khắc...
           </div>
+        ) : moments.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '60px 20px',
+            background: 'var(--bg-card)',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border-color)'
+          }}>
+            <Image size={48} color="var(--text-muted)" style={{ margin: '0 auto 16px auto' }} />
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Chưa Có Khoảnh Khắc Nào</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '16px' }}>
+              Hãy là người đầu tiên chia sẻ khoảnh khắc gaming của bạn!
+            </p>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+              <PlusCircle size={16} />
+              <span>Đăng Bài Đầu Tiên</span>
+            </button>
+          </div>
         ) : (
           moments.map((moment) => (
             <div key={moment.id} className="moment-card">
