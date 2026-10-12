@@ -98,6 +98,10 @@ public class GamePlayerService {
         return gamePlayerRepository.findByUserId(userId);
     }
 
+    public boolean existsByUserAndGame(Long userId, Long gameId) {
+        return gamePlayerRepository.existsByUserIdAndGameId(userId, gameId);
+    }
+
     public List<GamePlayer> getGamePlayersByStatus(String status) {
         return gamePlayerRepository.findByStatus(status);
     }

@@ -12,6 +12,7 @@ import java.util.List;
 public interface GamePlayerRepository extends JpaRepository<GamePlayer, Long> {
     List<GamePlayer> findByGameId(Long gameId);
     List<GamePlayer> findByUserId(Long userId);
+    boolean existsByUserIdAndGameId(Long userId, Long gameId);
     List<GamePlayer> findByStatus(String status);
     List<GamePlayer> findByRank(String rank);
     List<GamePlayer> findByRole(String role);

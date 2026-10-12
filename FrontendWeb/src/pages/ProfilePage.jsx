@@ -1,13 +1,130 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   User, Mail, Phone, Lock, Save, Sparkles, ShieldCheck,
   Star, MessageSquare, CheckCircle, XCircle, Clock, Coins,
-  ChevronRight, X, Edit2, TrendingUp, Award
+  ChevronRight, X, Edit2, TrendingUp, Award, Gamepad2, Pencil
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getUserAvatar, getFunAvatar, FUN_AVATAR_STYLES } from '../utils/avatarUtils';
 import api from '../api/apiService';
+
+const SERVERS = [
+  { value: 'VN', label: 'Việt Nam' },
+  { value: 'Asia', label: 'Châu Á' },
+  { value: 'KR', label: 'Hàn Quốc' },
+  { value: 'NA', label: 'Bắc Mỹ' },
+  { value: 'EU', label: 'Châu Âu' },
+];
+
+const EditGameModal = ({ isOpen, onClose, gameName, form, onChange, onSave, saving }) => {
+  if (!isOpen) return null;
+  const { rankMin, rankMax, roles, servers, pricePerHour, availableRanks, availableRoles } = form;
+  const toggleRole = (r) => onChange('roles', roles.includes(r) ? roles.filter(x => x !== r) : [...roles, r]);
+  const toggleServer = (s) => onChange('servers', servers.includes(s) ? servers.filter(x => x !== s) : [...servers, s]);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={onClose}>
+      <div className="glass-panel" style={{ width: '100%', maxWidth: '540px', padding: '0', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Gamepad2 size={18} color="var(--primary)" />
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Cập nhật: <span style={{ color: '#a5b4fc' }}>{gameName}</span></h3>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Rank range */}
+          {availableRanks && availableRanks.length > 0 ? (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Chấp Nhận Rank Từ - Đến *:</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
+                <select className="form-control" value={rankMin} onChange={e => {
+                  const newMin = e.target.value;
+                  const minIdx = availableRanks.indexOf(newMin);
+                  const maxIdx = availableRanks.indexOf(rankMax);
+                  onChange('rankMin', newMin);
+                  if (maxIdx < minIdx) onChange('rankMax', newMin);
+                }}>
+                  {availableRanks.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>→</span>
+                <select className="form-control" value={rankMax} onChange={e => onChange('rankMax', e.target.value)}>
+                  {availableRanks.slice(availableRanks.indexOf(rankMin)).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                {rankMin === rankMax ? `Hiển thị: ${rankMin}` : `Hiển thị: ${rankMin} - ${rankMax}`}
+              </span>
+            </div>
+          ) : (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Mức Rank / Cấp Độ *:</label>
+              <input type="text" className="form-control" placeholder="VD: Cao Thủ, Radiant..." value={rankMin} onChange={e => { onChange('rankMin', e.target.value); onChange('rankMax', e.target.value); }} />
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Roles */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Vị Trí / Role:</label>
+              {availableRoles && availableRoles.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', minHeight: '44px' }}>
+                  {availableRoles.map(ro => {
+                    const checked = roles.includes(ro);
+                    return (
+                      <span key={ro} onClick={() => toggleRole(ro)} style={{ padding: '4px 11px', borderRadius: '20px', cursor: 'pointer', background: checked ? 'rgba(99,102,241,0.2)' : 'var(--bg-secondary)', border: `1px solid ${checked ? '#6366f1' : 'var(--border-color)'}`, color: checked ? '#a5b4fc' : 'var(--text-secondary)', fontSize: '0.83rem', fontWeight: checked ? 600 : 400, transition: 'all 0.15s', userSelect: 'none' }}>
+                        {ro}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <input type="text" className="form-control" value="Không có" readOnly style={{ opacity: 0.5 }} />
+              )}
+            </div>
+
+            {/* Servers */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Server Khu Vực:</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', minHeight: '44px' }}>
+                {SERVERS.map(({ value, label }) => {
+                  const checked = servers.includes(value);
+                  return (
+                    <span key={value} onClick={() => toggleServer(value)} style={{ padding: '4px 11px', borderRadius: '20px', cursor: 'pointer', background: checked ? 'rgba(16,185,129,0.15)' : 'var(--bg-secondary)', border: `1px solid ${checked ? '#10b981' : 'var(--border-color)'}`, color: checked ? '#6ee7b7' : 'var(--text-secondary)', fontSize: '0.83rem', fontWeight: checked ? 600 : 400, transition: 'all 0.15s', userSelect: 'none' }}>
+                      {label} ({value})
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Price */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Giá Thuê (VNĐ / Giờ) *:</label>
+            <input type="number" step="5000" min="10000" max="500000" className="form-control" value={pricePerHour} onChange={e => onChange('pricePerHour', Number(e.target.value))} />
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+              💡 Mức khuyến nghị: 40.000 đ - 80.000 đ / giờ
+            </span>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px' }}>
+            <button className="btn btn-secondary" onClick={onClose} disabled={saving}>Hủy</button>
+            <button className="btn btn-primary" onClick={onSave} disabled={saving}>
+              <Save size={14} />
+              <span>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Modal hiển thị danh sách đánh giá
 const ReviewsModal = ({ isOpen, onClose, reviews, playerName, rating, reviewCount }) => {
@@ -156,12 +273,14 @@ export const ProfilePage = () => {
 
   // Player state
   const [playerProfile, setPlayerProfile] = useState(null);
+  const [allGamePlayers, setAllGamePlayers] = useState([]);
   const [playerStats, setPlayerStats] = useState(null);
   const [reviews, setReviews] = useState([]);
-  const [priceInput, setPriceInput] = useState('');
+  const [gameInfoInputs, setGameInfoInputs] = useState({});
+  const [savingInfoId, setSavingInfoId] = useState(null);
+  const [editingGame, setEditingGame] = useState(null); // { gpId, gameName, form }
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
-  const [savingPrice, setSavingPrice] = useState(false);
 
   // Load player data if user is player
   useEffect(() => {
@@ -170,15 +289,24 @@ export const ProfilePage = () => {
       setLoadingStats(true);
       try {
         const players = await api.getGamePlayersByUser(user.id);
-        const raw = players?.[0] || null;
-        if (!raw) return;
-        setPlayerProfile(raw);
-        setPriceInput(String(raw.pricePerHour || raw.price || ''));
+        if (!players || players.length === 0) return;
+        setAllGamePlayers(players);
+        setPlayerProfile(players[0]);
+        const inputs = {};
+        players.forEach(p => {
+          inputs[p.id] = {
+            rank: p.rank || '',
+            role: p.role || '',
+            server: p.server || 'VN',
+            price: String(p.pricePerHour || p.price || ''),
+          };
+        });
+        setGameInfoInputs(inputs);
 
-        const stats = await api.getPlayerStats(raw.id);
+        const stats = await api.getPlayerStats(players[0].id);
         if (stats) setPlayerStats(stats);
 
-        const revData = await api.getReviewsByPlayerId(raw.id);
+        const revData = await api.getReviewsByPlayerId(players[0].id);
         setReviews(Array.isArray(revData) ? revData : []);
       } catch (e) {
         console.warn('Load player data error:', e.message);
@@ -210,19 +338,45 @@ export const ProfilePage = () => {
     setOldPassword(''); setNewPassword(''); setConfirmPassword('');
   };
 
-  const handleUpdatePrice = async () => {
-    if (!playerProfile?.id) return;
-    const price = Number(priceInput);
-    if (!price || price <= 0) { addToast('Giá thuê không hợp lệ!', 'error'); return; }
-    setSavingPrice(true);
+  const openEditModal = (gp) => {
+    const availableRanks = gp.game?.availableRanks || [];
+    const availableRoles = gp.game?.availableRoles || [];
+    const rankStr = gp.rank || '';
+    const parts = rankStr.split(' - ');
+    const rankMin = parts[0]?.trim() || availableRanks[0] || rankStr;
+    const rankMax = parts[1]?.trim() || rankMin;
+    const roles = (gp.role || '').split('/').map(r => r.trim()).filter(Boolean);
+    const servers = (gp.server || 'VN').split('/').map(s => s.trim()).filter(Boolean);
+    setEditingGame({
+      gpId: gp.id,
+      gameName: gp.game?.name || gp.gameName || 'Game',
+      form: { rankMin, rankMax, roles, servers, pricePerHour: Number(gp.pricePerHour || 50000), availableRanks, availableRoles },
+    });
+  };
+
+  const updateEditField = (field, value) => {
+    setEditingGame(prev => prev ? { ...prev, form: { ...prev.form, [field]: value } } : null);
+  };
+
+  const handleSaveGameInfo = async () => {
+    if (!editingGame) return;
+    const { gpId, form } = editingGame;
+    const { rankMin, rankMax, roles, servers, pricePerHour } = form;
+    if (!rankMin.trim()) { addToast('Rank không được để trống!', 'error'); return; }
+    if (!pricePerHour || pricePerHour < 10000) { addToast('Giá thuê không hợp lệ (tối thiểu 10.000đ)!', 'error'); return; }
+    const rank = rankMin === rankMax ? rankMin : `${rankMin} - ${rankMax}`;
+    const role = roles.length > 0 ? roles.join(' / ') : '';
+    const server = servers.length > 0 ? servers.join(' / ') : 'VN';
+    setSavingInfoId(gpId);
     try {
-      await api.updatePlayerPrice(playerProfile.id, price);
-      setPlayerProfile(prev => ({ ...prev, pricePerHour: price }));
-      addToast('Cập nhật giá thuê thành công!', 'success');
+      await api.updatePlayerInfo(gpId, { rank, role, server, pricePerHour });
+      setAllGamePlayers(prev => prev.map(p => p.id === gpId ? { ...p, rank, role, server, pricePerHour } : p));
+      addToast('Cập nhật thành công!', 'success');
+      setEditingGame(null);
     } catch (e) {
-      addToast('Cập nhật giá thất bại: ' + (e.response?.data?.message || e.message), 'error');
+      addToast('Cập nhật thất bại: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
-      setSavingPrice(false);
+      setSavingInfoId(null);
     }
   };
 
@@ -271,102 +425,106 @@ export const ProfilePage = () => {
             <>
               {/* Stats cards */}
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                <StatCard
-                  icon={<Star size={22} fill="#f59e0b" color="#f59e0b" />}
-                  label="Đánh giá trung bình"
-                  value={rating ? rating.toFixed(1) : '—'}
-                  suffix="/ 5"
-                  color="#f59e0b"
-                />
-                <StatCard
-                  icon={<CheckCircle size={22} color="#22c55e" />}
-                  label="Đơn hoàn thành"
-                  value={completedOrders}
-                  suffix="đơn"
-                  color="#22c55e"
-                />
-                <StatCard
-                  icon={<XCircle size={22} color="#ef4444" />}
-                  label="Đơn đã hủy"
-                  value={canceledOrders}
-                  suffix="đơn"
-                  color="#ef4444"
-                />
-                <StatCard
-                  icon={<Clock size={22} color="#06b6d4" />}
-                  label="Tổng giờ chơi"
-                  value={totalHours}
-                  suffix="giờ"
-                  sublabel="Từ đơn hoàn thành"
-                  color="#06b6d4"
-                />
+                <StatCard icon={<Star size={22} fill="#f59e0b" color="#f59e0b" />} label="Đánh giá trung bình" value={rating ? rating.toFixed(1) : '—'} suffix="/ 5" color="#f59e0b" />
+                <StatCard icon={<CheckCircle size={22} color="#22c55e" />} label="Đơn hoàn thành" value={completedOrders} suffix="đơn" color="#22c55e" />
+                <StatCard icon={<XCircle size={22} color="#ef4444" />} label="Đơn đã hủy" value={canceledOrders} suffix="đơn" color="#ef4444" />
+                <StatCard icon={<Clock size={22} color="#06b6d4" />} label="Tổng giờ chơi" value={totalHours} suffix="giờ" sublabel="Từ đơn hoàn thành" color="#06b6d4" />
               </div>
 
               {/* Reviews summary */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px'
+                background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '14px 18px', marginBottom: '24px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <MessageSquare size={20} color="var(--primary)" />
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                      {reviewCount} lượt đánh giá
-                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{reviewCount} lượt đánh giá</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ color: '#f59e0b' }}>{'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}</span>
                       <span>{rating ? `${rating.toFixed(1)} / 5` : 'Chưa có đánh giá'}</span>
                     </div>
                   </div>
                 </div>
-                <button
-                  className="btn btn-outline"
-                  style={{ padding: '6px 14px', fontSize: '0.82rem', gap: '6px', borderColor: 'var(--primary)', color: 'var(--primary)' }}
-                  onClick={() => setShowReviewsModal(true)}
-                >
+                <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.82rem', gap: '6px', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => setShowReviewsModal(true)}>
                   <span>Xem chi tiết</span>
                   <ChevronRight size={14} />
                 </button>
               </div>
 
-              {/* Price editor */}
+              {/* Per-game cards: 2-column grid */}
               <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, fontSize: '0.9rem', marginBottom: '8px' }}>
-                  <Coins size={16} color="var(--primary)" />
-                  Giá Thuê (coin / giờ)
-                </label>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
-                  <div style={{ flex: 1, position: 'relative' }}>
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={priceInput}
-                      onChange={e => setPriceInput(e.target.value)}
-                      min="1000"
-                      step="1000"
-                      placeholder="Ví dụ: 50000"
-                      style={{ paddingRight: '60px' }}
-                    />
-                    <span style={{
-                      position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                      fontSize: '0.75rem', color: 'var(--text-muted)', pointerEvents: 'none'
-                    }}>coin/h</span>
-                  </div>
-                  <button
-                    className="btn btn-primary"
-                    style={{ whiteSpace: 'nowrap', gap: '6px' }}
-                    onClick={handleUpdatePrice}
-                    disabled={savingPrice}
-                  >
-                    <Edit2 size={14} />
-                    <span>{savingPrice ? 'Đang lưu...' : 'Cập nhật giá'}</span>
-                  </button>
+                <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <TrendingUp size={16} color="var(--primary)" />
+                  Game Đã Đăng Ký ({allGamePlayers.length})
                 </div>
-                {priceInput && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                    ≈ {Number(priceInput).toLocaleString('vi-VN')} coin / giờ
-                  </p>
-                )}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  {allGamePlayers.map(gp => {
+                    const gpStatus = (gp.status || '').toUpperCase();
+                    const statusColor = gpStatus === 'AVAILABLE' ? '#22c55e' : gpStatus === 'PENDING' ? '#fbbf24' : gpStatus === 'HIRED' ? '#06b6d4' : '#ef4444';
+                    const statusLabel = gpStatus === 'AVAILABLE' ? 'Hoạt động' : gpStatus === 'PENDING' ? 'Chờ duyệt' : gpStatus === 'HIRED' ? 'Đang thuê' : gpStatus === 'REJECTED' ? 'Từ chối' : gpStatus;
+                    const gameName = gp.game?.name || gp.gameName || gp.primaryGame || 'Game';
+                    const rank = gp.rank || '—';
+                    const roles = (gp.role || '').split('/').map(r => r.trim()).filter(Boolean);
+                    const servers = (gp.server || 'VN').split('/').map(s => s.trim()).filter(Boolean);
+                    const price = Number(gp.pricePerHour || 0);
+                    return (
+                      <div key={gp.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px 16px', position: 'relative', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {/* Edit button */}
+                        <button
+                          onClick={() => openEditModal(gp)}
+                          title="Cập nhật thông tin"
+                          style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '8px', padding: '5px 7px', cursor: 'pointer', color: '#a5b4fc', display: 'flex', alignItems: 'center', lineHeight: 1 }}
+                        >
+                          <Pencil size={13} />
+                        </button>
+
+                        {/* Game name + status */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '32px' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Gamepad2 size={16} color="var(--primary)" />
+                          </div>
+                          <span style={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.3 }}>{gameName}</span>
+                        </div>
+
+                        <span style={{ alignSelf: 'flex-start', fontSize: '0.7rem', fontWeight: 600, padding: '2px 9px', borderRadius: '20px', background: `${statusColor}18`, color: statusColor }}>
+                          {statusLabel}
+                        </span>
+
+                        {/* Info rows */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Rank:</span>{' '}
+                            <strong style={{ color: 'var(--secondary)' }}>{rank}</strong>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Vị trí:</span>{' '}
+                            <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {roles.length > 0 ? roles.map(r => (
+                                <span key={r} style={{ padding: '1px 8px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', fontSize: '0.75rem', fontWeight: 600 }}>{r}</span>
+                              )) : <span style={{ fontStyle: 'italic' }}>Không có</span>}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Server:</span>{' '}
+                            <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {servers.map(s => (
+                                <span key={s} style={{ padding: '1px 8px', borderRadius: '10px', background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', fontSize: '0.75rem', fontWeight: 600 }}>{s}</span>
+                              ))}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Price */}
+                        <div style={{ marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Coins size={13} color="var(--primary)" />
+                          <span style={{ fontWeight: 800, color: 'var(--accent-pink)', fontSize: '1rem' }}>{price.toLocaleString('vi-VN')} đ</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>/ giờ</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </>
           )}
@@ -487,15 +645,30 @@ export const ProfilePage = () => {
         </div>
       </form>
 
-      {/* Reviews Modal */}
-      <ReviewsModal
-        isOpen={showReviewsModal}
-        onClose={() => setShowReviewsModal(false)}
-        reviews={reviews}
-        playerName={playerProfile?.username || user?.username || 'Idol'}
-        rating={rating}
-        reviewCount={reviewCount}
-      />
+      {editingGame && createPortal(
+        <EditGameModal
+          isOpen={!!editingGame}
+          onClose={() => setEditingGame(null)}
+          gameName={editingGame.gameName}
+          form={editingGame.form}
+          onChange={updateEditField}
+          onSave={handleSaveGameInfo}
+          saving={savingInfoId === editingGame.gpId}
+        />,
+        document.body
+      )}
+
+      {createPortal(
+        <ReviewsModal
+          isOpen={showReviewsModal}
+          onClose={() => setShowReviewsModal(false)}
+          reviews={reviews}
+          playerName={playerProfile?.username || user?.username || 'Idol'}
+          rating={rating}
+          reviewCount={reviewCount}
+        />,
+        document.body
+      )}
     </div>
   );
 };

@@ -32,6 +32,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
   const [activeTab, setActiveTab] = useState('SERVICES'); // SERVICES, ALBUM, REVIEWS
   const [isFavorited, setIsFavorited] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
+  const [selectedGame, setSelectedGame] = useState(null);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -48,11 +49,30 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
       }
       const finalReviewCount = Math.max(pData?.reviewCount || 0, reviewList.length);
       if (pData) {
-        setPlayer({
+        // Fetch all game registrations for this user to build the full games list
+        let allGames = pData.games;
+        try {
+          const allRecords = await api.getGamePlayersByUser(pData.userId);
+          if (Array.isArray(allRecords) && allRecords.length > 0) {
+            allGames = allRecords
+              .filter(p => (p.status || '').toUpperCase() !== 'REJECTED')
+              .map(p => ({
+                name: p.game?.name || p.gameName || 'Game',
+                rank: p.rank || 'Cao Thủ',
+                role: p.role || 'Không có',
+                price: Number(p.pricePerHour || 50000),
+              }));
+          }
+        } catch (_) {}
+
+        const finalPlayer = {
           ...pData,
           rating: finalRating,
-          reviewCount: finalReviewCount
-        });
+          reviewCount: finalReviewCount,
+          games: allGames,
+        };
+        setPlayer(finalPlayer);
+        setSelectedGame(allGames?.[0] || null);
       }
       setReviews(reviewList);
       setLoading(false);
@@ -308,56 +328,62 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               <div className="glass-panel" style={{ padding: '24px' }}>
                 <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>Các Game Nhận Duo & Bảng Giá</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {player.games?.map((game, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '16px',
-                        background: 'var(--bg-tertiary)',
-                        borderRadius: 'var(--radius-md)',
-                        border: '1px solid var(--border-color)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '10px',
-                          background: 'rgba(139, 92, 246, 0.2)',
+                  {player.games?.map((game, idx) => {
+                    const isSelected = selectedGame?.name === game.name;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => setSelectedGame(game)}
+                        style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--primary)'
-                        }}>
-                          <Gamepad2 size={22} />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '1rem' }}>{game.name}</div>
-                          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                            Rank: <strong style={{ color: 'var(--secondary)' }}>{game.rank}</strong> • Vị trí: {game.role}
+                          justifyContent: 'space-between',
+                          padding: '16px',
+                          background: isSelected ? 'rgba(99,102,241,0.12)' : 'var(--bg-tertiary)',
+                          borderRadius: 'var(--radius-md)',
+                          border: `1px solid ${isSelected ? '#6366f1' : 'var(--border-color)'}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '10px',
+                            background: isSelected ? 'rgba(99,102,241,0.3)' : 'rgba(139, 92, 246, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: isSelected ? '#a5b4fc' : 'var(--primary)'
+                          }}>
+                            <Gamepad2 size={22} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{game.name}</div>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                              Rank: <strong style={{ color: 'var(--secondary)' }}>{game.rank}</strong> • Vị trí: {game.role}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: 800, color: 'var(--accent-pink)', fontSize: '1.1rem' }}>
-                            {game.price.toLocaleString('vi-VN')} đ
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 800, color: 'var(--accent-pink)', fontSize: '1.1rem' }}>
+                              {game.price.toLocaleString('vi-VN')} đ
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 1 giờ</div>
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 1 giờ</div>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={(e) => { e.stopPropagation(); setSelectedGame(game); onHirePlayer({ ...player, pricePerHour: game.price, primaryGame: game.name }); }}
+                          >
+                            Thuê Game Này
+                          </button>
                         </div>
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => onHirePlayer(player)}
-                        >
-                          Thuê Game Này
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -487,8 +513,13 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
           }}>
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Mức giá thuê</span>
+              {selectedGame && (
+                <div style={{ fontSize: '0.8rem', color: '#a5b4fc', fontWeight: 600, marginTop: '4px' }}>
+                  {selectedGame.name}
+                </div>
+              )}
               <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--accent-pink)', marginTop: '2px' }}>
-                {(player.pricePerHour || 50000).toLocaleString('vi-VN')} đ
+                {(selectedGame?.price || player.pricePerHour || 50000).toLocaleString('vi-VN')} đ
               </div>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>trên 1 giờ trải nghiệm</span>
             </div>
@@ -512,7 +543,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               <button
                 className="btn btn-primary btn-lg"
                 style={{ width: '100%' }}
-                onClick={() => onHirePlayer(player)}
+                onClick={() => onHirePlayer(selectedGame ? { ...player, pricePerHour: selectedGame.price, primaryGame: selectedGame.name } : player)}
               >
                 <Gamepad2 size={20} />
                 <span>Thuê Ngay Bây Giờ</span>

@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Crown,
   Gamepad2,
-  Image,
-  Mic,
-  DollarSign,
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
@@ -21,128 +18,110 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/apiService';
 
+const initGameForm = (game) => ({
+  gameId: game.id,
+  gameName: game.name,
+  rankMin: game.availableRanks?.[0] || '',
+  rankMax: game.availableRanks?.[0] || '',
+  roles: game.availableRoles?.length > 0 ? [game.availableRoles[0]] : [],
+  servers: ['VN'],
+  pricePerHour: 50000,
+  availableRanks: game.availableRanks || [],
+  availableRoles: game.availableRoles || [],
+});
+
 export const RegisterPlayerPage = ({ onOpenAuth }) => {
   const { user, updateProfile, isAuthenticated, isAdmin, isPlayer, loading: authLoading } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  const [step, setStep] = useState(1); // 1: Info, 2: Games & Skills, 3: Media & Voice, 4: Success
+  // 1: Info, 2: Chọn game, 3: Form từng game, 4: Media, 5: Thành công
+  const [step, setStep] = useState(1);
   const [games, setGames] = useState([]);
-  const [selectedGameId, setSelectedGameId] = useState(null);
-  const [selectedGame, setSelectedGame] = useState(null);
 
-  // Kiểm tra hồ sơ Idol hiện tại của user (mỗi user chỉ được đăng ký 1 lần)
-  const [existingPlayer, setExistingPlayer] = useState(null);
+  const [existingPlayers, setExistingPlayers] = useState([]);
   const [checkingExisting, setCheckingExisting] = useState(true);
 
-  // Form Fields
+  // Step 1
   const [nickname, setNickname] = useState(user?.fullName || user?.username || '');
   const [gender, setGender] = useState(user?.gender || 'FEMALE');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || user?.phone || '');
   const [bio, setBio] = useState(user?.bio || 'Mình rất vui vẻ, nhiệt tình và thích leo rank cùng anh em!');
-  const [rankMin, setRankMin] = useState('Cao Thủ');
-  const [rankMax, setRankMax] = useState('Cao Thủ');
-  const [roles, setRoles] = useState([]);
-  const [servers, setServers] = useState(['VN']);
-  const [pricePerHour, setPricePerHour] = useState(50000);
+
+  // Step 2
+  const [selectedGames, setSelectedGames] = useState([]);
+
+  // Step 3
+  const [gameFormData, setGameFormData] = useState([]);
+  const [currentGameIndex, setCurrentGameIndex] = useState(0);
+
+  // Step 4
   const [voiceUrl, setVoiceUrl] = useState('https://actions.google.com/sounds/v1/water/rain_heavy.ogg');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(true);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successCount, setSuccessCount] = useState(0);
+  const [succeededForms, setSucceededForms] = useState([]);
 
-  // Tự động đồng bộ số điện thoại và thông tin từ tài khoản cá nhân khi user tải xong
   useEffect(() => {
     if (user) {
       if (!nickname) setNickname(user.fullName || user.username || '');
       const userPhone = user.phoneNumber || user.phone || '';
-      if (userPhone && (!phoneNumber || phoneNumber === '0987654321')) {
-        setPhoneNumber(userPhone);
-      }
+      if (userPhone && (!phoneNumber || phoneNumber === '0987654321')) setPhoneNumber(userPhone);
       if (user.gender) setGender(user.gender);
       if (user.avatar) setAvatarUrl(user.avatar);
     }
   }, [user]);
 
-  // Kiểm tra xem tài khoản này đã có hồ sơ Player chưa
   useEffect(() => {
     let isMounted = true;
     const checkUserPlayer = async () => {
-      if (!user?.id) {
-        setCheckingExisting(false);
-        return;
-      }
+      if (!user?.id) { setCheckingExisting(false); return; }
       try {
         const players = await api.getGamePlayersByUser(user.id);
-        if (isMounted && Array.isArray(players) && players.length > 0) {
-          setExistingPlayer(players[0]);
-        }
+        if (isMounted && Array.isArray(players)) setExistingPlayers(players);
       } catch (e) {
         console.warn('Lỗi khi kiểm tra hồ sơ player:', e);
       } finally {
         if (isMounted) setCheckingExisting(false);
       }
     };
-
     if (isAuthenticated && user?.id) {
       checkUserPlayer();
     } else if (!authLoading) {
       setCheckingExisting(false);
     }
-
     return () => { isMounted = false; };
   }, [user?.id, isAuthenticated, authLoading]);
 
-  // Fetch games list
   useEffect(() => {
     const loadGames = async () => {
       try {
         const list = await api.getGames();
-        if (Array.isArray(list) && list.length > 0) {
-          setGames(list);
-          setSelectedGameId(list[0].id);
-          setSelectedGame(list[0]);
-          const firstRank = list[0].availableRanks?.[0] || '';
-          setRankMin(firstRank);
-          setRankMax(firstRank);
-          if (list[0].availableRoles?.length > 0) {
-            setRoles([list[0].availableRoles[0]]);
-          } else {
-            setRoles([]);
-          }
-        } else {
-          setGames([]);
-          setSelectedGameId(null);
-          setSelectedGame(null);
-        }
+        setGames(Array.isArray(list) ? list : []);
       } catch (err) {
         console.warn('Could not fetch games list from API:', err);
         setGames([]);
-        setSelectedGameId(null);
-        setSelectedGame(null);
       }
     };
     loadGames();
   }, []);
 
-  // Update game selection
-  const handleGameChange = (gameId) => {
-    const id = Number(gameId);
-    setSelectedGameId(id);
-    const found = games.find((g) => g.id === id);
-    setSelectedGame(found || null);
-    if (found?.availableRanks && found.availableRanks.length > 0) {
-      setRankMin(found.availableRanks[0]);
-      setRankMax(found.availableRanks[0]);
-    } else {
-      setRankMin('');
-      setRankMax('');
-    }
-    if (found?.availableRoles && found.availableRoles.length > 0) {
-      setRoles([found.availableRoles[0]]);
-    } else {
-      setRoles([]);
-    }
+  const existingGameIds = new Set(existingPlayers.map(p => p.game?.id || p.gameId));
+
+  const toggleGameSelection = (game) => {
+    if (existingGameIds.has(game.id)) return;
+    setSelectedGames(prev => {
+      const isSelected = prev.some(g => g.id === game.id);
+      if (isSelected) return prev.filter(g => g.id !== game.id);
+      if (prev.length >= 10) {
+        addToast('Bạn chỉ có thể chọn tối đa 10 game', 'warning');
+        return prev;
+      }
+      return [...prev, game];
+    });
   };
 
   const handleNextToStep2 = () => {
@@ -154,19 +133,36 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   };
 
   const handleNextToStep3 = () => {
-    if (!selectedGameId) {
-      addToast('Chưa có game trong hệ thống. Admin cần thêm game trước.', 'error');
+    if (selectedGames.length === 0) {
+      addToast('Vui lòng chọn ít nhất 1 game để đăng ký', 'warning');
       return;
     }
-    if (!rankMin.trim()) {
+    setGameFormData(selectedGames.map(g => initGameForm(g)));
+    setCurrentGameIndex(0);
+    setStep(3);
+  };
+
+  const updateCurrentForm = (field, value) => {
+    setGameFormData(prev => prev.map((item, idx) =>
+      idx === currentGameIndex ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const handleNextGame = () => {
+    const form = gameFormData[currentGameIndex];
+    if (!form.rankMin.trim()) {
       addToast('Vui lòng chọn hoặc nhập mức rank', 'warning');
       return;
     }
-    if (pricePerHour < 10000) {
+    if (form.pricePerHour < 10000) {
       addToast('Giá thuê tối thiểu là 10.000 đ/giờ', 'warning');
       return;
     }
-    setStep(3);
+    if (currentGameIndex < gameFormData.length - 1) {
+      setCurrentGameIndex(prev => prev + 1);
+    } else {
+      setStep(4);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -176,82 +172,74 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       return;
     }
 
-    // Chặn nếu tài khoản đã đăng ký Idol trước đó
-    if (isPlayer || existingPlayer) {
-      addToast('Tài khoản của bạn đã gửi hồ sơ đăng ký Idol rồi. Mỗi tài khoản chỉ được đăng ký 1 lần!', 'warning');
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessage('');
 
-    const payload = {
-      userId: user?.id,
-      gameId: selectedGameId || (games[0] ? games[0].id : 1),
-      username: nickname.trim(),
-      rank: (() => {
-        const rMin = rankMin.trim();
-        const rMax = rankMax.trim();
-        if (!rMin) return 'Cao Thủ';
-        if (!rMax || rMin === rMax) return rMin;
-        return `${rMin} - ${rMax}`;
-      })(),
-      role: roles.length > 0 ? roles.join(' / ') : 'Không có',
-      server: servers.length > 0 ? servers.join(' / ') : 'VN',
-      pricePerHour: Number(pricePerHour) || 50000,
-      description: bio.trim()
-    };
+    let count = 0;
+    let lastError = null;
+    const saved = [];
 
-    try {
-      // Call Backend API
-      const res = await api.registerPlayer(payload);
-      const created = res?.data || payload;
-      setExistingPlayer(created);
-
-      // Đồng bộ số điện thoại vào hồ sơ cá nhân nếu có thay đổi hoặc chưa có
-      if (phoneNumber && phoneNumber !== (user?.phoneNumber || user?.phone)) {
-        updateProfile({ phoneNumber, phone: phoneNumber });
+    for (const form of gameFormData) {
+      const payload = {
+        userId: user?.id,
+        gameId: form.gameId,
+        username: nickname.trim(),
+        rank: (() => {
+          const rMin = form.rankMin.trim();
+          const rMax = form.rankMax.trim();
+          if (!rMin) return 'Cao Thủ';
+          if (!rMax || rMin === rMax) return rMin;
+          return `${rMin} - ${rMax}`;
+        })(),
+        role: form.roles.length > 0 ? form.roles.join(' / ') : 'Không có',
+        server: form.servers.length > 0 ? form.servers.join(' / ') : 'VN',
+        pricePerHour: Number(form.pricePerHour) || 50000,
+        description: bio.trim(),
+      };
+      try {
+        await api.registerPlayer(payload);
+        count++;
+        saved.push(form);
+      } catch (err) {
+        const errMsg = err.response?.data?.message || err.response?.data || err.message || 'Đăng ký thất bại';
+        const errStr = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
+        console.error('[RegisterPlayer] payload:', payload, 'error:', err.response?.status, errMsg);
+        lastError = errStr;
       }
+    }
 
-      setIsSubmitting(false);
-      setStep(4);
-      confetti({
-        particleCount: 100,
-        spread: 80,
-        origin: { y: 0.5 }
-      });
-      addToast('🎉 Gửi hồ sơ đăng ký Idol thành công! Hồ sơ đang chờ Quản Trị Viên xét duyệt.', 'success');
-    } catch (err) {
-      setIsSubmitting(false);
-      const errMsg = err.response?.data?.message || err.response?.data || err.message || 'Đăng ký thất bại';
-      const errStr = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
-      console.error('[RegisterPlayer] payload:', payload, 'error:', err.response?.status, errMsg);
-      const isGameNotFound = err.response?.status === 404 && errStr.toLowerCase().includes('game');
-      if (isGameNotFound) {
-        setErrorMessage('Game được chọn chưa tồn tại trong hệ thống. Admin cần thêm game trước khi bạn có thể đăng ký.');
+    if (phoneNumber && phoneNumber !== (user?.phoneNumber || user?.phone)) {
+      updateProfile({ phoneNumber, phone: phoneNumber });
+    }
+
+    setIsSubmitting(false);
+    setSuccessCount(count);
+    setSucceededForms(saved);
+
+    if (count > 0) {
+      try {
+        const players = await api.getGamePlayersByUser(user?.id);
+        if (Array.isArray(players)) setExistingPlayers(players);
+      } catch (_) {}
+
+      setStep(5);
+      confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
+      if (count === gameFormData.length) {
+        addToast(`🎉 Đăng ký ${count} game thành công! Hồ sơ đang chờ Quản Trị Viên xét duyệt.`, 'success');
       } else {
-        setErrorMessage(errStr || 'Có lỗi xảy ra khi gửi hồ sơ. Vui lòng thử lại.');
+        addToast(`✅ Đăng ký thành công ${count}/${gameFormData.length} game. Một số game bị lỗi.`, 'warning');
+        setErrorMessage(lastError || '');
       }
-      addToast('Đăng ký thất bại: ' + (isGameNotFound ? 'Game chưa được thêm vào hệ thống.' : errStr), 'error');
-
-      // Nếu hệ thống báo tài khoản đã đăng ký rồi, đồng bộ lại hồ sơ ngay lập tức
-      if (typeof errMsg === 'string' && (errMsg.includes('đăng ký') || errMsg.includes('Idol'))) {
-        try {
-          const players = await api.getGamePlayersByUser(user?.id);
-          if (Array.isArray(players) && players.length > 0) {
-            setExistingPlayer(players[0]);
-          }
-        } catch (_) {}
-      }
+    } else {
+      setErrorMessage(lastError || 'Có lỗi xảy ra khi gửi hồ sơ. Vui lòng thử lại.');
+      addToast('Đăng ký thất bại: ' + (lastError || 'Lỗi không xác định'), 'error');
     }
   };
 
   if (authLoading || checkingExisting) {
     return (
       <div className="container animate-fade-in" style={{ maxWidth: '640px', padding: '100px 20px', textAlign: 'center' }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>
-          Đang kiểm tra thông tin hồ sơ...
-        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Đang kiểm tra thông tin hồ sơ...</div>
       </div>
     );
   }
@@ -260,31 +248,14 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
     return (
       <div className="container animate-fade-in" style={{ maxWidth: '640px', padding: '60px 20px', textAlign: 'center' }}>
         <div className="glass-panel" style={{ padding: '40px 30px' }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'rgba(236, 72, 153, 0.15)',
-            border: '2px solid var(--accent-pink)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px auto',
-            color: 'var(--accent-pink)'
-          }}>
+          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(236, 72, 153, 0.15)', border: '2px solid var(--accent-pink)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto', color: 'var(--accent-pink)' }}>
             <Crown size={32} />
           </div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '12px' }}>
-            Yêu Cầu Đăng Nhập
-          </h2>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '12px' }}>Yêu Cầu Đăng Nhập</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px' }}>
             Bạn cần đăng nhập hoặc tạo tài khoản PlayZone trước khi thực hiện đăng ký làm Idol / Duo Player.
           </p>
-          <button
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '14px', fontSize: '1rem' }}
-            onClick={() => onOpenAuth ? onOpenAuth('login') : navigate('/')}
-          >
+          <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '1rem' }} onClick={() => onOpenAuth ? onOpenAuth('login') : navigate('/')}>
             <LogIn size={18} />
             <span>Đăng Nhập Ngay</span>
           </button>
@@ -293,246 +264,12 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
     );
   }
 
-  // TRƯỜNG HỢP 1: Tài khoản đã là Idol Duo chính thức (AVAILABLE / ROLE_PLAYER)
-  if (isPlayer || existingPlayer?.status === 'AVAILABLE') {
-    return (
-      <div className="container animate-fade-in" style={{ maxWidth: '680px', padding: '60px 20px' }}>
-        <div className="glass-panel" style={{ padding: '40px 30px', textAlign: 'center' }}>
-          <div style={{
-            width: '76px',
-            height: '76px',
-            borderRadius: '50%',
-            background: 'rgba(236, 72, 153, 0.15)',
-            border: '2px solid var(--accent-pink)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px auto',
-            color: 'var(--accent-pink)',
-            boxShadow: '0 0 24px rgba(236, 72, 153, 0.25)'
-          }}>
-            <Crown size={40} />
-          </div>
-
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 14px',
-            borderRadius: '20px',
-            background: 'rgba(16, 185, 129, 0.15)',
-            color: 'var(--accent-green)',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            marginBottom: '16px'
-          }}>
-            <CheckCircle2 size={15} />
-            <span>IDOL DUO CHÍNH THỨC</span>
-          </div>
-
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>
-            Bạn Đã Là Idol Trên PlayZone!
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
-            Tài khoản <strong>{user?.fullName || user?.username}</strong> của bạn đã là Idol Duo chính thức. Mỗi tài khoản chỉ cần đăng ký <strong>1 lần duy nhất</strong> và hồ sơ của bạn đã sẵn sàng nhận đơn thuê.
-          </p>
-
-          {existingPlayer && (
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              padding: '16px 20px',
-              maxWidth: '460px',
-              margin: '0 auto 28px auto',
-              display: 'flex',
-              justifyContent: 'space-around',
-              textAlign: 'center'
-            }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Biệt danh</div>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{existingPlayer.username || user?.username}</div>
-              </div>
-              <div style={{ borderLeft: '1px solid var(--border-color)' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tựa game</div>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{existingPlayer.game?.name || existingPlayer.gameName || 'Duo Game'}</div>
-              </div>
-              <div style={{ borderLeft: '1px solid var(--border-color)' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Giá thuê</div>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-green)' }}>
-                  {(existingPlayer.pricePerHour || 50000).toLocaleString('vi-VN')} đ/h
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={() => navigate('/explore')}>
-              <Compass size={18} />
-              <span>Xem Danh Sách Khám Phá</span>
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/')}>
-              <Home size={18} />
-              <span>Về Trang Chủ</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // TRƯỜNG HỢP 2: Tài khoản đã nộp hồ sơ trước đó và đang chờ Quản Trị Viên xét duyệt
-  if (existingPlayer && step !== 4) {
-    return (
-      <div className="container animate-fade-in" style={{ maxWidth: '680px', padding: '60px 20px' }}>
-        <div className="glass-panel" style={{ padding: '40px 30px', textAlign: 'center' }}>
-          <div style={{
-            width: '76px',
-            height: '76px',
-            borderRadius: '50%',
-            background: 'rgba(245, 158, 11, 0.15)',
-            border: '2px solid #f59e0b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px auto',
-            color: '#f59e0b',
-            boxShadow: '0 0 24px rgba(245, 158, 11, 0.25)'
-          }}>
-            <Clock size={40} />
-          </div>
-
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 14px',
-            borderRadius: '20px',
-            background: 'rgba(245, 158, 11, 0.15)',
-            color: '#f59e0b',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            marginBottom: '16px'
-          }}>
-            <AlertCircle size={15} />
-            <span>HỒ SƠ ĐANG CHỜ XÉT DUYỆT</span>
-          </div>
-
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>
-            Hồ Sơ Đăng Ký Đang Được Xử Lý!
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px auto' }}>
-            Tài khoản <strong>{user?.fullName || user?.username}</strong> đã gửi hồ sơ đăng ký Idol Duo. Mỗi tài khoản chỉ được nộp hồ sơ <strong>1 lần duy nhất</strong>. Ban quản trị đang trong quá trình xét duyệt hồ sơ của bạn.
-          </p>
-
-          {/* Quy trình tiến độ */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '20px',
-            maxWidth: '540px',
-            margin: '0 auto 28px auto',
-            textAlign: 'left'
-          }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Trạng thái xét duyệt hiện tại
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  color: 'var(--accent-green)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <CheckCircle2 size={16} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>1. Tiếp nhận hồ sơ</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Biệt danh: <strong>{existingPlayer.username || nickname}</strong> • Game: <strong>{existingPlayer.game?.name || existingPlayer.gameName || 'Game'}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  background: 'rgba(245, 158, 11, 0.2)',
-                  color: '#f59e0b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Clock size={16} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f59e0b' }}>2. Đang chờ xét duyệt (Dự kiến 15 - 30 phút)</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Quản trị viên đang kiểm tra thông tin và hồ sơ</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.7 }}>
-                <div style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: 'var(--text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Sparkles size={16} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>3. Kích hoạt & Nhận đơn thuê</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Xuất hiện trên bảng Khám Phá sau khi hoàn tất xét duyệt</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={() => navigate('/explore')}>
-              <Compass size={18} />
-              <span>Khám Phá PlayZone</span>
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/')}>
-              <Home size={18} />
-              <span>Về Trang Chủ</span>
-            </button>
-          </div>
-
-          {isAdmin && (
-            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed var(--border-color)', display: 'inline-block' }}>
-              <button
-                className="btn btn-outline"
-                onClick={() => navigate('/admin')}
-                style={{ fontSize: '0.82rem', padding: '6px 14px', opacity: 0.8 }}
-              >
-                <ShieldCheck size={14} />
-                <span>[Admin Test] Vào Trang Quản Trị Duyệt Hồ Sơ</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const stepLabels = [
+    { num: 1, label: 'Thông tin cơ bản' },
+    { num: 2, label: 'Chọn Game' },
+    { num: 3, label: 'Chi tiết game' },
+    { num: 4, label: 'Hình ảnh & Giọng nói' },
+  ];
 
   return (
     <div className="container animate-fade-in" style={{ maxWidth: '780px', paddingBottom: '80px' }}>
@@ -551,52 +288,31 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
       </div>
 
       {/* Step Progress Bar */}
-      {step < 4 && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '32px',
-          position: 'relative'
-        }}>
-          {[
-            { num: 1, label: 'Thông tin cơ bản' },
-            { num: 2, label: 'Game & Bảng giá' },
-            { num: 3, label: 'Hình ảnh & Giọng nói' }
-          ].map((s) => (
+      {step < 5 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', position: 'relative' }}>
+          {stepLabels.map((s) => (
             <div
               key={s.num}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px',
-                zIndex: 2,
-                cursor: 'pointer'
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 2, cursor: s.num < step ? 'pointer' : 'default' }}
+              onClick={() => {
+                if (s.num < step) {
+                  if (s.num < 3) setCurrentGameIndex(0);
+                  setStep(s.num);
+                }
               }}
-              onClick={() => s.num < step && setStep(s.num)}
             >
               <div style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
+                width: '38px', height: '38px', borderRadius: '50%',
                 background: step === s.num
                   ? 'linear-gradient(135deg, var(--primary), #06b6d4)'
-                  : step > s.num
-                  ? 'var(--accent-green)'
-                  : 'var(--bg-tertiary)',
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                border: '2px solid var(--border-color)',
+                  : step > s.num ? 'var(--accent-green)' : 'var(--bg-tertiary)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 800, fontSize: '0.9rem', border: '2px solid var(--border-color)',
                 boxShadow: step === s.num ? '0 0 15px var(--primary-glow)' : 'none'
               }}>
                 {step > s.num ? '✓' : s.num}
               </div>
-              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: step >= s.num ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: step >= s.num ? 'var(--text-primary)' : 'var(--text-muted)', textAlign: 'center' }}>
                 {s.label}
               </span>
             </div>
@@ -606,66 +322,40 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
 
       {/* Form Card */}
       <div className="glass-panel" style={{ padding: '32px' }}>
+
+        {/* ── BƯỚC 1: THÔNG TIN CÁ NHÂN ── */}
         {step === 1 && (
           <div className="animate-fade-in">
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>
-              Bước 1: Thông Tin Cá Nhân
-            </h3>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>Bước 1: Thông Tin Cá Nhân</h3>
 
             <div className="form-group">
               <label className="form-label">Tên Hiển Thị / Biệt Danh Idol *:</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Ví dụ: Bé Miu Cute"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                required
-              />
+              <input type="text" className="form-control" placeholder="Ví dụ: Bé Miu Cute" value={nickname} onChange={(e) => setNickname(e.target.value)} required />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label className="form-label">Giới Tính:</label>
-                <select
-                  className="form-control"
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                >
+                <select className="form-control" value={gender} onChange={(e) => setGender(e.target.value)}>
                   <option value="FEMALE">🎀 Nữ</option>
                   <option value="MALE">🔥 Nam</option>
                   <option value="OTHER">✨ Khác</option>
                 </select>
               </div>
-
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span>Số Điện Thoại Liên Hệ:</span>
                   {(user?.phoneNumber || user?.phone) && (
-                    <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
-                      ✓ Đã tự động điền từ hồ sơ
-                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>✓ Đã tự động điền từ hồ sơ</span>
                   )}
                 </label>
-                <input
-                  type="tel"
-                  className="form-control"
-                  placeholder="0912345678"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                />
+                <input type="tel" className="form-control" placeholder="0912345678" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
               </div>
             </div>
 
             <div className="form-group">
               <label className="form-label">Lời Giới Thiệu Bản Thân (Bio):</label>
-              <textarea
-                className="form-control"
-                rows="4"
-                placeholder="Chia sẻ tính cách, phong cách chơi game, sở trường của bạn để thu hút người thuê..."
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-              />
+              <textarea className="form-control" rows="4" placeholder="Chia sẻ tính cách, phong cách chơi game, sở trường của bạn..." value={bio} onChange={(e) => setBio(e.target.value)} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
@@ -677,177 +367,94 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
           </div>
         )}
 
+        {/* ── BƯỚC 2: CHỌN GAME ── */}
         {step === 2 && (
           <div className="animate-fade-in">
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>
-              Bước 2: Game Sở Trường & Bảng Giá
-            </h3>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '6px', fontWeight: 800 }}>Bước 2: Danh Sách Game Đăng Ký</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '20px' }}>
+              Chọn các game bạn muốn nhận thuê (tối đa 10 game). Bạn sẽ điền thông tin chi tiết cho từng game ở bước tiếp theo.
+            </p>
+
+            {existingPlayers.length > 0 && (
+              <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '0.85rem', color: '#a5b4fc' }}>
+                Bạn đã đăng ký {existingPlayers.length} game trước đó. Các game đó được đánh dấu bên dưới và không thể chọn lại.
+              </div>
+            )}
 
             {games.length === 0 ? (
-              <div style={{ padding: '20px', borderRadius: 'var(--radius-md)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', marginBottom: '20px', color: 'var(--accent-red)', fontSize: '0.9rem' }}>
-                ⚠️ Hiện chưa có game nào trong hệ thống. Admin cần thêm game tại <strong>Trang Quản Trị → Danh Mục Game</strong> trước khi bạn có thể đăng ký.
+              <div style={{ padding: '20px', borderRadius: 'var(--radius-md)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--accent-red)', fontSize: '0.9rem' }}>
+                ⚠️ Hiện chưa có game nào trong hệ thống. Admin cần thêm game tại <strong>Trang Quản Trị → Danh Mục Game</strong>.
               </div>
             ) : (
-              <div className="form-group">
-                <label className="form-label">Tựa Game Đăng Ký Chính *:</label>
-                <select
-                  className="form-control"
-                  value={selectedGameId || ''}
-                  onChange={(e) => handleGameChange(e.target.value)}
-                >
-                  {games.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name} ({g.category || 'Game'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Rank range */}
-            {selectedGame?.availableRanks && selectedGame.availableRanks.length > 0 ? (
-              <div className="form-group">
-                <label className="form-label">Chấp Nhận Rank Từ - Đến *:</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
-                  <select
-                    className="form-control"
-                    value={rankMin}
-                    onChange={(e) => {
-                      const newMin = e.target.value;
-                      setRankMin(newMin);
-                      const ranks = selectedGame.availableRanks;
-                      const minIdx = ranks.indexOf(newMin);
-                      const maxIdx = ranks.indexOf(rankMax);
-                      if (maxIdx < minIdx) setRankMax(newMin);
-                    }}
-                  >
-                    {selectedGame.availableRanks.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>→</span>
-                  <select
-                    className="form-control"
-                    value={rankMax}
-                    onChange={(e) => setRankMax(e.target.value)}
-                  >
-                    {selectedGame.availableRanks
-                      .slice(selectedGame.availableRanks.indexOf(rankMin))
-                      .map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                  </select>
-                </div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  {rankMin === rankMax ? `Hiển thị: ${rankMin}` : `Hiển thị: ${rankMin} - ${rankMax}`}
-                </span>
-              </div>
-            ) : (
-              <div className="form-group">
-                <label className="form-label">Mức Rank / Cấp Độ *:</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Ví dụ: Cao Thủ 30 sao, Radiant..."
-                  value={rankMin}
-                  onChange={(e) => { setRankMin(e.target.value); setRankMax(e.target.value); }}
-                />
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="form-group">
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Vị Trí / Role:</span>
-                  {selectedGame?.availableRoles && selectedGame.availableRoles.length > 0 && (
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Giữ Ctrl/Shift</span>
-                  )}
-                </label>
-                {selectedGame?.availableRoles && selectedGame.availableRoles.length > 0 ? (
-                  <>
-                    <select
-                      className="form-control"
-                      multiple
-                      size={Math.min(selectedGame.availableRoles.length, 5)}
-                      value={roles}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                        setRoles(selected);
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                {games.map((game) => {
+                  const alreadyRegistered = existingGameIds.has(game.id);
+                  const isSelected = selectedGames.some(g => g.id === game.id);
+                  return (
+                    <div
+                      key={game.id}
+                      onClick={() => toggleGameSelection(game)}
+                      style={{
+                        position: 'relative',
+                        padding: '14px',
+                        borderRadius: 'var(--radius-md)',
+                        border: `2px solid ${alreadyRegistered ? 'rgba(16,185,129,0.4)' : isSelected ? '#6366f1' : 'var(--border-color)'}`,
+                        background: alreadyRegistered
+                          ? 'rgba(16,185,129,0.06)'
+                          : isSelected
+                          ? 'rgba(99,102,241,0.12)'
+                          : 'var(--bg-secondary)',
+                        cursor: alreadyRegistered ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.15s',
+                        opacity: alreadyRegistered ? 0.75 : 1,
                       }}
-                      style={{ height: 'auto' }}
                     >
-                      {selectedGame.availableRoles.map((ro) => (
-                        <option key={ro} value={ro}>{ro}</option>
-                      ))}
-                    </select>
-                    {roles.length > 0 && (
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                        Đã chọn: {roles.join(' / ')}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <input
-                    type="text"
-                    className="form-control"
-                    value="Không có"
-                    readOnly
-                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                  />
-                )}
+                      {/* Cover image */}
+                      {game.coverImage && (
+                        <img
+                          src={game.coverImage}
+                          alt={game.name}
+                          style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }}
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
+
+                      {/* Checkmark or "already registered" badge */}
+                      <div style={{ position: 'absolute', top: '8px', right: '8px' }}>
+                        {alreadyRegistered ? (
+                          <div style={{ background: 'rgba(16,185,129,0.9)', borderRadius: '12px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700, color: '#fff' }}>
+                            Đã đăng ký
+                          </div>
+                        ) : isSelected ? (
+                          <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <CheckCircle2 size={14} color="#fff" />
+                          </div>
+                        ) : (
+                          <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: '2px solid var(--border-color)', background: 'var(--bg-tertiary)' }} />
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: isSelected ? '#a5b4fc' : 'var(--text-primary)', paddingRight: '28px' }}>
+                        {game.name}
+                      </div>
+                      {game.category && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>{game.category}</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+            )}
 
-              <div className="form-group">
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Server Khu Vực:</span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Giữ Ctrl/Shift</span>
-                </label>
-                <select
-                  className="form-control"
-                  multiple
-                  size={5}
-                  value={servers}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                    setServers(selected);
-                  }}
-                  style={{ height: 'auto' }}
-                >
-                  <option value="VN">Việt Nam (VN)</option>
-                  <option value="Asia">Châu Á (Asia)</option>
-                  <option value="KR">Hàn Quốc (KR)</option>
-                  <option value="NA">Bắc Mỹ (NA)</option>
-                  <option value="EU">Châu Âu (EU)</option>
-                </select>
-                {servers.length > 0 && (
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                    Đã chọn: {servers.join(', ')}
-                  </span>
-                )}
+            {selectedGames.length > 0 && (
+              <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Đã chọn <strong style={{ color: '#a5b4fc' }}>{selectedGames.length}</strong> game:{' '}
+                {selectedGames.map(g => g.name).join(', ')}
               </div>
-            </div>
+            )}
 
-            <div className="form-group">
-              <label className="form-label">Giá Thuê Đề Xuất (VNĐ / Giờ) *:</label>
-              <input
-                type="number"
-                step="5000"
-                min="10000"
-                max="500000"
-                className="form-control"
-                value={pricePerHour}
-                onChange={(e) => setPricePerHour(Number(e.target.value))}
-              />
-            </div>
-
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px', display: 'block' }}>
-              💡 <em>Mức giá khuyến nghị: 40.000 đ - 80.000 đ / giờ đối với Idol mới bắt đầu để thu hút nhiều đơn đầu tiên.</em>
-            </span>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
-              <button className="btn btn-secondary" onClick={() => setStep(1)}>
-                Quay lại
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+              <button className="btn btn-secondary" onClick={() => setStep(1)}>Quay lại</button>
               <button className="btn btn-primary" onClick={handleNextToStep3}>
                 <span>Tiếp Tục</span>
                 <ArrowRight size={16} />
@@ -856,184 +463,237 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
           </div>
         )}
 
-        {step === 3 && (
+        {/* ── BƯỚC 3: FORM TỪNG GAME ── */}
+        {step === 3 && gameFormData.length > 0 && (() => {
+          const form = gameFormData[currentGameIndex];
+          const game = selectedGames[currentGameIndex];
+          const isLast = currentGameIndex === gameFormData.length - 1;
+
+          return (
+            <div className="animate-fade-in">
+              {/* Game progress indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
+                  Game {currentGameIndex + 1}/{gameFormData.length}: <span style={{ color: '#a5b4fc' }}>{form.gameName}</span>
+                </h3>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {gameFormData.map((_, idx) => (
+                    <div key={idx} style={{
+                      width: '10px', height: '10px', borderRadius: '50%',
+                      background: idx < currentGameIndex ? 'var(--accent-green)' : idx === currentGameIndex ? '#6366f1' : 'var(--bg-tertiary)',
+                      border: `1px solid ${idx <= currentGameIndex ? 'transparent' : 'var(--border-color)'}`,
+                    }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Rank range */}
+              {form.availableRanks.length > 0 ? (
+                <div className="form-group">
+                  <label className="form-label">Chấp Nhận Rank Từ - Đến *:</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
+                    <select
+                      className="form-control"
+                      value={form.rankMin}
+                      onChange={(e) => {
+                        const newMin = e.target.value;
+                        const minIdx = form.availableRanks.indexOf(newMin);
+                        const maxIdx = form.availableRanks.indexOf(form.rankMax);
+                        updateCurrentForm('rankMin', newMin);
+                        if (maxIdx < minIdx) updateCurrentForm('rankMax', newMin);
+                      }}
+                    >
+                      {form.availableRanks.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>→</span>
+                    <select
+                      className="form-control"
+                      value={form.rankMax}
+                      onChange={(e) => updateCurrentForm('rankMax', e.target.value)}
+                    >
+                      {form.availableRanks.slice(form.availableRanks.indexOf(form.rankMin)).map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    {form.rankMin === form.rankMax ? `Hiển thị: ${form.rankMin}` : `Hiển thị: ${form.rankMin} - ${form.rankMax}`}
+                  </span>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="form-label">Mức Rank / Cấp Độ *:</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ví dụ: Cao Thủ 30 sao, Radiant..."
+                    value={form.rankMin}
+                    onChange={(e) => { updateCurrentForm('rankMin', e.target.value); updateCurrentForm('rankMax', e.target.value); }}
+                  />
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {/* Role checkboxes */}
+                <div className="form-group">
+                  <label className="form-label">Vị Trí / Role:</label>
+                  {form.availableRoles.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                      {form.availableRoles.map((ro) => {
+                        const checked = form.roles.includes(ro);
+                        return (
+                          <label key={ro} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', background: checked ? 'rgba(99,102,241,0.2)' : 'var(--bg-secondary)', border: `1px solid ${checked ? '#6366f1' : 'var(--border-color)'}`, color: checked ? '#a5b4fc' : 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: checked ? 600 : 400, transition: 'all 0.15s', userSelect: 'none' }}>
+                            <input type="checkbox" checked={checked} onChange={() => updateCurrentForm('roles', checked ? form.roles.filter(r => r !== ro) : [...form.roles, ro])} style={{ display: 'none' }} />
+                            {ro}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <input type="text" className="form-control" value="Không có" readOnly style={{ opacity: 0.5, cursor: 'not-allowed' }} />
+                  )}
+                </div>
+
+                {/* Server checkboxes */}
+                <div className="form-group">
+                  <label className="form-label">Server Khu Vực:</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                    {[
+                      { value: 'VN', label: 'Việt Nam' },
+                      { value: 'Asia', label: 'Châu Á' },
+                      { value: 'KR', label: 'Hàn Quốc' },
+                      { value: 'NA', label: 'Bắc Mỹ' },
+                      { value: 'EU', label: 'Châu Âu' },
+                    ].map(({ value, label }) => {
+                      const checked = form.servers.includes(value);
+                      return (
+                        <label key={value} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer', background: checked ? 'rgba(16,185,129,0.15)' : 'var(--bg-secondary)', border: `1px solid ${checked ? '#10b981' : 'var(--border-color)'}`, color: checked ? '#6ee7b7' : 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: checked ? 600 : 400, transition: 'all 0.15s', userSelect: 'none' }}>
+                          <input type="checkbox" checked={checked} onChange={() => updateCurrentForm('servers', checked ? form.servers.filter(s => s !== value) : [...form.servers, value])} style={{ display: 'none' }} />
+                          {label} ({value})
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Giá Thuê Đề Xuất (VNĐ / Giờ) *:</label>
+                <input type="number" step="5000" min="10000" max="500000" className="form-control" value={form.pricePerHour} onChange={(e) => updateCurrentForm('pricePerHour', Number(e.target.value))} />
+              </div>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px', display: 'block' }}>
+                💡 <em>Mức giá khuyến nghị: 40.000 đ - 80.000 đ / giờ đối với Idol mới bắt đầu.</em>
+              </span>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+                <button className="btn btn-secondary" onClick={() => {
+                  if (currentGameIndex > 0) setCurrentGameIndex(prev => prev - 1);
+                  else setStep(2);
+                }}>
+                  Quay lại
+                </button>
+                <button className="btn btn-primary" onClick={handleNextGame}>
+                  <span>{isLast ? 'Tiếp Tục' : `Game tiếp theo →`}</span>
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── BƯỚC 4: HÌNH ẢNH & GIỌNG NÓI ── */}
+        {step === 4 && (
           <div className="animate-fade-in">
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>
-              Bước 3: Ảnh Đại Diện & Giọng Nói Mẫu
-            </h3>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '20px', fontWeight: 800 }}>Bước 4: Ảnh Đại Diện & Giọng Nói Mẫu</h3>
 
             <div className="form-group">
               <label className="form-label">Link Ảnh Đại Diện (Avatar Rõ Nét) *:</label>
-              <input
-                type="url"
-                className="form-control"
-                placeholder="https://..."
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-              />
+              <input type="url" className="form-control" placeholder="https://..." value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} />
             </div>
 
             <div className="form-group">
               <label className="form-label">Link Ghi Âm Giọng Nói Mẫu (Audio MP3/OGG):</label>
-              <input
-                type="url"
-                className="form-control"
-                placeholder="https://..."
-                value={voiceUrl}
-                onChange={(e) => setVoiceUrl(e.target.value)}
-              />
+              <input type="url" className="form-control" placeholder="https://..." value={voiceUrl} onChange={(e) => setVoiceUrl(e.target.value)} />
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                 🎙️ <em>Player có giọng nói thu hút sẽ nhận được gấp 3 lần lượt thuê từ khách hàng!</em>
               </span>
             </div>
 
-            <div style={{
-              padding: '16px',
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
-            }}>
-              <input
-                type="checkbox"
-                id="policyCheck"
-                checked={isPolicyAccepted}
-                onChange={(e) => setIsPolicyAccepted(e.target.checked)}
-                style={{ marginTop: '3px', cursor: 'pointer' }}
-              />
+            <div style={{ padding: '16px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-md)', marginBottom: '20px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <input type="checkbox" id="policyCheck" checked={isPolicyAccepted} onChange={(e) => setIsPolicyAccepted(e.target.checked)} style={{ marginTop: '3px', cursor: 'pointer' }} />
               <label htmlFor="policyCheck" style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.5 }}>
                 Tôi cam kết thông tin cung cấp là chính xác, tuân thủ <strong>Quy tắc ứng xử và Tiêu chuẩn cộng đồng PlayZone</strong>, không vi phạm pháp luật và không gian lận giao dịch.
               </label>
             </div>
 
             {errorMessage && (
-              <div style={{ color: 'var(--accent-red)', fontSize: '0.88rem', marginBottom: '16px' }}>
-                ⚠️ {errorMessage}
-              </div>
+              <div style={{ color: 'var(--accent-red)', fontSize: '0.88rem', marginBottom: '16px' }}>⚠️ {errorMessage}</div>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
-              <button className="btn btn-secondary" onClick={() => setStep(2)}>
+              <button className="btn btn-secondary" onClick={() => { setCurrentGameIndex(gameFormData.length - 1); setStep(3); }}>
                 Quay lại
               </button>
-              <button
-                className="btn btn-primary"
-                disabled={isSubmitting || !isPolicyAccepted}
-                onClick={handleSubmit}
-              >
+              <button className="btn btn-primary" disabled={isSubmitting || !isPolicyAccepted} onClick={handleSubmit}>
                 <ShieldCheck size={18} />
-                <span>{isSubmitting ? 'Đang Đăng Ký...' : 'Hoàn Tất Đăng Ký Player'}</span>
+                <span>{isSubmitting ? 'Đang Đăng Ký...' : `Hoàn Tất Đăng Ký ${gameFormData.length} Game`}</span>
               </button>
             </div>
           </div>
         )}
 
-        {step === 4 && (
+        {/* ── BƯỚC 5: THÀNH CÔNG ── */}
+        {step === 5 && (
           <div className="animate-fade-in" style={{ textAlign: 'center', padding: '24px 10px' }}>
-            <div style={{
-              width: '72px',
-              height: '72px',
-              borderRadius: '50%',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '2px solid var(--accent-green)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto',
-              color: 'var(--accent-green)',
-              boxShadow: '0 0 24px rgba(16, 185, 129, 0.25)'
-            }}>
+            <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)', border: '2px solid var(--accent-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto', color: 'var(--accent-green)', boxShadow: '0 0 24px rgba(16, 185, 129, 0.25)' }}>
               <CheckCircle2 size={40} />
             </div>
 
-            <h2 style={{ fontSize: '1.65rem', fontWeight: 800, marginBottom: '10px' }}>
-              Gửi Hồ Sơ Idol Thành Công!
-            </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '540px', margin: '0 auto 24px auto' }}>
-              Chúc mừng <strong>{nickname}</strong>! Hồ sơ đăng ký trở thành Idol Duo của bạn đã được gửi thành công. Đội ngũ Quản Trị Viên sẽ xét duyệt hồ sơ trong thời gian sớm nhất.
+            <h2 style={{ fontSize: '1.65rem', fontWeight: 800, marginBottom: '10px' }}>Gửi Hồ Sơ Idol Thành Công!</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px', maxWidth: '540px', margin: '0 auto 16px auto' }}>
+              Chúc mừng <strong>{nickname}</strong>! Đã đăng ký thành công <strong style={{ color: '#a5b4fc' }}>{successCount}/{gameFormData.length} game</strong>.
+              {successCount < gameFormData.length && <span style={{ color: '#f59e0b' }}> {gameFormData.length - successCount} game bị lỗi (có thể đã đăng ký trước đó).</span>}
+              {' '}Đội ngũ Quản Trị Viên sẽ xét duyệt hồ sơ trong thời gian sớm nhất.
             </p>
 
-            {/* Tiến trình phê duyệt trực quan cho người dùng */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '20px',
-              maxWidth: '540px',
-              margin: '0 auto 28px auto',
-              textAlign: 'left'
-            }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Tiến trình xử lý hồ sơ
+            {/* Danh sách game đã đăng ký thành công */}
+            {succeededForms.length > 0 && (
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '14px 20px', maxWidth: '460px', margin: '0 auto 20px auto', textAlign: 'left' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase' }}>Game đã đăng ký thành công</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {succeededForms.map((form) => (
+                    <div key={form.gameId} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem' }}>
+                      <CheckCircle2 size={15} color="var(--accent-green)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontWeight: 600 }}>{form.gameName}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>•</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{form.rankMin === form.rankMax ? form.rankMin : `${form.rankMin} - ${form.rankMax}`}</span>
+                      <span style={{ color: 'var(--accent-green)', fontWeight: 600, marginLeft: 'auto' }}>
+                        {Number(form.pricePerHour).toLocaleString('vi-VN')}đ/h
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
+            )}
 
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px', maxWidth: '540px', margin: '0 auto 28px auto', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tiến trình xử lý hồ sơ</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: 'rgba(16, 185, 129, 0.2)',
-                    color: 'var(--accent-green)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <CheckCircle2 size={16} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>1. Tiếp nhận hồ sơ</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Thông tin và hình ảnh đăng ký đã được lưu vào hệ thống</div>
-                  </div>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(16,185,129,0.2)', color: 'var(--accent-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><CheckCircle2 size={16} /></div>
+                  <div><div style={{ fontSize: '0.9rem', fontWeight: 600 }}>1. Tiếp nhận hồ sơ</div><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Thông tin và hình ảnh đăng ký đã được lưu vào hệ thống</div></div>
                 </div>
-
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: 'rgba(245, 158, 11, 0.2)',
-                    color: '#f59e0b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Clock size={16} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f59e0b' }}>2. Đang chờ xét duyệt (Dự kiến 15 - 30 phút)</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Quản trị viên sẽ kiểm tra nội dung giới thiệu, hình ảnh và âm thanh</div>
-                  </div>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Clock size={16} /></div>
+                  <div><div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f59e0b' }}>2. Đang chờ xét duyệt (Dự kiến 15 - 30 phút)</div><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Quản trị viên sẽ kiểm tra nội dung giới thiệu và hình ảnh</div></div>
                 </div>
-
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.7 }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: 'var(--text-muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Sparkles size={16} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>3. Kích hoạt & Nhận đơn thuê</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Xuất hiện trên bảng Khám Phá và sẵn sàng nhận đơn từ người thuê</div>
-                  </div>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Sparkles size={16} /></div>
+                  <div><div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>3. Kích hoạt & Nhận đơn thuê</div><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Xuất hiện trên bảng Khám Phá và sẵn sàng nhận đơn từ người thuê</div></div>
                 </div>
               </div>
             </div>
 
-            {/* Các nút hành động chính cho người dùng */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={() => navigate('/explore')}>
                 <Compass size={18} />
@@ -1045,14 +705,9 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
               </button>
             </div>
 
-            {/* Chỉ hiển thị cho Admin để tiện kiểm thử */}
             {isAdmin && (
               <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed var(--border-color)', display: 'inline-block' }}>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => navigate('/admin')}
-                  style={{ fontSize: '0.82rem', padding: '6px 14px', opacity: 0.8 }}
-                >
+                <button className="btn btn-outline" onClick={() => navigate('/admin')} style={{ fontSize: '0.82rem', padding: '6px 14px', opacity: 0.8 }}>
                   <ShieldCheck size={14} />
                   <span>[Admin Test] Vào Trang Quản Trị Duyệt Hồ Sơ</span>
                 </button>

@@ -245,20 +245,30 @@ export const api = {
       console.error('Error reading local_registered_players:', e);
     }
 
-    // Gộp backend + local (không mock data)
-    const map = new Map();
-    // 1. Thêm từ local
-    localPlayers.forEach(p => {
-      map.set(String(p.id), p);
-      if (p.username) map.set(`user_${p.username}`, p);
-    });
-    // 2. Thêm từ backend (ghi đè đồng bộ chính xác từ DB)
-    backendPlayers.forEach(p => {
-      map.set(String(p.id), p);
-      if (p.username) map.set(`user_${p.username}`, p);
+    // Gộp theo userId — mỗi user chỉ hiển thị 1 card, games[] chứa tất cả game đã đăng ký
+    const byUser = new Map();
+    const allPlayers = [...localPlayers, ...backendPlayers];
+    allPlayers.forEach(p => {
+      const key = String(p.userId || p.id);
+      if (!byUser.has(key)) {
+        byUser.set(key, { ...p });
+      } else {
+        const existing = byUser.get(key);
+        // Merge games array
+        const newGames = p.games || [];
+        const mergedGames = [...(existing.games || [])];
+        newGames.forEach(g => {
+          if (!mergedGames.some(eg => eg.name === g.name)) mergedGames.push(g);
+        });
+        existing.games = mergedGames;
+        // Keep lowest price as display price
+        if (p.pricePerHour < existing.pricePerHour) existing.pricePerHour = p.pricePerHour;
+        // Use AVAILABLE status if any registration is available
+        if (p.status === 'AVAILABLE') existing.status = 'AVAILABLE';
+      }
     });
 
-    return Array.from(new Set(map.values()));
+    return Array.from(byUser.values());
   },
 
   async getPlayerById(id) {
@@ -457,6 +467,11 @@ export const api = {
 
   async updatePlayerPrice(gamePlayerId, pricePerHour) {
     const res = await client.patch(`/api/game-players/${gamePlayerId}/price`, { pricePerHour });
+    return res.data;
+  },
+
+  async updatePlayerInfo(gamePlayerId, info) {
+    const res = await client.patch(`/api/game-players/${gamePlayerId}/info`, info);
     return res.data;
   },
 

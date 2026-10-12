@@ -128,10 +128,10 @@ public class GamePlayerController {
     @Operation(summary = "Create a new game player")
     public ResponseEntity<ApiResponse<GamePlayer>> createGamePlayer(
             @Valid @RequestBody GamePlayerRequest request) {
-        // Kiểm tra user đã có player chưa
-        if (!gamePlayerService.getGamePlayersByUser(request.getUserId()).isEmpty()) {
+        // Kiểm tra user đã đăng ký game này chưa (cho phép đăng ký nhiều game khác nhau)
+        if (gamePlayerService.existsByUserAndGame(request.getUserId(), request.getGameId())) {
             return ResponseEntity.badRequest()
-                .body(new ApiResponse<>(false, "User đã đăng ký làm player rồi!", null));
+                .body(new ApiResponse<>(false, "Bạn đã đăng ký game này rồi!", null));
         }
         User user = userService.findById(request.getUserId());
         // Tự động cập nhật thông tin cơ bản nếu còn trống để đăng ký thuận lợi
@@ -1283,6 +1283,42 @@ public class GamePlayerController {
         stats.put("description", gp.getDescription());
 
         return ResponseEntity.ok(new ApiResponse<>(true, "Player stats retrieved successfully", stats));
+    }
+
+    @Data
+    public static class UpdateInfoRequest {
+        private String rank;
+        private String role;
+        private String server;
+        private BigDecimal pricePerHour;
+    }
+
+    @PatchMapping("/{id}/info")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Update player rank/role/server/price")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updatePlayerInfo(
+            @PathVariable Long id,
+            @RequestBody UpdateInfoRequest request,
+            Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        GamePlayer gp = gamePlayerService.findById(id);
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        if (!isAdmin && !gp.getUser().getId().equals(currentUser.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponse<>(false, "Bạn không có quyền cập nhật thông tin này", null));
+        }
+        if (request.getRank() != null && !request.getRank().isBlank()) gp.setRank(request.getRank());
+        if (request.getRole() != null) gp.setRole(request.getRole());
+        if (request.getServer() != null && !request.getServer().isBlank()) gp.setServer(request.getServer());
+        if (request.getPricePerHour() != null) gp.setPricePerHour(request.getPricePerHour());
+        gamePlayerService.save(gp);
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", gp.getId());
+        result.put("rank", gp.getRank());
+        result.put("role", gp.getRole());
+        result.put("server", gp.getServer());
+        result.put("pricePerHour", gp.getPricePerHour());
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cập nhật thông tin thành công", result));
     }
 
     @Data
