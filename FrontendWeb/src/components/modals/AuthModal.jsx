@@ -5,6 +5,46 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import '../../styles/modals.css';
 
+// Reusable inline error block
+const ErrorBox = ({ message }) =>
+  message ? (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: '8px',
+      background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)',
+      borderRadius: '10px', padding: '10px 14px', marginBottom: '14px'
+    }}>
+      <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '1px' }} />
+      <span style={{ fontSize: '0.85rem', color: '#f87171', lineHeight: 1.4 }}>{message}</span>
+    </div>
+  ) : null;
+
+// Reusable password input with eye toggle
+const PasswordInput = ({ value, onChange, placeholder, show, onToggle }) => (
+  <div style={{ position: 'relative' }}>
+    <input
+      type={show ? 'text' : 'password'}
+      className="form-control"
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      style={{ paddingRight: '42px' }}
+    />
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{
+        position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+        background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+        color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+        transition: 'color 0.15s'
+      }}
+      title={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+    >
+      {show ? <EyeOff size={16} /> : <Eye size={16} />}
+    </button>
+  </div>
+);
+
 export const AuthModal = ({ isOpen, onClose }) => {
   const { login, register } = useAuth();
   const { addToast } = useToast();
@@ -92,46 +132,6 @@ export const AuthModal = ({ isOpen, onClose }) => {
       setRegisterError(msg);
     }
   };
-
-  // Reusable inline error block
-  const ErrorBox = ({ message }) =>
-    message ? (
-      <div style={{
-        display: 'flex', alignItems: 'flex-start', gap: '8px',
-        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)',
-        borderRadius: '10px', padding: '10px 14px', marginBottom: '14px'
-      }}>
-        <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: '1px' }} />
-        <span style={{ fontSize: '0.85rem', color: '#f87171', lineHeight: 1.4 }}>{message}</span>
-      </div>
-    ) : null;
-
-  // Reusable password input with eye toggle
-  const PasswordInput = ({ value, onChange, placeholder, show, onToggle }) => (
-    <div style={{ position: 'relative' }}>
-      <input
-        type={show ? 'text' : 'password'}
-        className="form-control"
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        style={{ paddingRight: '42px' }}
-      />
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-          background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
-          color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
-          transition: 'color 0.15s'
-        }}
-        title={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-      >
-        {show ? <EyeOff size={16} /> : <Eye size={16} />}
-      </button>
-    </div>
-  );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
