@@ -34,7 +34,6 @@ import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/players")
-@CrossOrigin(origins = "http://localhost:3000")
 public class PlayerController {
     private final UserService userService;
     private final PlayerStatsService playerStatsService;

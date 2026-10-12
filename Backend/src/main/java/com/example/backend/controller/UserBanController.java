@@ -23,7 +23,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/user-bans")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "User Ban", description = "User ban management APIs")
 public class UserBanController {
 

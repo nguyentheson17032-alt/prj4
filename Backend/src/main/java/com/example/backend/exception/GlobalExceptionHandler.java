@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
         
         return ResponseEntity.status(500).body(Map.of(
             "error", "Internal Server Error",
-            "message", ex.getMessage(),
+            "message", "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau",
             "timestamp", LocalDateTime.now()
         ));
     }

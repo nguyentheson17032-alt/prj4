@@ -1,10 +1,13 @@
 package com.example.backend.security;
 
+import com.example.backend.service.TokenBlacklistService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -12,11 +15,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.security.Key;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 
 @Component
@@ -31,7 +33,9 @@ public class JwtTokenUtil {
     @Value("${jwt.refresh.expiration}")
     private Long refreshExpiration;
 
-    private final Set<String> invalidatedTokens = new HashSet<>();
+    @Lazy
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
 
     private Key getSigningKey() {
         byte[] keyBytes = secret.getBytes();
@@ -64,11 +68,15 @@ public class JwtTokenUtil {
     }
 
     public void invalidateToken(String token) {
-        invalidatedTokens.add(token);
+        Date expiry = extractExpiration(token);
+        LocalDateTime expiresAt = expiry.toInstant()
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDateTime();
+        tokenBlacklistService.invalidate(token, expiresAt);
     }
 
     public boolean isTokenInvalidated(String token) {
-        return invalidatedTokens.contains(token);
+        return tokenBlacklistService.isInvalidated(token);
     }
 
     public Boolean validateToken(String token, UserDetails userDetails) {

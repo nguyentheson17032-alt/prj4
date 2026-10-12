@@ -15,7 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -57,7 +56,6 @@ import lombok.Data;
 
 @RestController
 @RequestMapping("/api/payments")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Payment", description = "Payment management APIs")
 public class PaymentController {
     private final PaymentService paymentService;
@@ -221,9 +219,7 @@ public class PaymentController {
 
             // Gửi thông báo cho admin
             try {
-                System.out.println("[PaymentController] Calling adminNotificationService.notifyAdminsAboutTopup");
                 adminNotificationService.notifyAdminsAboutTopup(user, request.getCoin());
-                System.out.println("[PaymentController] adminNotificationService.notifyAdminsAboutTopup completed successfully");
             } catch (Exception e) {
                 System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutTopup: " + e.getMessage());
                 e.printStackTrace();
@@ -384,9 +380,7 @@ public class PaymentController {
 
             // Gửi thông báo cho admin
             try {
-                System.out.println("[PaymentController] Calling adminNotificationService.notifyAdminsAboutWithdraw");
                 adminNotificationService.notifyAdminsAboutWithdraw(player, coin, request.getBankAccountNumber(), request.getBankAccountName(), request.getBankName());
-                System.out.println("[PaymentController] adminNotificationService.notifyAdminsAboutWithdraw completed successfully");
             } catch (Exception e) {
                 System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutWithdraw: " + e.getMessage());
                 e.printStackTrace();
@@ -667,9 +661,7 @@ public class PaymentController {
             
             // Gửi thông báo cho admin về giao dịch VNPay thành công
             try {
-                System.out.println("[PaymentController] Calling adminNotificationService.notifyAdminsAboutVnPayTransaction");
                 adminNotificationService.notifyAdminsAboutVnPayTransaction(user, payment.getCoin(), "THÀNH CÔNG");
-                System.out.println("[PaymentController] adminNotificationService.notifyAdminsAboutVnPayTransaction completed successfully");
             } catch (Exception e) {
                 System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutVnPayTransaction: " + e.getMessage());
                 e.printStackTrace();
@@ -697,30 +689,23 @@ public class PaymentController {
     @PostMapping("/donate")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> donate(@RequestBody DonateRequest request, Authentication authentication) {
-        System.out.println("=== BẮT ĐẦU DONATE ===");
-        System.out.println("Request: playerId=" + request.getPlayerId() + ", coin=" + request.getCoin() + ", message=" + request.getMessage());
         
         User user = userService.findByUsername(authentication.getName());
-        System.out.println("User gửi donate: id=" + user.getId() + ", username=" + user.getUsername() + ", coin=" + user.getCoin());
         
         // Tìm GamePlayer trước, sau đó lấy User từ GamePlayer
         GamePlayer gamePlayer = gamePlayerRepository.findById(request.getPlayerId())
                 .orElse(null);
         if (gamePlayer == null) {
-            System.out.println("Không tìm thấy GamePlayer với ID: " + request.getPlayerId());
             return ResponseEntity.badRequest().body(Map.of("message", "Không tìm thấy player nhận donate"));
         }
         
         User player = gamePlayer.getUser();
         if (player == null) {
-            System.out.println("GamePlayer không có User: " + request.getPlayerId());
             return ResponseEntity.badRequest().body(Map.of("message", "Player không hợp lệ"));
         }
         
-        System.out.println("Player nhận donate: id=" + player.getId() + ", username=" + player.getUsername() + ", coin=" + player.getCoin());
         
         if (user.getCoin() < request.getCoin()) {
-            System.out.println("Số dư không đủ: " + user.getCoin() + " < " + request.getCoin());
             
                     // Gửi thông báo cho người donate về việc số dư không đủ
         try {
@@ -743,15 +728,11 @@ public class PaymentController {
         // Trừ xu người donate
         user.setCoin(user.getCoin() - request.getCoin());
         User savedUser = userService.save(user);
-        System.out.println("Đã trừ xu người gửi và lưu: " + savedUser.getCoin());
         
         // Log số dư người nhận trước khi cộng
-        System.out.println("Coin người nhận trước khi cộng: " + player.getCoin());
         // Cộng xu cho player
         player.setCoin(player.getCoin() + request.getCoin());
-        System.out.println("Coin người nhận sau khi cộng: " + player.getCoin());
         User savedPlayer = userService.save(player);
-        System.out.println("Đã cộng xu cho người nhận và lưu: " + savedPlayer.getCoin());
 
         // Lưu Payment DONATE cho người gửi (trừ xu)
         Payment paymentFrom = new Payment();
@@ -765,7 +746,6 @@ public class PaymentController {
         paymentFrom.setCreatedAt(java.time.LocalDateTime.now());
         paymentFrom.setDescription("Donate cho " + player.getUsername() + ": " + request.getMessage());
         Payment savedPaymentFrom = paymentRepository.save(paymentFrom);
-        System.out.println("Đã lưu payment cho người gửi: id=" + savedPaymentFrom.getId() + ", user=" + savedPaymentFrom.getUser().getId() + ", player=" + savedPaymentFrom.getPlayer().getId());
 
         // Lưu Payment DONATE cho người nhận (cộng xu)
         Payment paymentTo = new Payment();
@@ -779,15 +759,12 @@ public class PaymentController {
         paymentTo.setCreatedAt(java.time.LocalDateTime.now());
         paymentTo.setDescription("Nhận donate từ " + user.getUsername() + ": " + request.getMessage());
         Payment savedPaymentTo = paymentRepository.save(paymentTo);
-        System.out.println("Đã lưu payment cho người nhận: id=" + savedPaymentTo.getId() + ", user=" + savedPaymentTo.getUser().getId() + ", player=" + savedPaymentTo.getPlayer().getId());
 
         // Kiểm tra lại số dư sau khi lưu
         User playerAfterSave = userService.findById(player.getId());
-        System.out.println("Số dư người nhận sau khi lưu payment: " + playerAfterSave.getCoin());
         
         // Kiểm tra lại số dư người gửi sau khi lưu
         User userAfterSave = userService.findById(user.getId());
-        System.out.println("Số dư người gửi sau khi lưu payment: " + userAfterSave.getCoin());
 
         // Gửi thông báo cho người donate
         try {
@@ -824,15 +801,12 @@ public class PaymentController {
 
         // Gửi thông báo cho admin về giao dịch donate
         try {
-            System.out.println("[PaymentController] Calling adminNotificationService.notifyAdminsAboutDonate");
             adminNotificationService.notifyAdminsAboutDonate(user, player, request.getCoin(), gamePlayer.getUsername());
-            System.out.println("[PaymentController] adminNotificationService.notifyAdminsAboutDonate completed successfully");
         } catch (Exception e) {
             System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutDonate: " + e.getMessage());
             e.printStackTrace();
         }
 
-        System.out.println("=== KẾT THÚC DONATE THÀNH CÔNG ===");
         return ResponseEntity.ok(Map.of("message", "Donate thành công"));
     }
 
@@ -872,9 +846,7 @@ public class PaymentController {
                     null // Có thể thêm image URL nếu muốn
                 );
                 
-                System.out.println("Đã gửi push notification donate cho user: " + recipient.getUsername());
             } else {
-                System.out.println("User " + recipient.getUsername() + " không có device token");
             }
         } catch (Exception e) {
             System.err.println("Lỗi khi gửi push notification donate: " + e.getMessage());
@@ -898,9 +870,7 @@ public class PaymentController {
                     null // Có thể thêm image URL nếu muốn
                 );
                 
-                System.out.println("Đã gửi push notification rút tiền cho user: " + user.getUsername());
             } else {
-                System.out.println("User " + user.getUsername() + " không có device token");
             }
         } catch (Exception e) {
             System.err.println("Lỗi khi gửi push notification rút tiền: " + e.getMessage());

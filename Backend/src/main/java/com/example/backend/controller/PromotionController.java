@@ -24,7 +24,6 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/api/promotions")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Promotion", description = "Promotion management APIs")
 public class PromotionController {
     private final PromotionService promotionService;

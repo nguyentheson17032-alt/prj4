@@ -149,6 +149,7 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllUsers() {
         return ResponseEntity.ok(userService.findAll());
     }
@@ -171,10 +172,7 @@ public class UserController {
     }
 
     private int calculateTotalOrders(Long userId) {
-        // Đếm số đơn hàng mà user đã thuê
-        return orderRepository.findAll().stream()
-            .filter(order -> order.getRenter() != null && order.getRenter().getId().equals(userId))
-            .toList().size();
+        return (int) orderRepository.countByRenter_Id(userId);
     }
 
     private int calculateTotalReviews(Long userId) {
@@ -188,6 +186,7 @@ public class UserController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody User user) {
         if (userService.existsByUsername(user.getUsername())) {
             return ResponseEntity.badRequest().body("Username already exists");
@@ -200,6 +199,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateUser(@PathVariable Long userId, @RequestBody User updatedUser) {
         User user = userService.findById(userId);
         if (user == null) {
@@ -217,6 +217,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
         User user = userService.findById(userId);
         if (user == null) {
@@ -227,6 +228,7 @@ public class UserController {
     }
 
     @PatchMapping("/{userId}/lock")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> lockUser(@PathVariable Long userId) {
         User user = userService.findById(userId);
         if (user == null) {
@@ -238,6 +240,7 @@ public class UserController {
     }
 
     @PatchMapping("/{userId}/unlock")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> unlockUser(@PathVariable Long userId) {
         User user = userService.findById(userId);
         if (user == null) {
@@ -249,6 +252,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> resetPassword(@PathVariable Long userId, @RequestBody Map<String, String> body) {
         User user = userService.findById(userId);
         if (user == null) {

@@ -19,7 +19,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/skills")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Skill", description = "Skill management APIs")
 public class SkillController {
     private final SkillService skillService;

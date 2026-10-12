@@ -33,7 +33,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/moments")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Moment", description = "Moment management APIs")
 public class MomentController {
 
@@ -77,92 +76,51 @@ public class MomentController {
             @RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
             Authentication authentication) throws IOException {
         
-        System.out.println("=== BẮT ĐẦU: createMomentWithFile ===");
-        System.out.println("gamePlayerId: " + gamePlayerId);
-        System.out.println("content: " + content);
-        System.out.println("imageFile: " + (imageFile != null ? imageFile.getOriginalFilename() : "null"));
-        System.out.println("authentication: " + authentication.getName());
-        
         try {
             User user = userService.findByUsername(authentication.getName());
-            System.out.println("User found: " + user.getUsername() + " (ID: " + user.getId() + ")");
-            
-            // Kiểm tra xem user có phải là owner của game player không
+
             boolean isOwner = momentService.isGamePlayerOwner(gamePlayerId, user.getId());
-            System.out.println("Is owner: " + isOwner);
-            
             if (!isOwner) {
-                System.out.println("User is not owner of game player");
                 return ResponseEntity.status(403).body(null);
             }
-            
+
             if (content.trim().isEmpty()) {
-                System.out.println("Content is empty");
                 return ResponseEntity.badRequest().body(null);
             }
-            
+
             CreateMomentRequest request = new CreateMomentRequest();
             request.setContent(content.trim());
-            
+
             List<String> imageUrls = new ArrayList<>();
-            
-            // Upload image if provided
+
             if (imageFile != null && !imageFile.isEmpty()) {
-                System.out.println("Processing image file...");
-                
-                // Validate file type
                 String contentType = imageFile.getContentType();
                 String originalFilename = imageFile.getOriginalFilename();
-                System.out.println("Content type: " + contentType);
-                System.out.println("Original filename: " + originalFilename);
-                
-                // Check content type or file extension
-                boolean isValidImage = false;
-                if (contentType != null && contentType.startsWith("image/")) {
-                    isValidImage = true;
-                } else if (originalFilename != null) {
-                    String extension = originalFilename.toLowerCase();
-                    if (extension.endsWith(".jpg") || extension.endsWith(".jpeg") || 
-                        extension.endsWith(".png") || extension.endsWith(".gif") || 
-                        extension.endsWith(".bmp") || extension.endsWith(".webp")) {
-                        isValidImage = true;
-                    }
+
+                boolean isValidImage = (contentType != null && contentType.startsWith("image/"));
+                if (!isValidImage && originalFilename != null) {
+                    String ext = originalFilename.toLowerCase();
+                    isValidImage = ext.endsWith(".jpg") || ext.endsWith(".jpeg") ||
+                            ext.endsWith(".png") || ext.endsWith(".gif") ||
+                            ext.endsWith(".bmp") || ext.endsWith(".webp");
                 }
-                
+
                 if (!isValidImage) {
-                    System.out.println("Invalid file type");
                     return ResponseEntity.badRequest().body(null);
                 }
-                
-                // Validate file size (max 5MB)
-                long fileSize = imageFile.getSize();
-                System.out.println("File size: " + fileSize + " bytes");
-                
-                if (fileSize > 5 * 1024 * 1024) {
-                    System.out.println("File too large");
+                if (imageFile.getSize() > 5 * 1024 * 1024) {
                     return ResponseEntity.badRequest().body(null);
                 }
-                
+
                 String fileName = fileStorageService.storeFile(imageFile, "moment-images");
-                System.out.println("File stored: " + fileName);
                 imageUrls.add(fileName);
-            } else {
-                System.out.println("No image file provided");
             }
-            
+
             request.setImageUrls(imageUrls);
-            System.out.println("Request prepared: " + request);
-            
             MomentDTO moment = momentService.createMoment(gamePlayerId, request);
-            System.out.println("Moment created successfully: " + moment.getId());
-            System.out.println("=== KẾT THÚC: createMomentWithFile ===");
-            
             return ResponseEntity.ok(moment);
-            
+
         } catch (Exception e) {
-            System.err.println("=== LỖI: createMomentWithFile ===");
-            System.err.println("Exception: " + e.getMessage());
-            e.printStackTrace();
             throw e;
         }
     }

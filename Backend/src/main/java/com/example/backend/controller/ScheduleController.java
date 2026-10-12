@@ -22,7 +22,6 @@ import com.example.backend.service.UserService;
 
 @RestController
 @RequestMapping("/api/schedules")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Schedule", description = "Schedule management APIs")
 public class ScheduleController {
     private final ScheduleService scheduleService;

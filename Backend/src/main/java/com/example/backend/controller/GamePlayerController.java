@@ -47,7 +47,6 @@ import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/game-players")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Game Player", description = "Game player management APIs")
 public class GamePlayerController {
     private final GamePlayerService gamePlayerService;
@@ -834,7 +833,7 @@ public class GamePlayerController {
 
     @GetMapping("/revenue/total")
     public ResponseEntity<Long> getTotalRevenue() {
-        Long total = revenueRepository.findAll().stream().mapToLong(r -> r.getAmount() != null ? r.getAmount() : 0L).sum();
+        Long total = revenueRepository.sumTotalRevenue();
         return ResponseEntity.ok(total);
     }
 
@@ -1040,10 +1039,7 @@ public class GamePlayerController {
             User playerUser = player.getUser();
 
             // Hủy các đơn thuê PENDING/CONFIRMED của player này
-            List<Order> ordersToCancel = orderRepository.findAll().stream()
-                .filter(o -> o.getPlayer() != null && o.getPlayer().getId().equals(player.getId()))
-                .filter(o -> "PENDING".equalsIgnoreCase(o.getStatus()) || "CONFIRMED".equalsIgnoreCase(o.getStatus()))
-                .toList();
+            List<Order> ordersToCancel = orderRepository.findActiveOrdersByPlayerId(player.getId());
             for (Order order : ordersToCancel) {
                 // Hoàn coin cho user nếu chưa hoàn thành
                 if (order.getRenter() != null && order.getPrice() != null && order.getPrice() > 0) {
@@ -1142,15 +1138,13 @@ public class GamePlayerController {
             dto.setEmail(gp.getUser() != null ? gp.getUser().getEmail() : "");
             dto.setPlayerName(gp.getUsername()); // Tên player khi đăng ký làm player
             // Số đơn thuê
-            int totalOrders = orderRepository.findAll().stream().filter(o -> o.getPlayer() != null && o.getPlayer().getId().equals(gp.getId())).toList().size();
+            int totalOrders = (int) orderRepository.countByPlayer_Id(gp.getId());
             dto.setTotalOrders(totalOrders);
             // Số đánh giá
             int totalReviews = playerReviewRepository.findByGamePlayerUserId(gp.getUser().getId()).size();
             dto.setTotalReviews(totalReviews);
             // Thu nhập: tổng price các order hoàn thành
-            long totalRevenue = orderRepository.findAll().stream()
-                .filter(o -> o.getPlayer() != null && o.getPlayer().getId().equals(gp.getId()) && "COMPLETED".equalsIgnoreCase(o.getStatus()))
-                .mapToLong(o -> o.getPrice() != null ? o.getPrice() : 0L).sum();
+            long totalRevenue = orderRepository.sumCompletedRevenueByPlayerId(gp.getId());
             dto.setTotalRevenue(totalRevenue);
             // Trạng thái
             dto.setStatus(gp.getStatus());

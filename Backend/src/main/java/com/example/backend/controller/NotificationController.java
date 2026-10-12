@@ -18,17 +18,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.InputStream;
-import java.util.Collections;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.auth.oauth2.ServiceAccountCredentials;
-import org.springframework.core.io.ClassPathResource;
-
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/notifications")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Notification", description = "Notification management APIs")
 public class NotificationController {
     private final NotificationService notificationService;
@@ -129,80 +122,15 @@ public class NotificationController {
     public ResponseEntity<?> updateDeviceToken(
             @Valid @RequestBody DeviceTokenRequest request,
             Authentication authentication) {
-        System.out.println("[NotificationController] ====== START updateDeviceToken ======");
-        System.out.println("[NotificationController] Request body: " + request);
-        System.out.println("[NotificationController] Authentication: " + authentication);
-        System.out.println("[NotificationController] Authentication name: " + authentication.getName());
-        System.out.println("[NotificationController] Authentication authorities: " + authentication.getAuthorities());
-        
         try {
             String username = authentication.getName();
-            System.out.println("[NotificationController] username từ authentication: " + username);
             User user = userService.findByUsername(username);
-            System.out.println("[NotificationController] Found user: " + user);
-            System.out.println("[NotificationController] Current device token: " + user.getDeviceToken());
-            System.out.println("[NotificationController] New device token: " + request.getDeviceToken());
-            
-            Long userId = user.getId();
-            System.out.println("[NotificationController] userId từ userService: " + userId);
-            notificationService.updateDeviceToken(userId, request.getDeviceToken());
-            System.out.println("[NotificationController] Đã gọi service cập nhật device token thành công");
-            System.out.println("[NotificationController] ====== END updateDeviceToken ======");
+            notificationService.updateDeviceToken(user.getId(), request.getDeviceToken());
             return ResponseEntity.ok().build();
         } catch (ResourceNotFoundException e) {
-            System.out.println("[NotificationController] ResourceNotFoundException: " + e.getMessage());
-            e.printStackTrace();
-            System.out.println("[NotificationController] ====== END updateDeviceToken with error ======");
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            System.out.println("[NotificationController] Exception: " + e.getMessage());
-            e.printStackTrace();
-            System.out.println("[NotificationController] ====== END updateDeviceToken with error ======");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("An unexpected error occurred: " + e.getMessage());
-        }
-    }
-
-    @Operation(summary = "Test Firebase credentials")
-    @GetMapping("/test-firebase")
-    public ResponseEntity<?> testFirebaseCredentials() {
-        try {
-            System.out.println("[NotificationController] Testing Firebase credentials...");
-            
-            // Test loading the service account file
-            ClassPathResource resource = new ClassPathResource("notifigation-d7a54-firebase-adminsdk-fbsvc-e812eeeadd.json");
-            if (!resource.exists()) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("Service account file not found");
-            }
-            
-            // Test creating credentials
-            try (InputStream is = resource.getInputStream()) {
-                GoogleCredentials credentials = GoogleCredentials
-                        .fromStream(is)
-                        .createScoped(Collections.singleton("https://www.googleapis.com/auth/firebase.messaging"));
-                
-                if (credentials instanceof ServiceAccountCredentials) {
-                    ServiceAccountCredentials serviceAccount = (ServiceAccountCredentials) credentials;
-                    System.out.println("[NotificationController] Service Account Email: " + serviceAccount.getClientEmail());
-                    System.out.println("[NotificationController] Project ID: " + serviceAccount.getProjectId());
-                    
-                    // Test getting access token
-                    credentials.refreshIfExpired();
-                    String accessToken = credentials.getAccessToken().getTokenValue();
-                    
-                    return ResponseEntity.ok("Firebase credentials test successful. Access token length: " + accessToken.length());
-                } else {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body("Failed to create ServiceAccountCredentials");
-                }
-            }
-            
-        } catch (Exception e) {
-            System.err.println("[NotificationController] Firebase test error: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Firebase credentials test failed: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

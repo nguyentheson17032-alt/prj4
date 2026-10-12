@@ -116,25 +116,14 @@ export const AuthProvider = ({ children }) => {
     const numericAmount = Number(amount);
     if (!numericAmount || numericAmount <= 0) throw new Error('Số tiền nạp không hợp lệ');
 
+    // Gọi API Backend trước, chỉ cập nhật UI sau khi thành công
+    await api.topUp(numericAmount);
+
     const currentBalance = Number(user.balance || user.walletBalance || user.coin || 0);
     const newBalance = currentBalance + numericAmount;
-    const updated = {
-      ...user,
-      balance: newBalance,
-      walletBalance: newBalance,
-      coin: newBalance
-    };
-
-    // Luôn cập nhật giao diện và localStorage ngay lập tức
+    const updated = { ...user, balance: newBalance, walletBalance: newBalance, coin: newBalance };
     setUser(updated);
     localStorage.setItem('current_user', JSON.stringify(updated));
-
-    // Gọi API Backend lưu vào CSDL
-    try {
-      await api.topUp(numericAmount);
-    } catch (err) {
-      console.warn('Ghi chú: Lỗi khi đồng bộ nạp tiền lên backend (local đã lưu):', err);
-    }
 
     return { success: true, newBalance };
   };
@@ -163,10 +152,9 @@ export const AuthProvider = ({ children }) => {
 
   const isAdmin = Boolean(
     user && (
-      (Array.isArray(user.roles) && user.roles.some(r => typeof r === 'string' && (r.toUpperCase().includes('ADMIN') || r.toUpperCase() === 'ROLE_ADMIN'))) ||
+      (Array.isArray(user.roles) && user.roles.some(r => typeof r === 'string' && (r.toUpperCase() === 'ADMIN' || r.toUpperCase() === 'ROLE_ADMIN'))) ||
       user.role === 'ADMIN' ||
-      user.role === 'ROLE_ADMIN' ||
-      (typeof user.username === 'string' && user.username.toLowerCase().includes('admin'))
+      user.role === 'ROLE_ADMIN'
     )
   );
 

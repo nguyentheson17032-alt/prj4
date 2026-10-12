@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/game-players/{playerId}/images")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Player Image", description = "Player image gallery management APIs")
 public class PlayerImageController {
     private final PlayerImageService playerImageService;

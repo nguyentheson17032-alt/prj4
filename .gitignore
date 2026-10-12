@@ -41,6 +41,7 @@ HELP.md
 # IDE & OS
 .idea/
 .vscode/
+.claude/
 *.iml
 *.iws
 *.ipr

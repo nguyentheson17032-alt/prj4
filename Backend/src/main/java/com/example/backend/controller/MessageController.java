@@ -23,7 +23,6 @@ import java.util.HashSet;
 
 @RestController
 @RequestMapping("/api/messages")
-@CrossOrigin(origins = "http://localhost:3000")
 public class MessageController {
 
     private final MessageService messageService;
@@ -119,11 +118,8 @@ public class MessageController {
     @GetMapping("/all-conversations")
     public ResponseEntity<?> getAllConversations(Authentication authentication) {
         User currentUser = userService.findByUsername(authentication.getName());
-        System.out.println("[DEBUG] Current user: " + currentUser.getId() + " - " + currentUser.getUsername());
         List<Message> sentMessages = messageService.getMessagesBySender(currentUser);
         List<Message> receivedMessages = messageService.getMessagesByReceiver(currentUser);
-        System.out.println("[DEBUG] Sent messages: " + sentMessages.size());
-        System.out.println("[DEBUG] Received messages: " + receivedMessages.size());
         Set<Long> chatUserIds = new HashSet<>();
         for (Message message : sentMessages) {
             chatUserIds.add(message.getReceiver().getId());
@@ -132,14 +128,12 @@ public class MessageController {
             chatUserIds.add(message.getSender().getId());
         }
         chatUserIds.remove(currentUser.getId());
-        System.out.println("[DEBUG] Chat user ids: " + chatUserIds);
         Map<Long, List<DetailMessageDTO>> conversationMap = new HashMap<>();
         Map<Long, String> nameMap = new HashMap<>();
         for (Long otherUserId : chatUserIds) {
             User otherUser = userService.findById(otherUserId);
             if (otherUser != null) {
                 List<Message> messages = messageService.getConversation(currentUser, otherUser);
-                System.out.println("[DEBUG] Messages with user " + otherUserId + ": " + messages.size());
                 List<DetailMessageDTO> detailMessages = messages.stream()
                     .map(m -> new DetailMessageDTO(
                         m.getContent(),
@@ -167,7 +161,6 @@ public class MessageController {
         List<ConversationDetailDTO> result = conversationMap.entrySet().stream()
             .map(entry -> new ConversationDetailDTO(entry.getKey(), nameMap.get(entry.getKey()), entry.getValue()))
             .toList();
-        System.out.println("[DEBUG] Result conversations: " + result.size());
         return ResponseEntity.ok(result);
     }
 

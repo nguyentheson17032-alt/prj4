@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/order-reviews")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Order Review", description = "Order review management APIs")
 public class OrderReviewController {
 
@@ -414,10 +413,7 @@ public class OrderReviewController {
             User user = userService.findByUsername(authentication.getName());
             
             // Lấy tất cả đơn hàng đã hoàn thành của user
-            List<Order> completedOrders = orderRepository.findAll().stream()
-                .filter(order -> order.getRenter() != null && order.getRenter().getId().equals(user.getId()))
-                .filter(order -> "COMPLETED".equals(order.getStatus()))
-                .collect(Collectors.toList());
+            List<Order> completedOrders = orderRepository.findByRenter_IdAndStatus(user.getId(), "COMPLETED");
 
             // Lọc ra những đơn hàng chưa có đánh giá
             List<Map<String, Object>> pendingReviews = completedOrders.stream()

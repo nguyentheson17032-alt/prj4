@@ -1,45 +1,787 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  ShieldCheck,
-  Users,
-  Gamepad2,
-  ShoppingBag,
-  TrendingUp,
-  DollarSign,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  Search,
-  Plus,
-  Lock,
-  Unlock,
-  RefreshCw,
-  BarChart3,
-  Award,
-  Clock,
-  ArrowLeft,
-  Sparkles,
-  ChevronRight,
-  Filter,
-  Check,
-  X
+  ShieldCheck, Users, Gamepad2, ShoppingBag, TrendingUp,
+  DollarSign, AlertTriangle, CheckCircle2, XCircle, Search,
+  Plus, Lock, Unlock, RefreshCw, BarChart3, Award, Clock,
+  Sparkles, ChevronRight, Check, X, CreditCard, Wallet,
+  LogOut, Home, ArrowUpCircle, ArrowDownCircle, Eye,
+  LayoutDashboard, FileText, Settings, Bell, Moon, Sun,
+  Ban, UserCheck, ChevronLeft, Filter
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getUserAvatar } from '../utils/avatarUtils';
+import { useTheme } from '../context/ThemeContext';
 import api from '../api/apiService';
 
-export const AdminPage = () => {
-  const { user, isAdmin, isAuthenticated } = useAuth();
-  const { addToast } = useToast();
-  const navigate = useNavigate();
+// ─────────────────────────────────────────────
+// Sidebar nav items
+// ─────────────────────────────────────────────
+const NAV_ITEMS = [
+  { id: 'overview',  label: 'Tổng Quan',       icon: LayoutDashboard },
+  { id: 'users',     label: 'Người Dùng',       icon: Users },
+  { id: 'players',   label: 'Game Thủ',         icon: Gamepad2 },
+  { id: 'orders',    label: 'Đơn Hàng',         icon: ShoppingBag },
+  { id: 'games',     label: 'Danh Mục Game',    icon: Gamepad2 },
+  { id: 'payments',  label: 'Nạp / Rút Tiền',  icon: CreditCard },
+  { id: 'reports',   label: 'Khiếu Nại',        icon: AlertTriangle },
+];
 
-  const [activeTab, setActiveTab] = useState('overview'); // overview, users, players, orders, games, reports
-  const [searchTerm, setSearchTerm] = useState('');
+// ─────────────────────────────────────────────
+// Status badge helper
+// ─────────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+  const map = {
+    PENDING:   { label: 'Chờ duyệt',   bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
+    COMPLETED: { label: 'Hoàn thành',  bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
+    AVAILABLE: { label: 'Sẵn sàng',    bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
+    BANNED:    { label: 'Đã khóa',     bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    REJECTED:  { label: 'Từ chối',     bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    PLAYING:   { label: 'Đang chơi',   bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
+    CONFIRMED: { label: 'Đã xác nhận', bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
+    CANCELLED: { label: 'Đã hủy',      bg: 'rgba(107,114,128,0.15)', color: '#6b7280' },
+    processed: { label: 'Đã xử lý',    bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
+    pending:   { label: 'Chờ xử lý',   bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
+    rejected:  { label: 'Từ chối',     bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+  };
+  const s = map[status] || { label: status, bg: 'rgba(107,114,128,0.15)', color: '#6b7280' };
+  return (
+    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: s.bg, color: s.color }}>
+      {s.label}
+    </span>
+  );
+};
+
+// ─────────────────────────────────────────────
+// Metric card
+// ─────────────────────────────────────────────
+const MetricCard = ({ label, value, sub, icon: Icon, color }) => (
+  <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</span>
+      <div style={{ padding: '8px', borderRadius: '10px', background: `${color}22`, color }}><Icon size={20} /></div>
+    </div>
+    <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{value}</div>
+    {sub && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>{sub}</div>}
+  </div>
+);
+
+// ─────────────────────────────────────────────
+// OVERVIEW TAB
+// ─────────────────────────────────────────────
+const OverviewTab = ({ ordersList, usersList, playersList, reportsList, loading }) => {
+  const totalRevenue = useMemo(() => ordersList.reduce((s, o) => s + (o.totalPrice || o.price || 0), 0), [ordersList]);
+  const pendingCount = playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING').length;
+  const completedCount = ordersList.filter(o => o.status === 'COMPLETED').length;
+  const completionRate = ordersList.length ? `${Math.round((completedCount / ordersList.length) * 100)}%` : '100%';
+
+  const weeklyData = useMemo(() => {
+    const days = ['CN','T2','T3','T4','T5','T6','T7'];
+    const now = new Date();
+    const result = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now); d.setDate(d.getDate() - (6 - i));
+      const dateStr = d.toISOString().split('T')[0];
+      const val = ordersList.filter(o => o.createdAt?.startsWith(dateStr)).reduce((s, o) => s + (o.totalPrice || o.price || 0), 0);
+      return { day: days[d.getDay()], date: `${d.getDate()}/${d.getMonth()+1}`, val };
+    });
+    const maxVal = Math.max(...result.map(r => r.val), 1);
+    return result.map(r => ({ ...r, height: r.val > 0 ? `${Math.max(15, Math.round((r.val/maxVal)*90))}%` : '8px' }));
+  }, [ordersList]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' }}>
+        <MetricCard label="Tổng Doanh Thu" value={`${totalRevenue.toLocaleString('vi-VN')} đ`} sub={`Từ ${ordersList.length} giao dịch`} icon={DollarSign} color="#10b981" />
+        <MetricCard label="Tổng Đơn Thuê" value={`${ordersList.length} đơn`} sub={`Tỷ lệ hoàn thành: ${completionRate}`} icon={ShoppingBag} color="#6366f1" />
+        <MetricCard label="Tổng Tài Khoản" value={usersList.length.toLocaleString()} sub={`${playersList.filter(p=>p.status!=='PENDING').length} Game thủ hoạt động`} icon={Users} color="#06b6d4" />
+        <MetricCard label="Game Thủ Chờ Duyệt" value={`${pendingCount} hồ sơ`} sub={`${reportsList.filter(r=>r.status==='PENDING').length} khiếu nại chưa xử lý`} icon={Award} color="#f59e0b" />
+      </div>
+
+      {/* Revenue Chart */}
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 20px' }}>Doanh Thu 7 Ngày Gần Nhất</h3>
+        <div style={{ height: '200px', display: 'flex', alignItems: 'flex-end', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+          {weeklyData.map((item, idx) => (
+            <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.val > 0 ? `${(item.val/1000).toFixed(0)}k` : '0'}</span>
+              <div title={`${item.day}: ${item.val.toLocaleString('vi-VN')} đ`} style={{ width: '100%', maxWidth: '32px', height: item.height, borderRadius: '6px 6px 0 0', background: item.val > 0 ? 'linear-gradient(180deg, var(--primary), var(--secondary))' : 'rgba(255,255,255,0.06)', transition: 'all 0.3s', cursor: 'pointer' }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{item.day}</span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{item.date}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary rows */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 14px' }}>Phân Bổ Trạng Thái Đơn</h3>
+          {['COMPLETED','CONFIRMED','PENDING','CANCELLED'].map(s => {
+            const cnt = ordersList.filter(o => o.status === s).length;
+            const pct = ordersList.length ? Math.round((cnt / ordersList.length) * 100) : 0;
+            return (
+              <div key={s} style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.83rem', marginBottom: '4px' }}>
+                  <StatusBadge status={s} />
+                  <span style={{ color: 'var(--text-muted)' }}>{cnt} ({pct}%)</span>
+                </div>
+                <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px' }}>
+                  <div style={{ width: `${pct || 1}%`, height: '100%', borderRadius: '3px', background: 'var(--primary)' }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 14px' }}>Trạng Thái Hệ Thống</h3>
+          {[
+            { label: 'Kết nối Backend', ok: true },
+            { label: 'Cơ sở dữ liệu', ok: true },
+            { label: 'Dịch vụ thanh toán', ok: true },
+            { label: 'Thông báo push', ok: true },
+          ].map(item => (
+            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <CheckCircle2 size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.85rem' }}>{item.label}</span>
+              <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: '6px' }}>Online</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// USERS TAB
+// ─────────────────────────────────────────────
+const UsersTab = ({ usersList, loading }) => {
+  const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
-  
-  // Real State from Backend API
+  const { addToast } = useToast();
+
+  const filtered = usersList
+    .filter(u => roleFilter === 'ALL' || (u.roles && u.roles.some(r => r.includes(roleFilter))))
+    .filter(u => !search || u.username?.toLowerCase().includes(search.toLowerCase()) || u.fullName?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+
+  const handleBan = async (u) => {
+    try {
+      const action = u.enabled !== false ? 'ban' : 'unban';
+      await api.request?.({ method: 'put', url: `/api/users/${u.id}/${action}` });
+      addToast(`Đã ${action === 'ban' ? 'khóa' : 'mở khóa'} ${u.username}`, 'success');
+    } catch {
+      addToast('Thao tác thất bại', 'error');
+    }
+  };
+
+  return (
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+        <div>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Danh Sách Người Dùng ({usersList.length})</h3>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Quản lý tài khoản và phân quyền</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '200px' }} placeholder="Tìm username, email..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+            <option value="ALL">Tất cả vai trò</option>
+            <option value="ADMIN">Admin</option>
+            <option value="PLAYER">Game thủ</option>
+            <option value="USER">Thành viên</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Thành viên</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Email</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Số dư ví</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Vai trò</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
+              <th style={{ padding: '10px 14px', textAlign: 'right' }}>Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không có kết quả</td></tr>
+            ) : filtered.map(u => {
+              const isAdmin = u.roles?.some(r => r.includes('ADMIN'));
+              const isPlayer = u.roles?.some(r => r.includes('PLAYER'));
+              const isBanned = u.enabled === false;
+              return (
+                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <img src={getUserAvatar(u)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{u.fullName || u.username}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>@{u.username}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px', color: 'var(--text-muted)' }}>{u.email || '—'}</td>
+                  <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>{((u.walletBalance || u.coin || 0)).toLocaleString('vi-VN')} đ</td>
+                  <td style={{ padding: '14px' }}>
+                    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: isAdmin ? 'rgba(244,63,94,0.15)' : isPlayer ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.08)', color: isAdmin ? '#f43f5e' : isPlayer ? '#06b6d4' : 'var(--text-muted)' }}>
+                      {isAdmin ? '🛡️ Admin' : isPlayer ? '🎮 Game thủ' : '👤 Thành viên'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '14px' }}><StatusBadge status={isBanned ? 'BANNED' : 'AVAILABLE'} /></td>
+                  <td style={{ padding: '14px', textAlign: 'right' }}>
+                    {!isAdmin && (
+                      <button className="btn btn-outline" style={{ padding: '5px 10px', fontSize: '0.75rem', height: 'auto', borderColor: isBanned ? '#10b981' : '#ef4444', color: isBanned ? '#10b981' : '#ef4444' }} onClick={() => handleBan(u)}>
+                        {isBanned ? <Unlock size={13} /> : <Lock size={13} />}
+                        <span style={{ marginLeft: '4px' }}>{isBanned ? 'Mở khóa' : 'Khóa'}</span>
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// PLAYERS TAB
+// ─────────────────────────────────────────────
+const PlayersTab = ({ playersList, setPlayersList, loading }) => {
+  const { addToast } = useToast();
+  const [summaryData, setSummaryData] = useState([]);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  useEffect(() => {
+    api.getPlayersSummary().then(d => { setSummaryData(d); setSummaryLoading(false); });
+  }, []);
+
+  const pendingPlayers = playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING');
+  const activePlayers = playersList.filter(p => p.status !== 'PENDING' && p.adminStatus !== 'PENDING');
+
+  const filteredSummary = summaryData.filter(p => {
+    const matchSearch = !search || p.name?.toLowerCase().includes(search.toLowerCase()) || p.playerName?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'ALL' || p.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const handleApprove = async (pid) => {
+    try {
+      await api.approvePlayer(pid);
+      setPlayersList(prev => prev.map(p => String(p.id) === String(pid) ? { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' } : p));
+      addToast('Đã phê duyệt Game thủ!', 'success');
+    } catch { addToast('Phê duyệt thất bại', 'error'); }
+  };
+
+  const handleReject = async (pid) => {
+    try {
+      await api.rejectPlayer(pid);
+      setPlayersList(prev => prev.filter(p => String(p.id) !== String(pid)));
+      addToast('Đã từ chối hồ sơ', 'info');
+    } catch { addToast('Thao tác thất bại', 'error'); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Pending approvals */}
+      {pendingPlayers.length > 0 && (
+        <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: '16px', padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }} />
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Hồ Sơ Chờ Duyệt ({pendingPlayers.length})</h3>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+            {pendingPlayers.map(p => (
+              <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px' }}>
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                  <img src={getUserAvatar(p)} alt="" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover' }} />
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{p.fullName || p.name || p.username}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{p.primaryGame || p.game || '—'}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{(p.pricePerHour || p.price || 0).toLocaleString('vi-VN')} đ/h</div>
+                  </div>
+                </div>
+                {p.bio && <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '8px', margin: '0 0 12px' }}>"{p.bio}"</p>}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.82rem', background: '#10b981', borderColor: '#10b981' }} onClick={() => handleApprove(p.id)}>
+                    <Check size={14} /> <span>Phê duyệt</span>
+                  </button>
+                  <button className="btn btn-outline" style={{ padding: '8px 12px', fontSize: '0.82rem', borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleReject(p.id)}>
+                    <X size={14} /> <span>Từ chối</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Full player list with summary data */}
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Danh Sách Game Thủ ({summaryData.length})</h3>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder="Tìm game thủ..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option value="ALL">Tất cả</option>
+              <option value="AVAILABLE">Sẵn sàng</option>
+              <option value="BANNED">Bị khóa</option>
+              <option value="PENDING">Chờ duyệt</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game thủ</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Đánh giá</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tổng đơn</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Doanh thu</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summaryLoading ? (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+              ) : filteredSummary.length === 0 ? (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không có game thủ nào</td></tr>
+              ) : filteredSummary.map(p => (
+                <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <img src={getUserAvatar(p)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{p.name || p.fullName}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.playerName || p.username}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px', color: 'var(--text-muted)' }}>{p.gameName || p.game || '—'}</td>
+                  <td style={{ padding: '14px' }}>⭐ {(p.rating || 0).toFixed(1)}</td>
+                  <td style={{ padding: '14px', fontWeight: 600 }}>{p.totalOrders || 0}</td>
+                  <td style={{ padding: '14px', color: '#10b981', fontWeight: 700 }}>{(p.totalRevenue || 0).toLocaleString('vi-VN')} đ</td>
+                  <td style={{ padding: '14px' }}><StatusBadge status={p.status || 'AVAILABLE'} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// ORDERS TAB
+// ─────────────────────────────────────────────
+const OrdersTab = ({ ordersList, loading }) => {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  const filtered = ordersList
+    .filter(o => statusFilter === 'ALL' || o.status === statusFilter)
+    .filter(o => !search || String(o.id).includes(search) || o.renterUsername?.toLowerCase().includes(search.toLowerCase()) || o.playerName?.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Lịch Sử Đơn Hàng ({ordersList.length})</h3>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder="Tìm mã đơn, tên..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="ALL">Tất cả</option>
+            <option value="PENDING">Chờ xác nhận</option>
+            <option value="CONFIRMED">Đã xác nhận</option>
+            <option value="COMPLETED">Hoàn thành</option>
+            <option value="CANCELLED">Đã hủy</option>
+          </select>
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Mã đơn</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Người thuê</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game thủ</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tổng tiền</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Thời gian</th>
+              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Chưa có đơn hàng nào</td></tr>
+            ) : filtered.map(o => (
+              <tr key={o.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <td style={{ padding: '14px', fontWeight: 700, color: 'var(--primary)' }}>#{o.id}</td>
+                <td style={{ padding: '14px' }}>{o.renterUsername || o.renterId || '—'}</td>
+                <td style={{ padding: '14px' }}>{o.playerName || o.playerId || '—'}</td>
+                <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>{(o.totalPrice || o.price || 0).toLocaleString('vi-VN')} đ</td>
+                <td style={{ padding: '14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{o.createdAt ? new Date(o.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
+                <td style={{ padding: '14px' }}><StatusBadge status={o.status} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// GAMES TAB
+// ─────────────────────────────────────────────
+const GamesTab = ({ gamesList, setGamesList, loading }) => {
+  const { addToast } = useToast();
+  const [search, setSearch] = useState('');
+
+  const filtered = gamesList.filter(g => !search || g.name?.toLowerCase().includes(search.toLowerCase()));
+
+  const handleAdd = () => {
+    const name = prompt('Tên game mới:');
+    if (name?.trim()) {
+      setGamesList(prev => [...prev, { id: Date.now(), name: name.trim() }]);
+      addToast(`Đã thêm game "${name}"`, 'success');
+    }
+  };
+
+  return (
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Danh Mục Game ({gamesList.length})</h3>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder="Tìm game..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <button className="btn btn-primary" style={{ fontSize: '0.85rem' }} onClick={handleAdd}>
+            <Plus size={15} /> <span>Thêm game</span>
+          </button>
+        </div>
+      </div>
+      {loading ? (
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>Đang tải...</p>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
+          {filtered.map(g => (
+            <div key={g.id} style={{ borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
+              {g.image && <img src={g.image} alt={g.name} style={{ width: '100%', height: '100px', objectFit: 'cover' }} />}
+              {!g.image && <div style={{ width: '100%', height: '100px', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Gamepad2 size={32} style={{ color: '#fff', opacity: 0.7 }} /></div>}
+              <div style={{ padding: '12px' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{g.name}</div>
+                {g.status && <div style={{ marginTop: '6px' }}><StatusBadge status={g.status} /></div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// PAYMENTS TAB (NEW)
+// ─────────────────────────────────────────────
+const PaymentsTab = () => {
+  const { addToast } = useToast();
+  const [tab, setTab] = useState('deposit');
+  const [depositList, setDepositList] = useState([]);
+  const [withdrawList, setWithdrawList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([api.getAdminTopupPayments(), api.getAdminWithdrawPayments()])
+      .then(([dep, wit]) => { setDepositList(dep); setWithdrawList(wit); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const currentList = tab === 'deposit' ? depositList : withdrawList;
+  const setCurrentList = tab === 'deposit' ? setDepositList : setWithdrawList;
+
+  const mapStatus = s => s === 'COMPLETED' ? 'processed' : s === 'PENDING' ? 'pending' : 'rejected';
+
+  const filtered = currentList.filter(item => {
+    const ms = mapStatus(item.status);
+    const matchStatus = statusFilter === 'all' || ms === statusFilter;
+    const matchSearch = !search || String(item.id).includes(search) || item.fullName?.toLowerCase().includes(search.toLowerCase());
+    return matchStatus && matchSearch;
+  });
+
+  const handleApprove = async (item) => {
+    try {
+      await api.processPayment(item.id);
+      setCurrentList(prev => prev.map(p => p.id === item.id ? { ...p, status: 'COMPLETED' } : p));
+      addToast('Đã xác nhận thanh toán!', 'success');
+      setSelectedItem(null);
+    } catch { addToast('Xác nhận thất bại', 'error'); }
+  };
+
+  const handleReject = async (item) => {
+    try {
+      await api.refundPayment(item.id, 'Admin từ chối');
+      setCurrentList(prev => prev.map(p => p.id === item.id ? { ...p, status: 'REJECTED' } : p));
+      addToast('Đã từ chối giao dịch', 'info');
+      setSelectedItem(null);
+    } catch { addToast('Thao tác thất bại', 'error'); }
+  };
+
+  const totalPending = depositList.filter(d => d.status === 'PENDING').length + withdrawList.filter(w => w.status === 'PENDING').length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <MetricCard label="Nạp tiền chờ duyệt" value={depositList.filter(d=>d.status==='PENDING').length} sub={`Tổng: ${depositList.length}`} icon={ArrowDownCircle} color="#10b981" />
+        <MetricCard label="Rút tiền chờ duyệt" value={withdrawList.filter(w=>w.status==='PENDING').length} sub={`Tổng: ${withdrawList.length}`} icon={ArrowUpCircle} color="#f59e0b" />
+        <MetricCard label="Tổng chờ xử lý" value={totalPending} sub="Cần xử lý ngay" icon={CreditCard} color="#f43f5e" />
+      </div>
+
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+        {/* Tab header */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+          {[
+            { id: 'deposit', label: '⬇ Nạp Tiền', count: depositList.length, pendingCount: depositList.filter(d=>d.status==='PENDING').length },
+            { id: 'withdraw', label: '⬆ Rút Tiền', count: withdrawList.length, pendingCount: withdrawList.filter(w=>w.status==='PENDING').length },
+          ].map(t => (
+            <button key={t.id} onClick={() => { setTab(t.id); setSearch(''); setStatusFilter('all'); }} style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', background: tab === t.id ? 'var(--primary)' : 'transparent', color: tab === t.id ? '#fff' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {t.label}
+              {t.pendingCount > 0 && <span style={{ background: '#f43f5e', color: '#fff', fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px' }}>{t.pendingCount}</span>}
+            </button>
+          ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input className="form-control" style={{ paddingLeft: '32px', height: '34px', fontSize: '0.83rem', minWidth: '160px' }} placeholder="Tìm tên, ID..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <select className="form-control" style={{ height: '34px', fontSize: '0.83rem' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option value="all">Tất cả</option>
+              <option value="pending">Chờ xử lý</option>
+              <option value="processed">Đã xử lý</option>
+              <option value="rejected">Từ chối</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>ID</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Người dùng</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Số tiền</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Phương thức</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Ngày</th>
+                {tab === 'withdraw' && <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tài khoản nhận</th>}
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
+                <th style={{ padding: '10px 14px', textAlign: 'right' }}>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không có giao dịch nào</td></tr>
+              ) : filtered.map(item => {
+                const ms = mapStatus(item.status);
+                return (
+                  <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--primary)' }}>#{item.id}</td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <div style={{ fontWeight: 600 }}>{item.fullName || '—'}</div>
+                      {item.phoneNumber && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.phoneNumber}</div>}
+                    </td>
+                    <td style={{ padding: '12px 14px', fontWeight: 700, color: tab === 'deposit' ? '#10b981' : '#f59e0b' }}>
+                      {(item.coin || 0).toLocaleString('vi-VN')} đ
+                    </td>
+                    <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>{item.method || 'MANUAL'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}
+                    </td>
+                    {tab === 'withdraw' && (
+                      <td style={{ padding: '12px 14px', fontSize: '0.8rem' }}>
+                        {item.bankName ? <span>{item.bankName}<br /><span style={{ color: 'var(--text-muted)' }}>{item.bankAccountNumber}</span></span> : '—'}
+                      </td>
+                    )}
+                    <td style={{ padding: '12px 14px' }}><StatusBadge status={ms} /></td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-outline" style={{ padding: '5px 8px', fontSize: '0.75rem', height: 'auto' }} onClick={() => setSelectedItem(item)}>
+                          <Eye size={13} />
+                        </button>
+                        {ms === 'pending' && (
+                          <>
+                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '0.75rem', height: 'auto', background: '#10b981', borderColor: '#10b981' }} onClick={() => handleApprove(item)}>
+                              <Check size={13} /> <span>Duyệt</span>
+                            </button>
+                            <button className="btn btn-outline" style={{ padding: '5px 8px', fontSize: '0.75rem', height: 'auto', borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleReject(item)}>
+                              <X size={13} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Detail Modal */}
+      {selectedItem && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedItem(null)}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', maxWidth: '420px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Chi Tiết Giao Dịch #{selectedItem.id}</h3>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setSelectedItem(null)}><X size={20} /></button>
+            </div>
+            {[
+              ['Người dùng', selectedItem.fullName || '—'],
+              ['Số điện thoại', selectedItem.phoneNumber || '—'],
+              ['Số tiền', `${(selectedItem.coin || 0).toLocaleString('vi-VN')} đ`],
+              ['Phương thức', selectedItem.method || 'MANUAL'],
+              ['Ngày tạo', selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleString('vi-VN') : '—'],
+              ...(tab === 'withdraw' ? [
+                ['Ngân hàng', selectedItem.bankName || '—'],
+                ['Số tài khoản', selectedItem.bankAccountNumber || '—'],
+                ['Tên tài khoản', selectedItem.bankAccountName || '—'],
+              ] : []),
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)', fontSize: '0.87rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>{k}</span>
+                <span style={{ fontWeight: 600 }}>{v}</span>
+              </div>
+            ))}
+            {mapStatus(selectedItem.status) === 'pending' && (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button className="btn btn-primary" style={{ flex: 1, background: '#10b981', borderColor: '#10b981' }} onClick={() => handleApprove(selectedItem)}>
+                  <Check size={15} /> <span>Xác nhận</span>
+                </button>
+                <button className="btn btn-outline" style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleReject(selectedItem)}>
+                  <X size={15} /> <span>Từ chối</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// REPORTS TAB
+// ─────────────────────────────────────────────
+const ReportsTab = ({ reportsList, setReportsList, loading }) => {
+  const { addToast } = useToast();
+
+  const handleResolve = (id) => {
+    setReportsList(prev => prev.map(r => r.id === id ? { ...r, status: 'RESOLVED' } : r));
+    addToast('Đã xử lý khiếu nại!', 'success');
+  };
+
+  const pending = reportsList.filter(r => r.status === 'PENDING');
+  const resolved = reportsList.filter(r => r.status === 'RESOLVED');
+
+  return (
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Khiếu Nại & Vi Phạm ({reportsList.length})</h3>
+        <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem' }}>
+          <span style={{ color: '#f59e0b', fontWeight: 700 }}>{pending.length} chờ xử lý</span>
+          <span style={{ color: '#10b981', fontWeight: 700 }}>{resolved.length} đã xử lý</span>
+        </div>
+      </div>
+      {loading ? (
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>Đang tải...</p>
+      ) : reportsList.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          <CheckCircle2 size={36} style={{ color: '#10b981', margin: '0 auto 10px', display: 'block' }} />
+          <div>Không có khiếu nại nào!</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {reportsList.map(r => (
+            <div key={r.id} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--primary)' }}>#{r.id}</span>
+                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(244,63,94,0.15)', color: '#f43f5e', fontWeight: 700 }}>{r.type || 'Khiếu nại'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.createdAt || '—'}</span>
+                  <StatusBadge status={r.status || 'PENDING'} />
+                </div>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                <strong>{r.reportedBy || 'Khách hàng'}</strong> → <strong>{r.targetUser || 'Game thủ'}</strong>: "{r.content || r.reason || '—'}"
+              </div>
+              {r.status !== 'RESOLVED' && (
+                <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem', height: 'auto' }} onClick={() => handleResolve(r.id)}>
+                  <CheckCircle2 size={14} /> <span>Đã xử lý</span>
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// MAIN ADMIN PAGE
+// ─────────────────────────────────────────────
+export const AdminPage = () => {
+  const { user, isAdmin, isAuthenticated, logout } = useAuth();
+  const { addToast } = useToast();
+  const { isDark, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Detect active section from URL
+  const pathSection = location.pathname.split('/admin/')[1] || 'overview';
+  const [activeSection, setActiveSection] = useState(pathSection);
+
+  useEffect(() => {
+    const s = location.pathname.split('/admin/')[1] || 'overview';
+    setActiveSection(s);
+  }, [location.pathname]);
+
+  // Data state
   const [usersList, setUsersList] = useState([]);
   const [playersList, setPlayersList] = useState([]);
   const [ordersList, setOrdersList] = useState([]);
@@ -47,857 +789,155 @@ export const AdminPage = () => {
   const [gamesList, setGamesList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load data from Backend
-  const loadAdminData = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const [usersData, playersData, ordersData, gamesData, reportsData] = await Promise.allSettled([
-        api.getUsers(),
-        api.getPlayers(),
-        api.getOrders(),
-        api.getGames(),
-        api.getReports()
+      const [usersR, playersR, ordersR, gamesR, reportsR] = await Promise.allSettled([
+        api.getUsers(), api.getPlayers(), api.getOrders(), api.getGames(), api.getReports()
       ]);
-
-      if (usersData.status === 'fulfilled' && Array.isArray(usersData.value)) {
-        setUsersList(usersData.value);
-      }
-      if (playersData.status === 'fulfilled' && Array.isArray(playersData.value)) {
-        setPlayersList(playersData.value);
-      }
-      if (ordersData.status === 'fulfilled' && Array.isArray(ordersData.value)) {
-        setOrdersList(ordersData.value);
-      }
-      if (gamesData.status === 'fulfilled' && Array.isArray(gamesData.value)) {
-        setGamesList(gamesData.value);
-      }
-      if (reportsData.status === 'fulfilled' && Array.isArray(reportsData.value)) {
-        setReportsList(reportsData.value);
-      }
+      if (usersR.status === 'fulfilled' && Array.isArray(usersR.value)) setUsersList(usersR.value);
+      if (playersR.status === 'fulfilled' && Array.isArray(playersR.value)) setPlayersList(playersR.value);
+      if (ordersR.status === 'fulfilled' && Array.isArray(ordersR.value)) setOrdersList(ordersR.value);
+      if (gamesR.status === 'fulfilled' && Array.isArray(gamesR.value)) setGamesList(gamesR.value);
+      if (reportsR.status === 'fulfilled' && Array.isArray(reportsR.value)) setReportsList(reportsR.value);
     } catch (err) {
-      console.error('Lỗi khi tải dữ liệu admin từ backend:', err);
+      console.error('Admin data load error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isAuthenticated && isAdmin) {
-      loadAdminData();
-    }
+    if (isAuthenticated && isAdmin) loadData();
   }, [isAuthenticated, isAdmin]);
 
-  // Toggle user ban
-  const handleToggleBanUser = (id) => {
-    setUsersList(prev => prev.map(u => {
-      if (u.id === id) {
-        const nextStatus = u.status === 'ACTIVE' ? 'BANNED' : 'ACTIVE';
-        addToast(`Đã ${nextStatus === 'BANNED' ? 'khóa' : 'mở khóa'} tài khoản ${u.username}`, nextStatus === 'BANNED' ? 'warning' : 'success');
-        return { ...u, status: nextStatus };
-      }
-      return u;
-    }));
-  };
+  const pendingPlayers = playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING').length;
+  const pendingReports = reportsList.filter(r => r.status === 'PENDING').length;
+  const pendingPayments = 0; // loaded lazily in PaymentsTab
 
-  // Add coins to user
-  const handleAddCoins = (id) => {
-    const amountStr = prompt('Nhập số xu muốn cộng cho người dùng (ví dụ: 100000):', '100000');
-    if (!amountStr || isNaN(amountStr)) return;
-    const amount = Number(amountStr);
-    setUsersList(prev => prev.map(u => {
-      if (u.id === id) {
-        addToast(`Đã cộng ${(amount).toLocaleString('vi-VN')} đ cho ${u.username}`, 'success');
-        return { ...u, balance: (u.balance || 0) + amount };
-      }
-      return u;
-    }));
-  };
-
-  // Approve / Reject Player application
-  const handleApprovePlayer = async (playerId) => {
-    setPlayersList(prev => prev.map(p => {
-      if (p.id === playerId || String(p.id) === String(playerId)) {
-        addToast(`Đã phê duyệt hồ sơ Idol "${p.fullName || p.name}"!`, 'success');
-        return { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' };
-      }
-      return p;
-    }));
-
-    await api.approvePlayer(playerId);
-  };
-
-  const handleRejectPlayer = async (playerId) => {
-    setPlayersList(prev => prev.filter(p => p.id !== playerId && String(p.id) !== String(playerId)));
-    addToast('Đã từ chối hồ sơ đăng ký!', 'info');
-    await api.rejectPlayer(playerId);
-  };
-
-  // Resolve Report
-  const handleResolveReport = (reportId) => {
-    setReportsList(prev => prev.map(r => {
-      if (r.id === reportId) {
-        addToast('Đã xử lý khiếu nại thành công!', 'success');
-        return { ...r, status: 'RESOLVED' };
-      }
-      return r;
-    }));
-  };
-
-  // Real Computed Stats (100% from backend, 0 mock)
-  const totalRevenue = useMemo(() => {
-    return ordersList.reduce((acc, o) => acc + (o.totalPrice || o.price || 0), 0);
-  }, [ordersList]);
-
-  const totalOrdersCount = ordersList.length;
-  const totalUsersCount = usersList.length;
-  const pendingPlayersCount = playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING').length;
-  const pendingReportsCount = reportsList.filter(r => r.status === 'PENDING').length;
-
-  const completedOrdersCount = useMemo(() => {
-    return ordersList.filter(o => o.status === 'COMPLETED').length;
-  }, [ordersList]);
-
-  const completionRate = useMemo(() => {
-    if (ordersList.length === 0) return '100%';
-    return `${Math.round((completedOrdersCount / ordersList.length) * 100)}%`;
-  }, [ordersList, completedOrdersCount]);
-
-  // Real 7-Day Revenue Calculation
-  const weeklyRevenueData = useMemo(() => {
-    const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    const result = [];
-    const now = new Date();
-
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dayName = days[d.getDay()];
-      const dateStr = d.toISOString().split('T')[0];
-
-      const dayOrders = ordersList.filter(o => {
-        if (!o.createdAt) return false;
-        return o.createdAt.startsWith(dateStr);
-      });
-
-      const val = dayOrders.reduce((sum, o) => sum + (o.totalPrice || o.price || 0), 0);
-      result.push({
-        day: dayName,
-        date: `${d.getDate()}/${d.getMonth() + 1}`,
-        val
-      });
-    }
-
-    const maxVal = Math.max(...result.map(r => r.val), 1);
-    return result.map(r => ({
-      ...r,
-      height: r.val > 0 ? `${Math.max(15, Math.round((r.val / maxVal) * 90))}%` : '8px'
-    }));
-  }, [ordersList]);
-
-  // Real Top Games distribution computed from ordersList and gamesList
-  const topGamesStats = useMemo(() => {
-    if (!gamesList.length) return [];
-    const colors = ['#38bdf8', '#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#ec4899'];
-    const total = ordersList.length;
-
-    return gamesList.slice(0, 5).map((g, idx) => {
-      const count = ordersList.filter(o => o.game === g.name || o.gameName === g.name || o.gameId === g.id).length;
-      const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-      return {
-        name: g.name,
-        count: `${count} lượt thuê`,
-        pct,
-        color: colors[idx % colors.length]
-      };
-    });
-  }, [gamesList, ordersList]);
-
+  // ─── Not admin ───
   if (!isAuthenticated || !isAdmin) {
     return (
-      <div className="container" style={{ padding: '60px 20px', minHeight: '65vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{
-          background: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          padding: '40px',
-          maxWidth: '520px',
-          textAlign: 'center',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
-        }}>
-          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-            <AlertTriangle size={32} />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '40px', maxWidth: '480px', textAlign: 'center' }}>
+          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(244,63,94,0.15)', color: '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <ShieldCheck size={32} />
           </div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '10px' }}>Khu Vực Quản Trị Hệ Thống</h2>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '10px' }}>Khu Vực Quản Trị</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
-            Trang này chỉ dành cho tài khoản có phân quyền <strong>Quản Trị Viên (Admin)</strong>. Vui lòng đăng nhập bằng tài khoản Admin để tiếp tục.
+            Trang này chỉ dành cho <strong>Quản Trị Viên</strong>.
           </p>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <Link to="/" className="btn btn-outline">
-              <ArrowLeft size={16} />
-              <span>Về Trang Chủ</span>
-            </Link>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                window.location.reload();
-              }}
-            >
-              <ShieldCheck size={16} />
-              <span>Đăng Nhập Admin</span>
-            </button>
+            <Link to="/" className="btn btn-outline"><span>Về Trang Chủ</span></Link>
           </div>
         </div>
       </div>
     );
   }
 
+  const navBadges = { players: pendingPlayers, reports: pendingReports };
+
+  // ─── Admin layout ───
+  const SIDEBAR_WIDTH = sidebarCollapsed ? '64px' : '220px';
+
   return (
-    <div className="admin-page-container container" style={{ padding: '30px 20px 60px' }}>
-      {/* Top Banner Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(244,63,94,0.15) 0%, rgba(99,102,241,0.15) 50%, rgba(6,182,212,0.15) 100%)',
-        border: '1px solid rgba(244,63,94,0.3)',
-        borderRadius: '16px',
-        padding: '24px 28px',
-        marginBottom: '28px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px',
-        backdropFilter: 'blur(10px)'
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      {/* Sidebar */}
+      <aside style={{
+        width: SIDEBAR_WIDTH, minHeight: '100vh', background: 'var(--card-bg)',
+        borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column',
+        position: 'fixed', top: 0, left: 0, zIndex: 100, transition: 'width 0.25s ease', overflow: 'hidden'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{
-            width: '54px',
-            height: '54px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #f43f5e, #ec4899)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            boxShadow: '0 8px 20px rgba(244,63,94,0.3)'
-          }}>
-            <ShieldCheck size={30} />
+        {/* Logo */}
+        <div style={{ padding: '20px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '10px', minHeight: '64px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #f43f5e, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <ShieldCheck size={18} style={{ color: '#fff' }} />
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>PlayZone Admin Dashboard</h1>
-              <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'rgba(244,63,94,0.2)', color: '#f43f5e', borderRadius: '6px', fontWeight: 700 }}>
-                Super Admin
-              </span>
-            </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '4px 0 0' }}>
-              Hệ thống giám sát, quản lý Idol Duo, người dùng, giao dịch và vận hành nền tảng trực tiếp từ cơ sở dữ liệu.
-            </p>
-          </div>
+          {!sidebarCollapsed && <span style={{ fontWeight: 800, fontSize: '1rem', whiteSpace: 'nowrap' }}>PlayZone Admin</span>}
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={loadAdminData}
-            className="btn btn-outline"
-            style={{ fontSize: '0.85rem' }}
-            title="Làm mới dữ liệu"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            <span>Đồng bộ DB</span>
-          </button>
-          <Link to="/" className="btn btn-outline" style={{ fontSize: '0.85rem' }}>
-            <ArrowLeft size={16} />
-            <span>Về PlayZone</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Metric Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '18px',
-        marginBottom: '28px'
-      }}>
-        {/* Doanh thu */}
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Tổng Doanh Thu Thực</span>
-            <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
-              <DollarSign size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            {totalRevenue.toLocaleString('vi-VN')} đ
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#10b981', marginTop: '6px' }}>
-            <TrendingUp size={14} />
-            <span>Từ {ordersList.length} giao dịch hoàn tất</span>
-          </div>
-        </div>
-
-        {/* Đơn thuê */}
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Tổng Đơn Thuê</span>
-            <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', color: '#6366f1' }}>
-              <ShoppingBag size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            {totalOrdersCount} đơn
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-            <Clock size={14} />
-            <span>Tỷ lệ hoàn thành: {completionRate}</span>
-          </div>
-        </div>
-
-        {/* Người dùng */}
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Tổng Tài Khoản</span>
-            <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(6,182,212,0.15)', color: '#06b6d4' }}>
-              <Users size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            {totalUsersCount.toLocaleString('vi-VN')}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#06b6d4', marginTop: '6px' }}>
-            <Sparkles size={14} />
-            <span>{playersList.filter(p => p.status !== 'PENDING').length} Idol đã kích hoạt</span>
-          </div>
-        </div>
-
-        {/* Hồ sơ chờ duyệt */}
-        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Idol Chờ Duyệt</span>
-            <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
-              <Award size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: pendingPlayersCount > 0 ? '#f59e0b' : 'var(--text-primary)' }}>
-            {pendingPlayersCount} hồ sơ
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-            <span>{pendingReportsCount} khiếu nại chưa xử lý</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        borderBottom: '1px solid var(--border-color)',
-        marginBottom: '24px',
-        overflowX: 'auto',
-        paddingBottom: '2px'
-      }}>
-        {[
-          { id: 'overview', label: '📊 Tổng Quan & Biểu Đồ', icon: BarChart3 },
-          { id: 'users', label: '👥 Quản Lý Người Dùng', icon: Users, badge: usersList.length },
-          { id: 'players', label: '🎮 Duyệt & Quản Lý Idol', icon: Gamepad2, badge: pendingPlayersCount > 0 ? pendingPlayersCount : null, badgeColor: '#f59e0b' },
-          { id: 'orders', label: '🛍️ Quản Lý Đơn Thuê', icon: ShoppingBag, badge: ordersList.length },
-          { id: 'games', label: '🕹️ Danh Mục Game', icon: Gamepad2 },
-          { id: 'reports', label: '⚠️ Khiếu Nại & Báo Cáo', icon: AlertTriangle, badge: pendingReportsCount > 0 ? pendingReportsCount : null, badgeColor: '#f43f5e' }
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 18px',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                borderRadius: '10px 10px 0 0',
-                border: 'none',
-                background: isActive ? 'var(--card-bg)' : 'transparent',
-                color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                borderBottom: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Icon size={16} />
-              <span>{tab.label}</span>
-              {tab.badge && (
-                <span style={{
-                  fontSize: '0.72rem',
-                  padding: '2px 6px',
-                  borderRadius: '10px',
-                  background: tab.badgeColor || 'var(--primary)',
-                  color: '#fff',
-                  fontWeight: 800
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            const badge = navBadges[item.id];
+            const isActive = activeSection === item.id;
+            return (
+              <button key={item.id}
+                onClick={() => { setActiveSection(item.id); navigate(`/admin${item.id === 'overview' ? '' : '/' + item.id}`); }}
+                title={sidebarCollapsed ? item.label : ''}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  background: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                  fontWeight: isActive ? 700 : 500, fontSize: '0.88rem',
+                  transition: 'all 0.15s', textAlign: 'left', width: '100%', whiteSpace: 'nowrap'
                 }}>
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                <Icon size={18} style={{ flexShrink: 0 }} />
+                {!sidebarCollapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+                {!sidebarCollapsed && badge > 0 && (
+                  <span style={{ background: '#f43f5e', color: '#fff', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>{badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom actions */}
+        <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <button onClick={() => navigate('/')} title="Về PlayZone" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', whiteSpace: 'nowrap', width: '100%' }}>
+            <Home size={18} style={{ flexShrink: 0 }} />
+            {!sidebarCollapsed && <span>Về PlayZone</span>}
+          </button>
+          <button onClick={toggleTheme} title="Đổi theme" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', whiteSpace: 'nowrap', width: '100%' }}>
+            {isDark ? <Sun size={18} style={{ flexShrink: 0 }} /> : <Moon size={18} style={{ flexShrink: 0 }} />}
+            {!sidebarCollapsed && <span>{isDark ? 'Light mode' : 'Dark mode'}</span>}
+          </button>
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title="Thu gọn" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', width: '100%' }}>
+            {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {!sidebarCollapsed && <span>Thu gọn</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div style={{ marginLeft: SIDEBAR_WIDTH, flex: 1, transition: 'margin-left 0.25s ease', minWidth: 0 }}>
+        {/* Top header */}
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 90, background: 'var(--card-bg)',
+          borderBottom: '1px solid var(--border-color)', padding: '0 24px',
+          display: 'flex', alignItems: 'center', height: '64px', gap: '16px'
+        }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              {NAV_ITEMS.find(n => n.id === activeSection)?.label || 'Tổng Quan'}
+            </span>
+          </div>
+          <button onClick={loadData} className="btn btn-outline" style={{ fontSize: '0.82rem', height: '34px', padding: '0 12px' }} title="Làm mới">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            {!sidebarCollapsed && <span style={{ marginLeft: '6px' }}>Làm mới</span>}
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src={getUserAvatar(user)} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+            <div style={{ lineHeight: 1.2 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{user?.fullName || user?.username}</div>
+              <div style={{ fontSize: '0.72rem', color: '#f43f5e' }}>Admin</div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main style={{ padding: '24px' }}>
+          {activeSection === 'overview' && <OverviewTab ordersList={ordersList} usersList={usersList} playersList={playersList} reportsList={reportsList} loading={loading} />}
+          {activeSection === 'users' && <UsersTab usersList={usersList} loading={loading} />}
+          {activeSection === 'players' && <PlayersTab playersList={playersList} setPlayersList={setPlayersList} loading={loading} />}
+          {activeSection === 'orders' && <OrdersTab ordersList={ordersList} loading={loading} />}
+          {activeSection === 'games' && <GamesTab gamesList={gamesList} setGamesList={setGamesList} loading={loading} />}
+          {activeSection === 'payments' && <PaymentsTab />}
+          {activeSection === 'reports' && <ReportsTab reportsList={reportsList} setReportsList={setReportsList} loading={loading} />}
+        </main>
       </div>
-
-      {/* TAB CONTENT: OVERVIEW */}
-      {activeTab === 'overview' && (
-        <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-          {/* Revenue Chart Visualizer */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Biểu Đồ Doanh Thu 7 Ngày Gần Nhất</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Dữ liệu tổng hợp trực tiếp từ các đơn thuê đã thanh toán</p>
-              </div>
-              <span style={{ fontSize: '0.8rem', padding: '4px 10px', background: 'rgba(16,185,129,0.15)', color: '#10b981', borderRadius: '8px', fontWeight: 700 }}>
-                {ordersList.length} đơn phát sinh
-              </span>
-            </div>
-
-            {/* Dynamic Interactive Visual Chart */}
-            <div style={{ height: '220px', display: 'flex', alignItems: 'flex-end', gap: '16px', padding: '20px 0 10px', borderBottom: '1px solid var(--border-color)' }}>
-              {weeklyRevenueData.map((item, idx) => (
-                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', height: '100%', justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                    {item.val > 0 ? `${(item.val / 1000).toFixed(0)}k` : '0đ'}
-                  </span>
-                  <div
-                    style={{
-                      width: '100%',
-                      maxWidth: '36px',
-                      height: item.height,
-                      borderRadius: '8px 8px 0 0',
-                      background: item.val > 0
-                        ? 'linear-gradient(180deg, var(--primary), var(--secondary))'
-                        : 'rgba(255,255,255,0.06)',
-                      boxShadow: item.val > 0 ? '0 4px 12px rgba(99,102,241,0.2)' : 'none',
-                      transition: 'all 0.3s ease',
-                      cursor: 'pointer'
-                    }}
-                    title={`${item.day} (${item.date}): ${(item.val).toLocaleString('vi-VN')} đ`}
-                  />
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>
-                      {item.day}
-                    </span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                      {item.date}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Platform Distribution & Quick Summary */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 16px' }}>Thống Kê Đơn Thuê Theo Danh Mục Game</h3>
-            
-            {topGamesStats.length === 0 ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                Chưa có dữ liệu danh mục game
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {topGamesStats.map((g, i) => (
-                  <div key={i}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
-                      <span>{g.name}</span>
-                      <span style={{ color: 'var(--text-muted)' }}>{g.count} ({g.pct}%)</span>
-                    </div>
-                    <div style={{ width: '100%', height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: `${g.pct > 0 ? g.pct : 2}%`, height: '100%', background: g.color, borderRadius: '4px' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div style={{ marginTop: '24px', padding: '14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <CheckCircle2 size={18} style={{ color: '#10b981' }} />
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Trạng thái cơ sở dữ liệu:</span>
-                </div>
-                <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 700, background: 'rgba(16,185,129,0.15)', padding: '2px 8px', borderRadius: '6px' }}>
-                  Đã kết nối trực tiếp Backend
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: USERS */}
-      {activeTab === 'users' && (
-        <div className="animate-fade-in" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-          {/* Header Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Danh Sách Người Dùng & Phân Quyền ({usersList.length})</h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Quản lý số dư, trạng thái tài khoản và vai trò thành viên</p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              {/* Search */}
-              <div style={{ position: 'relative', minWidth: '220px' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  className="form-control"
-                  style={{ paddingLeft: '36px', height: '38px', fontSize: '0.85rem' }}
-                  placeholder="Tìm username, email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-
-              {/* Filter */}
-              <select
-                className="form-control"
-                style={{ height: '38px', fontSize: '0.85rem', width: 'auto' }}
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-              >
-                <option value="ALL">Tất cả vai trò</option>
-                <option value="ADMIN">Admin</option>
-                <option value="PLAYER">Player / Idol</option>
-                <option value="USER">User Thường</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '12px 14px' }}>Thành viên</th>
-                  <th style={{ padding: '12px 14px' }}>Email</th>
-                  <th style={{ padding: '12px 14px' }}>Số dư ví</th>
-                  <th style={{ padding: '12px 14px' }}>Vai trò</th>
-                  <th style={{ padding: '12px 14px' }}>Trạng thái</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'right' }}>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usersList
-                  .filter(u => roleFilter === 'ALL' || u.role === roleFilter || (u.roles && u.roles.some(r => r.includes(roleFilter))))
-                  .filter(u => !searchTerm || (u.username && u.username.toLowerCase().includes(searchTerm.toLowerCase())) || (u.fullName && u.fullName.toLowerCase().includes(searchTerm.toLowerCase())))
-                  .map((u) => {
-                    const isUserAdmin = u.role === 'ADMIN' || (u.roles && u.roles.some(r => r.includes('ADMIN')));
-                    const isUserPlayer = u.role === 'PLAYER' || (u.roles && u.roles.some(r => r.includes('PLAYER')));
-
-                    return (
-                      <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
-                        <td style={{ padding: '14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <img src={getUserAvatar(u)} alt={u.username} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
-                            <div>
-                              <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{u.fullName || u.username}</div>
-                              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>@{u.username}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '14px', color: 'var(--text-muted)' }}>{u.email || `${u.username}@playzone.com`}</td>
-                        <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>
-                          {(u.balance || 0).toLocaleString('vi-VN')} đ
-                        </td>
-                        <td style={{ padding: '14px' }}>
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            background: isUserAdmin ? 'rgba(244,63,94,0.15)' : isUserPlayer ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.08)',
-                            color: isUserAdmin ? '#f43f5e' : isUserPlayer ? '#06b6d4' : 'var(--text-muted)'
-                          }}>
-                            {isUserAdmin ? '🛡️ Admin' : isUserPlayer ? '🎮 Idol/Player' : '👤 Thành viên'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px' }}>
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            background: u.status !== 'BANNED' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                            color: u.status !== 'BANNED' ? '#10b981' : '#ef4444'
-                          }}>
-                            {u.status !== 'BANNED' ? 'Hoạt động' : 'Đã khóa'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              className="btn btn-outline"
-                              style={{ padding: '6px 10px', fontSize: '0.75rem', height: 'auto' }}
-                              title="Nạp / Cộng coin"
-                              onClick={() => handleAddCoins(u.id)}
-                            >
-                              <DollarSign size={14} />
-                              <span>+ Coin</span>
-                            </button>
-                            {!isUserAdmin && (
-                              <button
-                                className="btn btn-outline"
-                                style={{
-                                  padding: '6px 10px',
-                                  fontSize: '0.75rem',
-                                  height: 'auto',
-                                  borderColor: u.status !== 'BANNED' ? '#ef4444' : '#10b981',
-                                  color: u.status !== 'BANNED' ? '#ef4444' : '#10b981'
-                                }}
-                                onClick={() => handleToggleBanUser(u.id)}
-                              >
-                                {u.status !== 'BANNED' ? <Lock size={14} /> : <Unlock size={14} />}
-                                <span>{u.status !== 'BANNED' ? 'Khóa' : 'Mở khóa'}</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: PLAYERS APPROVAL */}
-      {activeTab === 'players' && (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Pending Applications Section */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '16px', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Hồ Sơ Đăng Ký Idol Mới Chờ Xét Duyệt ({pendingPlayersCount})</h3>
-              </div>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Xét duyệt hồ sơ trực tiếp</span>
-            </div>
-
-            {pendingPlayersCount === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                <CheckCircle2 size={36} style={{ color: '#10b981', margin: '0 auto 10px' }} />
-                <div>Không còn hồ sơ nào đang chờ duyệt. Mọi Idol mới đã được giải quyết!</div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                {playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING').map(player => (
-                  <div key={player.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px' }}>
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: '12px' }}>
-                      <img src={getUserAvatar(player)} alt={player.name} style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover' }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{player.fullName || player.name}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{player.primaryGame || 'Liên Quân'} • {player.rank || 'Kim Cương'}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Gửi lúc: {player.submittedAt || 'Mới đây'}</div>
-                      </div>
-                    </div>
-
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '8px', margin: '0 0 12px' }}>
-                      "{player.bio || 'Sẵn sàng duo leo rank cùng anh em!'}"
-                    </p>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', fontSize: '0.82rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Giá đề xuất:</span>
-                      <span style={{ fontWeight: 700, color: '#10b981' }}>{(player.pricePerHour || player.price || 0).toLocaleString('vi-VN')} đ/h</span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button
-                        className="btn btn-primary"
-                        style={{ flex: 1, padding: '8px', fontSize: '0.82rem', background: '#10b981', borderColor: '#10b981' }}
-                        onClick={() => handleApprovePlayer(player.id)}
-                      >
-                        <Check size={16} />
-                        <span>Phê Duyệt Ngay</span>
-                      </button>
-                      <button
-                        className="btn btn-outline"
-                        style={{ padding: '8px 14px', fontSize: '0.82rem', borderColor: '#ef4444', color: '#ef4444' }}
-                        onClick={() => handleRejectPlayer(player.id)}
-                      >
-                        <X size={16} />
-                        <span>Từ Chối</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Active Idols List */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 16px' }}>
-              Danh Sách Idol Đang Hoạt Động ({playersList.filter(p => p.status !== 'PENDING' && p.adminStatus !== 'PENDING').length})
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-              {playersList.filter(p => p.status !== 'PENDING' && p.adminStatus !== 'PENDING').map(player => {
-                const playerOrdersCount = ordersList.filter(o => o.playerId === player.id || o.playerName === player.name).length;
-
-                return (
-                  <div key={player.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
-                    <img src={getUserAvatar(player)} alt={player.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.fullName || player.name}</div>
-                      <div style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }}>{(player.pricePerHour || player.price || 0).toLocaleString('vi-VN')} đ/h</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>⭐ {player.rating || 5.0} • {player.primaryGame || 'Game'}</div>
-                    </div>
-                    <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 700 }}>
-                      Sẵn sàng
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: ORDERS */}
-      {activeTab === 'orders' && (
-        <div className="animate-fade-in" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 16px' }}>Lịch Sử Đơn Hàng Toàn Hệ Thống ({ordersList.length})</h3>
-          {ordersList.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              Chưa có đơn hàng nào trong hệ thống
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '12px 14px' }}>Mã Đơn</th>
-                    <th style={{ padding: '12px 14px' }}>Idol</th>
-                    <th style={{ padding: '12px 14px' }}>Game</th>
-                    <th style={{ padding: '12px 14px' }}>Thời Lượng</th>
-                    <th style={{ padding: '12px 14px' }}>Tổng Tiền</th>
-                    <th style={{ padding: '12px 14px' }}>Trạng Thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ordersList.map(order => (
-                    <tr key={order.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '14px', fontWeight: 700, color: 'var(--primary)' }}>#{order.id}</td>
-                      <td style={{ padding: '14px', fontWeight: 600 }}>{order.playerName || order.playerId}</td>
-                      <td style={{ padding: '14px', color: 'var(--text-muted)' }}>{order.game || order.gameName || 'Liên Quân Mobile'}</td>
-                      <td style={{ padding: '14px' }}>{order.hours || 1} giờ</td>
-                      <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>{(order.totalPrice || order.price || 0).toLocaleString('vi-VN')} đ</td>
-                      <td style={{ padding: '14px' }}>
-                        <span style={{
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          background: order.status === 'COMPLETED' ? 'rgba(16,185,129,0.15)' : order.status === 'PLAYING' ? 'rgba(6,182,212,0.15)' : 'rgba(245,158,11,0.15)',
-                          color: order.status === 'COMPLETED' ? '#10b981' : order.status === 'PLAYING' ? '#06b6d4' : '#f59e0b'
-                        }}>
-                          {order.status === 'COMPLETED' ? 'Hoàn thành' : order.status === 'PLAYING' ? 'Đang chơi' : 'Đang xử lý'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB CONTENT: GAMES */}
-      {activeTab === 'games' && (
-        <div className="animate-fade-in" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Danh Mục Tựa Game Nền Tảng ({gamesList.length})</h3>
-            <button
-              className="btn btn-primary"
-              style={{ fontSize: '0.85rem' }}
-              onClick={() => {
-                const name = prompt('Nhập tên Game mới muốn thêm:');
-                if (name) {
-                  setGamesList(prev => [...prev, { id: 'game-' + Date.now(), name, image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500&auto=format&fit=crop&q=80' }]);
-                  addToast(`Đã thêm game "${name}" thành công!`, 'success');
-                }
-              }}
-            >
-              <Plus size={16} />
-              <span>Thêm Game Mới</span>
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-            {gamesList.map(game => {
-              const activeCount = playersList.filter(p => (p.game === game.name || p.gameName === game.name) && p.status !== 'PENDING').length;
-
-              return (
-                <div key={game.id} style={{ borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
-                  <img src={game.image} alt={game.name} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
-                  <div style={{ padding: '12px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>{game.name}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{activeCount} Idol đang hoạt động</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: REPORTS */}
-      {activeTab === 'reports' && (
-        <div className="animate-fade-in" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 16px' }}>Trung Tâm Khiếu Nại & Xử Lý Vi Phạm ({reportsList.length})</h3>
-          {reportsList.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              <CheckCircle2 size={36} style={{ color: '#10b981', margin: '0 auto 10px' }} />
-              <div>Không có khiếu nại hoặc báo cáo vi phạm nào!</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {reportsList.map(report => (
-                <div key={report.id} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--primary)' }}>#{report.id}</span>
-                      <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(244,63,94,0.15)', color: '#f43f5e', fontWeight: 700 }}>
-                        {report.type || 'Khiếu nại'}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{report.createdAt || 'Gần đây'}</span>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                    <strong>{report.reportedBy || 'Khách hàng'}</strong> khiếu nại đối với <strong>{report.targetUser || 'Idol'}</strong>: "{report.content || 'Nội dung phản ánh'}"
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: report.status === 'RESOLVED' ? '#10b981' : '#f59e0b', fontWeight: 700 }}>
-                      {report.status === 'RESOLVED' ? '✓ Đã giải quyết' : '⏳ Đang chờ xử lý'}
-                    </span>
-                    {report.status !== 'RESOLVED' && (
-                      <button
-                        className="btn btn-primary"
-                        style={{ padding: '6px 12px', fontSize: '0.78rem', height: 'auto' }}
-                        onClick={() => handleResolveReport(report.id)}
-                      >
-                        <CheckCircle2 size={14} />
-                        <span>Xử lý & Hoàn Tiền</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

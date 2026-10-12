@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,7 +33,6 @@ import com.example.backend.service.OrderService;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = "http://localhost:3000")
 public class OrderController {
 
     private final PaymentRepository paymentRepository;
@@ -175,32 +173,26 @@ public class OrderController {
     @GetMapping("/user/{userId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<OrderResponseDTO>> getOrdersByUser(@PathVariable Long userId) {
-        List<Order> orders = orderRepository.findAll().stream()
-                .filter(order -> order.getRenter() != null && order.getRenter().getId().equals(userId))
-                .toList();
+        List<Order> orders = orderRepository.findByRenter_Id(userId);
         return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
     @GetMapping("/player/{playerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<OrderResponseDTO>> getOrdersByPlayer(@PathVariable Long playerId) {
-        List<Order> orders = orderRepository.findAll().stream()
-                .filter(order -> order.getPlayer() != null && order.getPlayer().getId().equals(playerId))
-                .toList();
+        List<Order> orders = orderRepository.findByPlayer_Id(playerId);
         return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
     @GetMapping("/user-all/{userId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<UserOrderDTO>> getAllUserOrders(@PathVariable Long userId) {
-        List<Order> allOrders = orderRepository.findAll();
+        List<Order> allOrders = orderRepository.findAllByUserId(userId);
 
-        // Lấy đơn hàng user thuê (là renter)
         List<Order> hiredOrders = allOrders.stream()
                 .filter(order -> order.getRenter() != null && order.getRenter().getId().equals(userId))
                 .toList();
 
-        // Lấy đơn hàng user được thuê (là player)
         List<Order> hiringOrders = allOrders.stream()
                 .filter(order -> order.getPlayer() != null && order.getPlayer().getUser() != null &&
                         order.getPlayer().getUser().getId().equals(userId))
@@ -291,14 +283,12 @@ public class OrderController {
     @GetMapping("/user-stats/{userId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getUserOrderStats(@PathVariable Long userId) {
-        List<Order> allOrders = orderRepository.findAll();
+        List<Order> allOrders = orderRepository.findAllByUserId(userId);
 
-        // Lấy đơn hàng user thuê (là renter)
         List<Order> hiredOrders = allOrders.stream()
                 .filter(order -> order.getRenter() != null && order.getRenter().getId().equals(userId))
                 .toList();
 
-        // Lấy đơn hàng user được thuê (là player)
         List<Order> hiringOrders = allOrders.stream()
                 .filter(order -> order.getPlayer() != null && order.getPlayer().getUser() != null &&
                         order.getPlayer().getUser().getId().equals(userId))
@@ -360,10 +350,7 @@ public class OrderController {
     public ResponseEntity<?> getExpiredOrders() {
         try {
             LocalDateTime now = LocalDateTime.now();
-            List<Order> expiredOrders = orderRepository.findAll().stream()
-                    .filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus()))
-                    .filter(o -> o.getEndTime() != null && o.getEndTime().isBefore(now))
-                    .toList();
+            List<Order> expiredOrders = orderRepository.findExpiredConfirmedOrders(now);
 
             List<Map<String, Object>> result = new ArrayList<>();
             for (Order order : expiredOrders) {
@@ -388,9 +375,7 @@ public class OrderController {
     @GetMapping("/status")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<OrderResponseDTO>> getOrdersByStatus(@RequestParam String status) {
-        List<Order> orders = orderRepository.findAll().stream()
-                .filter(order -> order.getStatus() != null && order.getStatus().equalsIgnoreCase(status))
-                .toList();
+        List<Order> orders = orderRepository.findByStatus(status.toUpperCase());
         return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
@@ -434,6 +419,7 @@ public class OrderController {
     }
 
     @GetMapping("/summary")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<OrderSummaryDTO>> getOrderSummary() {
         List<Order> orders = orderRepository.findAll();
         List<OrderSummaryDTO> result = new ArrayList<>();
@@ -492,11 +478,7 @@ public class OrderController {
             LocalDateTime endDate = LocalDateTime.now();
             LocalDateTime startDate = endDate.minusDays(days - 1).withHour(0).withMinute(0).withSecond(0);
             
-            List<Order> orders = orderRepository.findAll().stream()
-                    .filter(order -> order.getStartTime() != null && 
-                            !order.getStartTime().isBefore(startDate) && 
-                            !order.getStartTime().isAfter(endDate))
-                    .toList();
+            List<Order> orders = orderRepository.findByStartTimeBetween(startDate, endDate);
 
             // Tạo map để nhóm dữ liệu theo ngày
             Map<String, Long> dailyRevenue = new HashMap<>();
@@ -552,23 +534,12 @@ public class OrderController {
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.LocalDate yesterday = today.minusDays(1);
         java.time.LocalDateTime startToday = today.atStartOfDay();
-        java.time.LocalDateTime endToday = today.atTime(23,59,59);
+        java.time.LocalDateTime endToday = today.atTime(23, 59, 59);
         java.time.LocalDateTime startYesterday = yesterday.atStartOfDay();
-        java.time.LocalDateTime endYesterday = yesterday.atTime(23,59,59);
-        
-        // Đếm số đơn hàng hôm nay
-        long todayOrders = orderRepository.findAll().stream()
-                .filter(order -> order.getStartTime() != null && 
-                        !order.getStartTime().isBefore(startToday) && 
-                        !order.getStartTime().isAfter(endToday))
-                .count();
-        
-        // Đếm số đơn hàng hôm qua
-        long yesterdayOrders = orderRepository.findAll().stream()
-                .filter(order -> order.getStartTime() != null && 
-                        !order.getStartTime().isBefore(startYesterday) && 
-                        !order.getStartTime().isAfter(endYesterday))
-                .count();
+        java.time.LocalDateTime endYesterday = yesterday.atTime(23, 59, 59);
+
+        long todayOrders = orderRepository.findByStartTimeBetween(startToday, endToday).size();
+        long yesterdayOrders = orderRepository.findByStartTimeBetween(startYesterday, endYesterday).size();
         
         double percent;
         if (yesterdayOrders == 0) {
@@ -580,6 +551,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{orderId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteOrder(@PathVariable Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));

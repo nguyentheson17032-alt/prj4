@@ -192,73 +192,8 @@ export const api = {
   },
 
   async registerPlayer(playerData) {
-    const newPlayer = {
-      id: Date.now(),
-      userId: playerData.userId || 1,
-      username: playerData.username,
-      name: playerData.username,
-      fullName: playerData.username,
-      avatar: playerData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-      avatarUrl: playerData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-      coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
-      bio: playerData.description || 'Sẵn sàng duo leo rank cùng anh em!',
-      pricePerHour: Number(playerData.pricePerHour) || 50000,
-      rating: 0,
-      reviewCount: 0,
-      orderCount: 0,
-      status: 'PENDING', // Mặc định PENDING để chờ Admin phê duyệt!
-      adminStatus: 'PENDING',
-      gender: playerData.gender || 'FEMALE',
-      isVip: false,
-      isHot: false,
-      voiceIntroUrl: playerData.voiceUrl || 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg',
-      voiceDuration: '0:15',
-      rank: playerData.rank || 'Cao Thủ',
-      role: playerData.role || 'ALL',
-      server: playerData.server || 'VN',
-      primaryGame: playerData.primaryGame || 'Liên Quân Mobile',
-      games: [
-        {
-          name: playerData.primaryGame || 'Liên Quân Mobile',
-          rank: playerData.rank || 'Cao Thủ',
-          role: playerData.role || 'ALL',
-          price: Number(playerData.pricePerHour) || 50000
-        }
-      ],
-      submittedAt: new Date().toLocaleString('vi-VN'),
-      createdAt: new Date().toISOString()
-    };
-
-    // 1. Lưu vào localStorage để Admin duyệt ngay
-    try {
-      const stored = localStorage.getItem('local_registered_players');
-      const existing = stored ? JSON.parse(stored) : [];
-      const filtered = existing.filter(p => p.username !== newPlayer.username && p.userId !== newPlayer.userId);
-      filtered.unshift(newPlayer);
-      localStorage.setItem('local_registered_players', JSON.stringify(filtered));
-    } catch (e) {
-      console.error('Error saving local_registered_players:', e);
-    }
-
-    // 2. Gọi Backend API
-    try {
-      const res = await client.post('/api/game-players', playerData);
-      if (res.data && (res.data.data || res.data.id)) {
-        const raw = res.data.data || res.data;
-        const normalized = normalizeGamePlayer(raw);
-        normalized.status = 'PENDING';
-        normalized.adminStatus = 'PENDING';
-        const stored = localStorage.getItem('local_registered_players');
-        const existing = stored ? JSON.parse(stored) : [];
-        const filtered = existing.filter(p => p.username !== normalized.username && p.id !== newPlayer.id);
-        filtered.unshift(normalized);
-        localStorage.setItem('local_registered_players', JSON.stringify(filtered));
-      }
-      return res.data;
-    } catch (err) {
-      console.warn('Backend registerPlayer endpoint note:', err.message);
-      return { success: true, message: 'Đăng ký thành công, đang chờ Admin duyệt' };
-    }
+    const res = await client.post('/api/game-players', playerData);
+    return res.data;
   },
 
   async approvePlayer(playerId) {
@@ -316,17 +251,17 @@ export const api = {
   // Moments
   async getMoments() {
     try {
-      const res = await client.get('/api/moments');
+      const res = await client.get('/api/moments/all');
+      if (res.data && Array.isArray(res.data.content)) return res.data.content;
       if (Array.isArray(res.data)) return res.data;
-      if (res.data && Array.isArray(res.data.data)) return res.data.data;
       return [];
     } catch (e) {
       return [];
     }
   },
 
-  async createMoment(data) {
-    const res = await client.post('/api/moments', data);
+  async createMoment(gamePlayerId, data) {
+    const res = await client.post(`/api/moments/${gamePlayerId}`, data);
     return res.data;
   },
 
@@ -431,6 +366,47 @@ export const api = {
       const res = await client.get('/api/payments/topup-history');
       if (Array.isArray(res.data)) return res.data;
       if (res.data && Array.isArray(res.data.data)) return res.data.data;
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // Admin Payment Management
+  async getAdminTopupPayments() {
+    try {
+      const res = await client.get('/api/payments/topup-users');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async getAdminWithdrawPayments() {
+    try {
+      const res = await client.get('/api/payments/withdraw-users');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async processPayment(id, transactionId = 'ADMIN_MANUAL') {
+    const res = await client.post(`/api/payments/${id}/process`, { transactionId });
+    return res.data;
+  },
+
+  async refundPayment(id, reason = 'Admin từ chối') {
+    const res = await client.post(`/api/payments/${id}/refund`, { reason });
+    return res.data;
+  },
+
+  // Admin Game Players Summary
+  async getPlayersSummary() {
+    try {
+      const res = await client.get('/api/game-players/summary');
+      if (res.data && Array.isArray(res.data.data)) return res.data.data;
+      if (Array.isArray(res.data)) return res.data;
       return [];
     } catch (e) {
       return [];

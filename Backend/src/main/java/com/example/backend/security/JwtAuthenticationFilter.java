@@ -28,34 +28,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        
-        System.out.println("[JwtAuthenticationFilter] ====== START doFilterInternal ======");
-        System.out.println("[JwtAuthenticationFilter] Request URI: " + request.getRequestURI());
-        System.out.println("[JwtAuthenticationFilter] Request method: " + request.getMethod());
-        
+
         final String authHeader = request.getHeader("Authorization");
-        System.out.println("[JwtAuthenticationFilter] Authorization header: " + authHeader);
-        
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            System.out.println("[JwtAuthenticationFilter] No Bearer token found, skipping authentication");
-            System.out.println("[JwtAuthenticationFilter] ====== END doFilterInternal ======");
             filterChain.doFilter(request, response);
             return;
         }
 
         final String jwt = authHeader.substring(7);
-        System.out.println("[JwtAuthenticationFilter] JWT token: " + jwt);
-        
         final String username = jwtTokenUtil.extractUsername(jwt);
-        System.out.println("[JwtAuthenticationFilter] Extracted username: " + username);
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            System.out.println("[JwtAuthenticationFilter] Loading user details for username: " + username);
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-            System.out.println("[JwtAuthenticationFilter] Loaded user details: " + userDetails);
-            
+
             if (jwtTokenUtil.validateToken(jwt, userDetails)) {
-                System.out.println("[JwtAuthenticationFilter] Token is valid, setting authentication");
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                     userDetails,
                     null,
@@ -63,12 +50,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 );
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
-                System.out.println("[JwtAuthenticationFilter] Authentication set successfully");
-            } else {
-                System.out.println("[JwtAuthenticationFilter] Token validation failed");
             }
         }
-        System.out.println("[JwtAuthenticationFilter] ====== END doFilterInternal ======");
         filterChain.doFilter(request, response);
     }
-} 
+}

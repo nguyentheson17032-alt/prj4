@@ -36,7 +36,6 @@ import com.example.backend.service.FileStorageService;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:3000")
 public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private final AuthenticationManager authenticationManager;
@@ -326,39 +325,21 @@ public class AuthController {
 
     @PostMapping("/device-token")
     public ResponseEntity<?> saveDeviceToken(@RequestBody DeviceTokenRequest request, Authentication authentication) {
-        System.out.println("[AuthController] ====== START saveDeviceToken ======");
-        System.out.println("[AuthController] Request body: " + request);
-        System.out.println("[AuthController] Authentication: " + authentication);
-        System.out.println("[AuthController] Authentication name: " + authentication.getName());
-        System.out.println("[AuthController] Authentication authorities: " + authentication.getAuthorities());
-        
         try {
             if (request.getDeviceToken() == null || request.getDeviceToken().trim().isEmpty()) {
-                System.out.println("[AuthController] Device token is null or empty");
-                System.out.println("[AuthController] ====== END saveDeviceToken with error ======");
                 return ResponseEntity.badRequest().body("Token thiết bị không được để trống");
             }
-
             User user = userService.findByUsername(authentication.getName());
-            System.out.println("[AuthController] Found user: " + user);
-            System.out.println("[AuthController] Current device token: " + user.getDeviceToken());
-            System.out.println("[AuthController] New device token: " + request.getDeviceToken().trim());
-            
             user.setDeviceToken(request.getDeviceToken().trim());
             userService.save(user);
-            System.out.println("[AuthController] Device token updated successfully");
-            System.out.println("[AuthController] ====== END saveDeviceToken ======");
-            
             return ResponseEntity.ok(Map.of(
                 "message", "Cập nhật token thiết bị thành công",
                 "deviceToken", user.getDeviceToken()
             ));
         } catch (Exception e) {
-            System.out.println("[AuthController] Exception: " + e.getMessage());
-            e.printStackTrace();
-            System.out.println("[AuthController] ====== END saveDeviceToken with error ======");
+            logger.error("Lỗi khi cập nhật device token: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Không thể cập nhật token thiết bị: " + e.getMessage()));
+                .body(Map.of("error", "Không thể cập nhật token thiết bị"));
         }
     }
 

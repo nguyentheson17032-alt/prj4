@@ -23,7 +23,6 @@ import com.example.backend.service.UserService;
 
 @RestController
 @RequestMapping("/api/reviews")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Review", description = "Review management APIs")
 public class ReviewController {
     private final ReviewService reviewService;

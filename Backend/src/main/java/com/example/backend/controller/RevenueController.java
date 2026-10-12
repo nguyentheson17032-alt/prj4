@@ -14,7 +14,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/statistics")
-@CrossOrigin(origins = "http://localhost:3000")
 public class RevenueController {
     private final RevenueRepository revenueRepository;
     private final PaymentRepository paymentRepository;

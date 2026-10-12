@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
@@ -27,19 +27,106 @@ import DepositModal from './components/modals/DepositModal';
 import DonateModal from './components/modals/DonateModal';
 import AuthModal from './components/modals/AuthModal';
 
+const AppContent = ({
+  selectedPlayerForHire, setSelectedPlayerForHire,
+  selectedPlayerForDonate, setSelectedPlayerForDonate,
+  isDepositOpen, setIsDepositOpen,
+  isAuthOpen, setIsAuthOpen
+}) => {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
+  return (
+    <div className="app-container">
+      {!isAdminRoute && (
+        <Navbar
+          onOpenDeposit={() => setIsDepositOpen(true)}
+          onOpenAuth={() => setIsAuthOpen(true)}
+        />
+      )}
+
+      <main className={isAdminRoute ? '' : 'main-content'}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <HomePage
+                onHirePlayer={setSelectedPlayerForHire}
+                onOpenDeposit={() => setIsDepositOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/explore"
+            element={<ExplorePage onHirePlayer={setSelectedPlayerForHire} />}
+          />
+          <Route
+            path="/player/:id"
+            element={
+              <PlayerDetailPage
+                onHirePlayer={setSelectedPlayerForHire}
+                onDonatePlayer={setSelectedPlayerForDonate}
+              />
+            }
+          />
+          <Route
+            path="/chat"
+            element={<ChatPage onHirePlayer={setSelectedPlayerForHire} />}
+          />
+          <Route path="/moments" element={<MomentsPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route
+            path="/wallet"
+            element={
+              <WalletPage
+                onOpenDeposit={() => setIsDepositOpen(true)}
+              />
+            }
+          />
+          <Route
+            path="/register-player"
+            element={<RegisterPlayerPage onOpenAuth={() => setIsAuthOpen(true)} />}
+          />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/*" element={<AdminPage />} />
+        </Routes>
+      </main>
+
+      {!isAdminRoute && <Footer />}
+
+      {!isAdminRoute && (
+        <>
+          <BookingModal
+            player={selectedPlayerForHire}
+            isOpen={!!selectedPlayerForHire}
+            onClose={() => setSelectedPlayerForHire(null)}
+          />
+          <DepositModal
+            isOpen={isDepositOpen}
+            onClose={() => setIsDepositOpen(false)}
+          />
+          <DonateModal
+            player={selectedPlayerForDonate}
+            isOpen={!!selectedPlayerForDonate}
+            onClose={() => setSelectedPlayerForDonate(null)}
+          />
+          <AuthModal
+            isOpen={isAuthOpen}
+            onClose={() => setIsAuthOpen(false)}
+          />
+        </>
+      )}
+    </div>
+  );
+};
+
 export const App = () => {
   const [selectedPlayerForHire, setSelectedPlayerForHire] = useState(null);
   const [selectedPlayerForDonate, setSelectedPlayerForDonate] = useState(null);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-
-  const handleHirePlayer = (player) => {
-    setSelectedPlayerForHire(player);
-  };
-
-  const handleDonatePlayer = (player) => {
-    setSelectedPlayerForDonate(player);
-  };
 
   return (
     <ThemeProvider>
@@ -47,97 +134,16 @@ export const App = () => {
         <AudioProvider>
           <ToastProvider>
             <Router>
-              <div className="app-container">
-                {/* Fixed Top Navbar */}
-                <Navbar
-                  onOpenDeposit={() => setIsDepositOpen(true)}
-                  onOpenAuth={() => setIsAuthOpen(true)}
-                />
-
-                {/* Main View Router */}
-                <main className="main-content">
-                  <Routes>
-                    <Route
-                      path="/"
-                      element={
-                        <HomePage
-                          onHirePlayer={handleHirePlayer}
-                          onOpenDeposit={() => setIsDepositOpen(true)}
-                        />
-                      }
-                    />
-                    <Route
-                      path="/explore"
-                      element={<ExplorePage onHirePlayer={handleHirePlayer} />}
-                    />
-                    <Route
-                      path="/player/:id"
-                      element={
-                        <PlayerDetailPage
-                          onHirePlayer={handleHirePlayer}
-                          onDonatePlayer={handleDonatePlayer}
-                        />
-                      }
-                    />
-                    <Route
-                      path="/chat"
-                      element={<ChatPage onHirePlayer={handleHirePlayer} />}
-                    />
-                    <Route path="/moments" element={<MomentsPage />} />
-                    <Route path="/orders" element={<OrdersPage />} />
-                    <Route
-                      path="/wallet"
-                      element={
-                        <WalletPage
-                          onOpenDeposit={() => setIsDepositOpen(true)}
-                        />
-                      }
-                    />
-                    <Route
-                      path="/register-player"
-                      element={<RegisterPlayerPage onOpenAuth={() => setIsAuthOpen(true)} />}
-                    />
-                    <Route path="/profile" element={<ProfilePage />} />
-                    <Route path="/policy" element={<PolicyPage />} />
-                    <Route path="/admin" element={<AdminPage />} />
-                    <Route path="/admin/*" element={<AdminPage />} />
-                  </Routes>
-                </main>
-
-                {/* Footer */}
-                <Footer />
-
-                {/* Global Modals */}
-                <BookingModal
-                  player={selectedPlayerForHire}
-                  isOpen={!!selectedPlayerForHire}
-                  onClose={() => setSelectedPlayerForHire(null)}
-                  onOpenDeposit={() => {
-                    setSelectedPlayerForHire(null);
-                    setIsDepositOpen(true);
-                  }}
-                />
-
-                <DepositModal
-                  isOpen={isDepositOpen}
-                  onClose={() => setIsDepositOpen(false)}
-                />
-
-                <DonateModal
-                  player={selectedPlayerForDonate}
-                  isOpen={!!selectedPlayerForDonate}
-                  onClose={() => setSelectedPlayerForDonate(null)}
-                  onOpenDeposit={() => {
-                    setSelectedPlayerForDonate(null);
-                    setIsDepositOpen(true);
-                  }}
-                />
-
-                <AuthModal
-                  isOpen={isAuthOpen}
-                  onClose={() => setIsAuthOpen(false)}
-                />
-              </div>
+              <AppContent
+                selectedPlayerForHire={selectedPlayerForHire}
+                setSelectedPlayerForHire={setSelectedPlayerForHire}
+                selectedPlayerForDonate={selectedPlayerForDonate}
+                setSelectedPlayerForDonate={setSelectedPlayerForDonate}
+                isDepositOpen={isDepositOpen}
+                setIsDepositOpen={setIsDepositOpen}
+                isAuthOpen={isAuthOpen}
+                setIsAuthOpen={setIsAuthOpen}
+              />
             </Router>
           </ToastProvider>
         </AudioProvider>

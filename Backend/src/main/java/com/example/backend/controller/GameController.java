@@ -23,7 +23,6 @@ import java.util.Arrays;
 
 @RestController
 @RequestMapping("/api/games")
-@CrossOrigin(origins = "http://localhost:3000")
 public class GameController {
 
     @Autowired

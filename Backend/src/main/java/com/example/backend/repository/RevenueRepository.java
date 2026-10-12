@@ -15,4 +15,7 @@ public interface RevenueRepository extends JpaRepository<Revenue, Long> {
 
     @Query(value = "SELECT DATE(created_at) as date, SUM(amount) as total FROM revenues WHERE created_at BETWEEN :start AND :end GROUP BY DATE(created_at) ORDER BY DATE(created_at)", nativeQuery = true)
     List<Object[]> findDailyRevenueBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COALESCE(SUM(r.amount), 0) FROM Revenue r")
+    Long sumTotalRevenue();
 } 

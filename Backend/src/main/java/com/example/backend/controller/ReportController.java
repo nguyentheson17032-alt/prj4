@@ -26,7 +26,6 @@ import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/reports")
-@CrossOrigin(origins = "http://localhost:3000")
 @Tag(name = "Report", description = "Report management APIs")
 public class ReportController {
     private final ReportService reportService;
@@ -61,9 +60,7 @@ public class ReportController {
             
             // Gửi thông báo cho admin về tố cáo mới
             try {
-                System.out.println("[ReportController] Calling adminNotificationService.notifyAdminsAboutReport");
                 adminNotificationService.notifyAdminsAboutReport(reporter, reportedUser, request.getReason());
-                System.out.println("[ReportController] adminNotificationService.notifyAdminsAboutReport completed successfully");
             } catch (Exception e) {
                 System.err.println("[ReportController] Error calling adminNotificationService.notifyAdminsAboutReport: " + e.getMessage());
                 e.printStackTrace();
@@ -135,9 +132,7 @@ public class ReportController {
             
             // Gửi thông báo cho admin về tố cáo mới
             try {
-                System.out.println("[ReportController] Calling adminNotificationService.notifyAdminsAboutReport");
                 adminNotificationService.notifyAdminsAboutReport(reporter, reportedUser, reason);
-                System.out.println("[ReportController] adminNotificationService.notifyAdminsAboutReport completed successfully");
             } catch (Exception e) {
                 System.err.println("[ReportController] Error calling adminNotificationService.notifyAdminsAboutReport: " + e.getMessage());
                 e.printStackTrace();

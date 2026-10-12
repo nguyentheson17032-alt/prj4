@@ -11,7 +11,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/game-statuses")
-@CrossOrigin(origins = "http://localhost:3000")
 public class GameStatusController {
 
     @Autowired
