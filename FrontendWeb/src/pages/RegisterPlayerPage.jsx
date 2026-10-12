@@ -124,9 +124,13 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
     setSelectedGame(found || null);
     if (found?.availableRanks && found.availableRanks.length > 0) {
       setRank(found.availableRanks[0]);
+    } else {
+      setRank('');
     }
     if (found?.availableRoles && found.availableRoles.length > 0) {
       setRole(found.availableRoles[0]);
+    } else {
+      setRole('Không có');
     }
   };
 
@@ -721,9 +725,9 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Ví dụ: Mid / Support / AD..."
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
+                    value="Không có"
+                    readOnly
+                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
                   />
                 )}
               </div>
