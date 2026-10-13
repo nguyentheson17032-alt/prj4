@@ -192,7 +192,11 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
               <img src={player.avatar} alt={player.fullName} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: '1rem' }}>{player.fullName}</div>
-                <div style={{ color: 'var(--accent-amber)', fontSize: '0.82rem', fontWeight: 600 }}>⭐ {player.rating || 5.0} • {player.orderCount || 100}+ đơn</div>
+                <div style={{ color: 'var(--accent-amber)', fontSize: '0.82rem', fontWeight: 600 }}>
+                  {((player.reviewCount || player.ratingCount || player.totalReviews) > 0 && player.rating > 0)
+                    ? `⭐ ${Number(player.rating).toFixed(1)} (${player.reviewCount || player.ratingCount || player.totalReviews})`
+                    : '⭐ Chưa có (0)'} • {player.orderCount || 0} đơn
+                </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ color: 'var(--accent-pink)', fontWeight: 800, fontSize: '1.05rem' }}>{basePrice.toLocaleString('vi-VN')} đ</div>

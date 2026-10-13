@@ -1001,6 +1001,35 @@ public class PaymentController {
             long completedOrders = playerCompletedOrderCountMap.getOrDefault(gpId, 0L);
             long orderHours = playerTotalHoursMap.getOrDefault(gpId, 0L);
 
+            // Lấy reviews thực tế từ playerReviewRepository
+            List<PlayerReview> userReviews = (gp.getUser() != null)
+                    ? playerReviewRepository.findByGamePlayerUserId(gp.getUser().getId())
+                    : java.util.Collections.emptyList();
+            List<PlayerReview> gpReviews = playerReviewRepository.findByGamePlayerId(gpId);
+            int reviewCount = Math.max(userReviews.size(), gpReviews.size());
+
+            Double avgRating = null;
+            if (reviewCount > 0) {
+                if (gp.getUser() != null) {
+                    avgRating = playerReviewRepository.getAverageRatingByPlayerId(gp.getUser().getId());
+                }
+                if (avgRating == null) {
+                    avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gpId);
+                }
+            }
+            double finalRating = (reviewCount > 0 && avgRating != null)
+                    ? Math.round(avgRating * 10.0) / 10.0
+                    : 0.0;
+
+            // Đồng bộ DB nếu chưa có review nào nhưng DB lưu rating ảo
+            if (reviewCount == 0 && gp.getRating() != null) {
+                gp.setRating(null);
+                gamePlayerRepository.save(gp);
+            } else if (reviewCount > 0 && (gp.getRating() == null || !gp.getRating().equals(finalRating))) {
+                gp.setRating(finalRating);
+                gamePlayerRepository.save(gp);
+            }
+
             if (!userPlayerMap.containsKey(userId)) {
                 Map<String, Object> pMap = new HashMap<>();
                 pMap.put("id", gp.getId());
@@ -1013,7 +1042,10 @@ public class PaymentController {
                 pMap.put("avatar", avatar);
                 pMap.put("orderCount", completedOrders);
                 pMap.put("totalHours", orderHours);
-                pMap.put("rating", gp.getRating() != null ? gp.getRating() : 5.0);
+                pMap.put("rating", finalRating);
+                pMap.put("reviewCount", reviewCount);
+                pMap.put("ratingCount", reviewCount);
+                pMap.put("totalReviews", reviewCount);
                 pMap.put("pricePerHour", gp.getPricePerHour());
                 userPlayerMap.put(userId, pMap);
             } else {
@@ -1022,9 +1054,12 @@ public class PaymentController {
                 long prevHours = (long) existing.get("totalHours");
                 existing.put("orderCount", prevOrders + completedOrders);
                 existing.put("totalHours", prevHours + orderHours);
-                Double currentRating = (Double) existing.get("rating");
-                if (gp.getRating() != null && (currentRating == null || currentRating < gp.getRating())) {
-                    existing.put("rating", gp.getRating());
+                int prevReviews = ((Number) existing.getOrDefault("reviewCount", 0)).intValue();
+                if (reviewCount > prevReviews) {
+                    existing.put("reviewCount", reviewCount);
+                    existing.put("ratingCount", reviewCount);
+                    existing.put("totalReviews", reviewCount);
+                    existing.put("rating", finalRating);
                 }
             }
         }

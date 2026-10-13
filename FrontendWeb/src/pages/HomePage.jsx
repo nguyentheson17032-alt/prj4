@@ -234,6 +234,24 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
                   const totalExp = Number(p.exp !== undefined ? p.exp : (realHours * 600));
                   const expLabel = totalExp >= 1000 ? `${(totalExp / 1000).toFixed(1)}k Exp` : `${totalExp} Exp`;
 
+                  const matchedPlayer = players.find(ap =>
+                    (ap.id && String(ap.id) === String(p.id)) ||
+                    (ap.userId && p.userId && String(ap.userId) === String(p.userId)) ||
+                    (ap.username && p.username && ap.username.toLowerCase() === p.username.toLowerCase()) ||
+                    (ap.fullName && p.fullName && ap.fullName.toLowerCase() === p.fullName.toLowerCase())
+                  );
+                  const revCount = Number(
+                    (p.reviewCount !== undefined && p.reviewCount !== null)
+                      ? p.reviewCount
+                      : (matchedPlayer?.reviewCount ?? matchedPlayer?.totalReviews ?? p.ratingCount ?? p.totalReviews ?? 0)
+                  );
+                  const numRating = Number(
+                    revCount > 0
+                      ? (p.rating || matchedPlayer?.rating || 5.0)
+                      : 0
+                  );
+                  const hasReview = revCount > 0 && numRating > 0;
+
                   return (
                     <div key={p.id || idx} className="leaderboard-item" onClick={() => navigate(`/player/${p.id}`)} style={{ cursor: 'pointer' }}>
                       <div className={`rank-badge-num ${idx === 0 ? 'rank-top1' : idx === 1 ? 'rank-top2' : idx === 2 ? 'rank-top3' : 'rank-topother'}`}>
@@ -245,7 +263,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
                           {p.fullName || p.username}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          {realHours > 0 ? `${realHours}h chơi • ` : ''}{realOrders} đơn • ⭐ {p.rating > 0 ? Number(p.rating).toFixed(1) : 'Chưa có'}
+                          {realHours > 0 ? `${realHours}h chơi • ` : ''}{realOrders} đơn • {hasReview ? `⭐ ${numRating.toFixed(1)} (${revCount})` : '⭐ Chưa có (0)'}
                         </div>
                       </div>
                       <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-pink)' }}>

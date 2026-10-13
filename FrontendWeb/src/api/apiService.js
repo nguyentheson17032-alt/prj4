@@ -30,8 +30,9 @@ export const normalizeGamePlayer = (gp) => {
   const price = Number(gp.pricePerHour || gp.price || 50000);
   const status = (gp.status || 'PENDING').toUpperCase();
 
-  const rating = gp.rating !== null && gp.rating !== undefined ? Number(gp.rating) : 0;
-  const reviewCount = Number(gp.reviewCount || gp.totalReviews || 0);
+  const reviewCount = Number(gp.reviewCount ?? gp.ratingCount ?? gp.totalReviews ?? 0);
+  const rawRating = (gp.rating !== null && gp.rating !== undefined) ? Number(gp.rating) : 0;
+  const rating = reviewCount > 0 ? rawRating : 0;
   const totalGames = Number(gp.totalGames || 0);
   const orderCount = Number(gp.orderCount || gp.totalOrders || totalGames || 0);
   const isVip = Boolean(gp.isVip === true || (orderCount >= 50 && rating >= 4.8));

@@ -554,11 +554,19 @@ public class GamePlayerController {
         if (gp == null) return map;
 
         long completedOrders = orderRepository.countCompletedOrdersByPlayerId(gp.getId());
-        Double avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gp.getId());
-        if (avgRating == null && gp.getUser() != null) {
-            avgRating = playerReviewRepository.getAverageRatingByPlayerId(gp.getUser().getId());
+        List<PlayerReview> gpReviews = playerReviewRepository.findByGamePlayerId(gp.getId());
+        List<PlayerReview> userReviews = (gp.getUser() != null)
+                ? playerReviewRepository.findByGamePlayerUserId(gp.getUser().getId())
+                : java.util.Collections.emptyList();
+        int reviewCount = Math.max(gpReviews.size(), userReviews.size());
+
+        Double avgRating = null;
+        if (reviewCount > 0) {
+            avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gp.getId());
+            if (avgRating == null && gp.getUser() != null) {
+                avgRating = playerReviewRepository.getAverageRatingByPlayerId(gp.getUser().getId());
+            }
         }
-        int reviewCount = playerReviewRepository.findByGamePlayerId(gp.getId()).size();
 
         // Đồng bộ ngược lại DB nếu có sai lệch
         boolean dirty = false;
@@ -566,12 +574,15 @@ public class GamePlayerController {
             gp.setTotalGames((int) completedOrders);
             dirty = true;
         }
-        if (avgRating != null) {
+        if (reviewCount > 0 && avgRating != null) {
             Double rounded = Math.round(avgRating * 10.0) / 10.0;
             if (gp.getRating() == null || !gp.getRating().equals(rounded)) {
                 gp.setRating(rounded);
                 dirty = true;
             }
+        } else if (reviewCount == 0 && gp.getRating() != null) {
+            gp.setRating(null);
+            dirty = true;
         }
         if (dirty) {
             gamePlayerService.save(gp);
@@ -586,11 +597,12 @@ public class GamePlayerController {
         map.put("pricePerHour", gp.getPricePerHour());
         map.put("status", gp.getStatus());
         map.put("description", gp.getDescription());
-        map.put("rating", gp.getRating() != null ? gp.getRating() : (avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0));
+        map.put("rating", (reviewCount > 0 && avgRating != null) ? Math.round(avgRating * 10.0) / 10.0 : 0.0);
         map.put("totalGames", gp.getTotalGames() != null ? gp.getTotalGames() : (int) completedOrders);
         map.put("orderCount", (int) completedOrders);
         map.put("totalOrders", (int) completedOrders);
         map.put("reviewCount", reviewCount);
+        map.put("ratingCount", reviewCount);
         map.put("totalReviews", reviewCount);
         map.put("winRate", gp.getWinRate());
         map.put("hiredBy", gp.getHiredBy());
@@ -1489,7 +1501,7 @@ public class GamePlayerController {
             // Xếp hạng (label)
             dto.setRankLabel(gp.getRank());
             // Rating (sao)
-            dto.setRating(gp.getRating() != null ? gp.getRating() : 0.0);
+            dto.setRating(totalReviews > 0 && gp.getRating() != null ? gp.getRating() : 0.0);
             // Thể loại game
             dto.setGameName(gp.getGame() != null ? gp.getGame().getName() : "");
             // Avatar URL
