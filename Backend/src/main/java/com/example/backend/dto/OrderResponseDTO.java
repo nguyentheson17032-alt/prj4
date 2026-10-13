@@ -30,6 +30,9 @@ public class OrderResponseDTO {
     private Boolean isReviewed;
     private Double reviewRating;
     private String reviewComment;
+    private Double discountRate;
+    private Long platformFee;
+    private Long playerReceived;
 
     public OrderResponseDTO(Long id, String renterName, String playerName, String hireTime, String status, Long price) {
         this.id = id;

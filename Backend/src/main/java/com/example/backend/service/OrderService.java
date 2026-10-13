@@ -17,7 +17,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.example.backend.service.PlayerRewardService;
 import com.example.backend.entity.User;
+import com.example.backend.entity.Revenue;
 import com.example.backend.repository.UserRepository;
+import com.example.backend.repository.RevenueRepository;
 
 @Service
 public class OrderService {
@@ -37,6 +39,8 @@ public class OrderService {
     private PlayerRewardService playerRewardService;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private RevenueRepository revenueRepository;
 
     // Chạy mỗi 5 phút
     @Scheduled(fixedRate = 300000)
@@ -119,13 +123,50 @@ public class OrderService {
                 order.setStatus("COMPLETED");
                 orderRepository.save(order);
 
-                // Cộng nốt 40% coin cho player khi hoàn thành đơn tự động
-                long totalCoin = order.getPrice();
-                long playerReceive40 = Math.round(totalCoin * 0.4);
+                // Cộng nốt 35% coin cho player khi hoàn thành đơn tự động (50% đã nhận lúc confirm)
+                long totalCoin = order.getPrice() != null ? order.getPrice() : 0L;
+                long platformFee = Math.round(totalCoin * 0.15); // 15% chiết khấu hệ thống
+                long playerTotalReceived = totalCoin - platformFee; // 85% tổng nhận
+                long playerReceive50 = Math.round(totalCoin * 0.5); // 50% đợt 1
+                long playerReceive35 = playerTotalReceived - playerReceive50; // 35% đợt 2
+
                 if (order.getPlayer() != null && order.getPlayer().getUser() != null) {
                     User playerUser = order.getPlayer().getUser();
-                    playerUser.setCoin(playerUser.getCoin() + playerReceive40);
+                    playerUser.setCoin(playerUser.getCoin() + playerReceive35);
                     userRepository.save(playerUser);
+                }
+
+                // Lưu Payment & Revenue 15% cho hệ thống
+                try {
+                    Payment appPayment = new Payment();
+                    appPayment.setUser(order.getRenter());
+                    if (order.getPlayer() != null) {
+                        appPayment.setPlayer(order.getPlayer().getUser());
+                        appPayment.setGamePlayer(order.getPlayer());
+                    }
+                    appPayment.setCoin(platformFee);
+                    appPayment.setOriginalAmount(totalCoin);
+                    appPayment.setDiscountRate(0.15);
+                    appPayment.setPlatformFee(platformFee);
+                    appPayment.setPlayerReceived(playerTotalReceived);
+                    appPayment.setStatus(Payment.PaymentStatus.COMPLETED);
+                    appPayment.setType(Payment.PaymentType.HIRE);
+                    appPayment.setPaymentMethod(Payment.PaymentMethod.HIRE);
+                    appPayment.setCurrency("COIN");
+                    appPayment.setCreatedAt(LocalDateTime.now());
+                    appPayment.setCompletedAt(LocalDateTime.now());
+                    appPayment.setStartTime(order.getStartTime());
+                    appPayment.setEndTime(order.getEndTime());
+                    appPayment.setDescription("Phí chiết khấu hệ thống 15% từ đơn hoàn thành tự động #" + order.getId());
+                    paymentRepository.save(appPayment);
+
+                    Revenue revenue = new Revenue();
+                    revenue.setAmount(platformFee);
+                    revenue.setCreatedAt(LocalDateTime.now());
+                    revenue.setPayment(appPayment);
+                    revenueRepository.save(revenue);
+                } catch (Exception ex) {
+                    logger.error("Error creating revenue for auto-completed order {}: {}", order.getId(), ex.getMessage());
                 }
 
                 // Gọi logic thưởng cho player

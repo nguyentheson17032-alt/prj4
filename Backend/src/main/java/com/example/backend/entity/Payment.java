@@ -15,7 +15,7 @@ public class Payment {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", nullable = true)
     private User user;
 
     @ManyToOne
@@ -84,6 +84,19 @@ public class Payment {
 
     @Column(name = "bank_name")
     private String bankName;
+
+    // Chiết khấu và hoa hồng nền tảng
+    @Column(name = "original_amount")
+    private Long originalAmount;
+
+    @Column(name = "discount_rate")
+    private Double discountRate;
+
+    @Column(name = "platform_fee")
+    private Long platformFee;
+
+    @Column(name = "player_received")
+    private Long playerReceived;
 
     @PrePersist
     protected void onCreate() {

@@ -105,9 +105,15 @@ export const WalletPage = ({ onOpenDeposit }) => {
 
             // Nếu là người được thuê (Player/Idol)
             if (isPlayer && !isRenter) {
-              let earnedAmount = Math.round((o.totalPrice || 0) * 0.9);
+              const origPrice = Number(o.totalPrice || o.price || 0);
+              const feeAmount = o.platformFee != null ? o.platformFee : Math.round(origPrice * 0.15);
+              const playerFinal = o.playerReceived != null ? o.playerReceived : (origPrice - feeAmount);
+
+              let earnedAmount = playerFinal;
+              let stageText = '';
               if (o.status === 'CONFIRMED') {
-                earnedAmount = Math.round((o.totalPrice || 0) * 0.5);
+                earnedAmount = Math.round(origPrice * 0.5);
+                stageText = ' (Đợt 1: 50%)';
               } else if (o.status === 'CANCELED' || o.status === 'REJECTED') {
                 earnedAmount = 0;
               }
@@ -116,7 +122,10 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 id: `ORD-${o.id}`,
                 type: 'RECEIVE',
                 amount: +earnedAmount,
-                description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)`,
+                originalPrice: origPrice,
+                feeAmount: feeAmount,
+                feeDetail: o.status === 'COMPLETED' ? `Giá gốc: ${origPrice.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${feeAmount.toLocaleString('vi-VN')} đ` : (o.status === 'CONFIRMED' ? `Đợt 1 nhận 50% | Chiết khấu 15% hệ thống tính khi hoàn tất đơn` : null),
+                description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)${stageText}`,
                 date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
                 rawDate: orderRawDate
@@ -134,11 +143,17 @@ export const WalletPage = ({ onOpenDeposit }) => {
               });
             } else if (isPlayer && isRenter) {
               // Trường hợp tự thuê bản thân trong thử nghiệm
-              let earnedAmount = Math.round((o.totalPrice || 0) * 0.9);
+              const origPrice = Number(o.totalPrice || o.price || 0);
+              const feeAmount = o.platformFee != null ? o.platformFee : Math.round(origPrice * 0.15);
+              const playerFinal = o.playerReceived != null ? o.playerReceived : (origPrice - feeAmount);
+
               list.push({
                 id: `ORD-${o.id}-IN`,
                 type: 'RECEIVE',
-                amount: +earnedAmount,
+                amount: +playerFinal,
+                originalPrice: origPrice,
+                feeAmount: feeAmount,
+                feeDetail: `Giá gốc: ${origPrice.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${feeAmount.toLocaleString('vi-VN')} đ`,
                 description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)`,
                 date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
@@ -196,20 +211,43 @@ export const WalletPage = ({ onOpenDeposit }) => {
               desc.includes('nhận donate')
             );
 
-            const coinAmount = Number(d.coin || d.amount || 0);
+            const origCoin = Number(d.originalAmount || d.coin || d.amount || 0);
+            const fee = d.platformFee != null ? Number(d.platformFee) : Math.round(origCoin * 0.15);
+            const recvCoin = d.playerReceived != null ? Number(d.playerReceived) : (origCoin - fee);
             const donateDateStr = d.createdAt;
             const donateRawDate = parseToTimestamp(donateDateStr);
 
-            list.push({
-              id: `GIFT-${d.id}`,
-              type: 'DONATE',
-              subType: isReceive ? 'DONATE_RECEIVE' : 'DONATE_SENT',
-              amount: isReceive ? +coinAmount : -coinAmount,
-              description: d.description || (isReceive ? 'Nhận quà tặng từ fan' : 'Tặng quà Idol'),
-              date: formatTransactionDate(donateDateStr),
-              status: d.status || 'COMPLETED',
-              rawDate: donateRawDate
-            });
+            if (isReceive) {
+              // Idol nhận quà: Thực nhận 85%
+              const finalReceive = d.playerReceived != null ? Number(d.playerReceived) : (d.coin && Number(d.coin) <= recvCoin ? Number(d.coin) : recvCoin);
+              list.push({
+                id: `GIFT-${d.id}`,
+                type: 'DONATE',
+                subType: 'DONATE_RECEIVE',
+                amount: +finalReceive,
+                originalPrice: origCoin,
+                feeAmount: fee,
+                feeDetail: `Giá quà: ${origCoin.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${fee.toLocaleString('vi-VN')} đ`,
+                description: d.description || `Nhận quà tặng từ ${d.partnerName || 'Fan'}`,
+                date: formatTransactionDate(donateDateStr),
+                status: d.status || 'COMPLETED',
+                rawDate: donateRawDate
+              });
+            } else {
+              // Fan tặng quà: Trừ 100%
+              list.push({
+                id: `GIFT-${d.id}`,
+                type: 'DONATE',
+                subType: 'DONATE_SENT',
+                amount: -origCoin,
+                originalPrice: origCoin,
+                feeDetail: `Idol nhận: ${recvCoin.toLocaleString('vi-VN')} đ (đã khấu trừ 15% phí hệ thống)`,
+                description: d.description || `Tặng quà cho ${d.partnerName || 'Idol'}`,
+                date: formatTransactionDate(donateDateStr),
+                status: d.status || 'COMPLETED',
+                rawDate: donateRawDate
+              });
+            }
           });
         }
 
@@ -361,12 +399,41 @@ export const WalletPage = ({ onOpenDeposit }) => {
                         )}
                         {tx.type === 'REFUND' && <span className="badge badge-online">↺ Hoàn Tiền</span>}
                       </td>
-                      <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{tx.description}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        <div style={{ fontWeight: 600 }}>{tx.description}</div>
+                        {tx.feeDetail && (
+                          <div style={{
+                            fontSize: '0.74rem',
+                            color: tx.amount > 0 ? '#10b981' : 'var(--text-muted)',
+                            marginTop: '3px',
+                            fontWeight: 500
+                          }}>
+                            {tx.feeDetail}
+                          </div>
+                        )}
+                      </td>
                       <td style={{
                         fontWeight: 800,
-                        color: tx.amount > 0 ? 'var(--accent-green)' : 'var(--accent-pink)'
+                        color: tx.amount > 0 ? 'var(--accent-green)' : 'var(--accent-pink)',
+                        whiteSpace: 'nowrap'
                       }}>
-                        {tx.amount > 0 ? `+${tx.amount.toLocaleString('vi-VN')} đ` : `${tx.amount.toLocaleString('vi-VN')} đ`}
+                        <div>
+                          {tx.amount > 0 ? `+${tx.amount.toLocaleString('vi-VN')} đ` : `${tx.amount.toLocaleString('vi-VN')} đ`}
+                        </div>
+                        {tx.amount > 0 && (tx.type === 'RECEIVE' || tx.subType === 'DONATE_RECEIVE') && tx.status === 'COMPLETED' && (
+                          <span style={{
+                            display: 'inline-block',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(56, 189, 248, 0.12)',
+                            color: '#38bdf8',
+                            marginTop: '2px'
+                          }}>
+                            Thực nhận 85%
+                          </span>
+                        )}
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{tx.date}</td>
                       <td>

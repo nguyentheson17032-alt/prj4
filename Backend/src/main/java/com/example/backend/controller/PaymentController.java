@@ -30,12 +30,14 @@ import com.example.backend.entity.Payment;
 import com.example.backend.entity.PlayerReview;
 import com.example.backend.entity.User;
 import com.example.backend.entity.GamePlayer;
+import com.example.backend.entity.Revenue;
 import com.example.backend.exception.PaymentException;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.repository.OrderRepository;
 import com.example.backend.repository.PaymentRepository;
 import com.example.backend.repository.PlayerReviewRepository;
 import com.example.backend.repository.GamePlayerRepository;
+import com.example.backend.repository.RevenueRepository;
 import com.example.backend.service.NotificationService;
 import com.example.backend.service.PaymentService;
 import com.example.backend.service.QRCodeService;
@@ -68,6 +70,7 @@ public class PaymentController {
     private final OrderRepository orderRepository;
     private final GamePlayerRepository gamePlayerRepository;
     private final AdminNotificationService adminNotificationService;
+    private final RevenueRepository revenueRepository;
     private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
     private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
 
@@ -78,7 +81,8 @@ public class PaymentController {
             VnPayService vnPayService,
             OrderRepository orderRepository,
             GamePlayerRepository gamePlayerRepository,
-            AdminNotificationService adminNotificationService) {
+            AdminNotificationService adminNotificationService,
+            RevenueRepository revenueRepository) {
         this.paymentService = paymentService;
         this.userService = userService;
         this.paymentRepository = paymentRepository;
@@ -89,6 +93,7 @@ public class PaymentController {
         this.orderRepository = orderRepository;
         this.gamePlayerRepository = gamePlayerRepository;
         this.adminNotificationService = adminNotificationService;
+        this.revenueRepository = revenueRepository;
     }
 
     @Operation(summary = "Create a new payment")
@@ -743,46 +748,74 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(Map.of("message", "Số dư ví không đủ để tặng quà. Vui lòng nạp thêm!"));
         }
         
-        // Trừ xu người donate
-        user.setCoin(user.getCoin() - request.getCoin());
+        // Tính toán chiết khấu hệ thống 15%
+        long originalCoin = request.getCoin();
+        long platformFee = Math.round(originalCoin * 0.15); // 15% phí sàn
+        long playerReceive = originalCoin - platformFee;     // 85% Idol thực nhận
+
+        // Trừ 100% xu người donate
+        user.setCoin(user.getCoin() - originalCoin);
         User savedUser = userService.save(user);
         
-        // Cộng xu cho player
-        player.setCoin(player.getCoin() + request.getCoin());
+        // Cộng 85% xu cho player (Idol)
+        player.setCoin(player.getCoin() + playerReceive);
         User savedPlayer = userService.save(player);
 
-        // Lưu Payment DONATE cho người gửi (trừ xu)
+        // Lưu Payment DONATE cho người gửi (trừ 100% xu)
         Payment paymentFrom = new Payment();
         paymentFrom.setUser(user);
         paymentFrom.setPlayer(player);
-        paymentFrom.setCoin(request.getCoin());
+        paymentFrom.setGamePlayer(gamePlayer);
+        paymentFrom.setCoin(originalCoin);
+        paymentFrom.setOriginalAmount(originalCoin);
+        paymentFrom.setDiscountRate(0.15);
+        paymentFrom.setPlatformFee(platformFee);
+        paymentFrom.setPlayerReceived(playerReceive);
         paymentFrom.setCurrency("COIN");
         paymentFrom.setStatus(Payment.PaymentStatus.COMPLETED);
         paymentFrom.setPaymentMethod(Payment.PaymentMethod.DONATE);
         paymentFrom.setType(Payment.PaymentType.DONATE);
         paymentFrom.setCreatedAt(java.time.LocalDateTime.now());
+        paymentFrom.setCompletedAt(java.time.LocalDateTime.now());
         paymentFrom.setDescription("Tặng quà cho " + recipientDisplayName + ": " + (request.getMessage() != null ? request.getMessage() : ""));
         Payment savedPaymentFrom = paymentRepository.save(paymentFrom);
 
-        // Lưu Payment DONATE cho người nhận (cộng xu)
+        // Lưu Payment DONATE cho người nhận (cộng 85% xu)
         Payment paymentTo = new Payment();
         paymentTo.setUser(player);
         paymentTo.setPlayer(user);
-        paymentTo.setCoin(request.getCoin());
+        paymentTo.setGamePlayer(gamePlayer);
+        paymentTo.setCoin(playerReceive);
+        paymentTo.setOriginalAmount(originalCoin);
+        paymentTo.setDiscountRate(0.15);
+        paymentTo.setPlatformFee(platformFee);
+        paymentTo.setPlayerReceived(playerReceive);
         paymentTo.setCurrency("COIN");
         paymentTo.setStatus(Payment.PaymentStatus.COMPLETED);
         paymentTo.setPaymentMethod(Payment.PaymentMethod.DONATE);
         paymentTo.setType(Payment.PaymentType.DONATE);
         paymentTo.setCreatedAt(java.time.LocalDateTime.now());
-        paymentTo.setDescription("Nhận quà từ " + (user.getFullName() != null ? user.getFullName() : user.getUsername()) + ": " + (request.getMessage() != null ? request.getMessage() : ""));
+        paymentTo.setCompletedAt(java.time.LocalDateTime.now());
+        paymentTo.setDescription("Nhận quà từ " + (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " (Đã khấu trừ 15% phí hệ thống): " + (request.getMessage() != null ? request.getMessage() : ""));
         Payment savedPaymentTo = paymentRepository.save(paymentTo);
+
+        // Lưu doanh thu nền tảng (Revenue) 15%
+        try {
+            Revenue revenue = new Revenue();
+            revenue.setAmount(platformFee);
+            revenue.setCreatedAt(java.time.LocalDateTime.now());
+            revenue.setPayment(savedPaymentFrom);
+            revenueRepository.save(revenue);
+        } catch (Exception e) {
+            System.err.println("[PaymentController] Error saving donate revenue: " + e.getMessage());
+        }
 
         // Gửi thông báo cho người donate
         try {
             notificationService.createNotification(
                 user.getId(),
                 "✅ Tặng quà thành công",
-                "Bạn đã tặng quà trị giá " + request.getCoin() + " xu cho " + recipientDisplayName + " thành công. Số dư còn lại: " + savedUser.getCoin() + " xu.",
+                "Bạn đã tặng quà trị giá " + originalCoin + " xu cho " + recipientDisplayName + " thành công. Số dư còn lại: " + savedUser.getCoin() + " xu.",
                 "donate_sent",
                 "/donate-history",
                 savedPaymentFrom.getId().toString()
@@ -796,21 +829,21 @@ public class PaymentController {
             notificationService.createNotification(
                 player.getId(),
                 "🎁 Bạn nhận được quà tặng mới!",
-                (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " đã tặng quà trị giá " + request.getCoin() + " xu cho bạn. Lời nhắn: " + request.getMessage(),
+                (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " đã tặng quà trị giá " + originalCoin + " xu cho bạn (Thực nhận: " + playerReceive + " xu sau khi trừ 15% phí hệ thống). Lời nhắn: " + (request.getMessage() != null ? request.getMessage() : ""),
                 "donate_received",
                 "/donate-history",
                 savedPaymentTo.getId().toString()
             );
             
             // Gửi push notification riêng cho người nhận donate
-            sendDonatePushNotification(player, user, request.getCoin(), request.getMessage());
+            sendDonatePushNotification(player, user, playerReceive, request.getMessage());
         } catch (Exception e) {
             System.err.println("[PaymentController] Error sending notification to recipient: " + e.getMessage());
         }
 
         // Gửi thông báo cho admin về giao dịch donate
         try {
-            adminNotificationService.notifyAdminsAboutDonate(user, player, request.getCoin(), recipientDisplayName);
+            adminNotificationService.notifyAdminsAboutDonate(user, player, originalCoin, recipientDisplayName);
         } catch (Exception e) {
             System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutDonate: " + e.getMessage());
         }
@@ -818,7 +851,9 @@ public class PaymentController {
         Map<String, Object> resp = new HashMap<>();
         resp.put("message", "Tặng quà thành công");
         resp.put("newBalance", savedUser.getCoin());
-        resp.put("coin", request.getCoin());
+        resp.put("coin", originalCoin);
+        resp.put("platformFee", platformFee);
+        resp.put("playerReceived", playerReceive);
         return ResponseEntity.ok(resp);
     }
 
@@ -834,6 +869,15 @@ public class PaymentController {
             Map<String, Object> map = new HashMap<>();
             map.put("id", p.getId());
             map.put("coin", p.getCoin());
+
+            long orig = p.getOriginalAmount() != null ? p.getOriginalAmount() : (p.getCoin() != null ? p.getCoin() : 0L);
+            long fee = p.getPlatformFee() != null ? p.getPlatformFee() : Math.round(orig * 0.15);
+            long recv = p.getPlayerReceived() != null ? p.getPlayerReceived() : (orig - fee);
+
+            map.put("originalAmount", orig);
+            map.put("discountRate", p.getDiscountRate() != null ? p.getDiscountRate() : 0.15);
+            map.put("platformFee", fee);
+            map.put("playerReceived", recv);
             map.put("currency", p.getCurrency());
             map.put("status", p.getStatus() != null ? p.getStatus().name() : "COMPLETED");
             map.put("description", p.getDescription());

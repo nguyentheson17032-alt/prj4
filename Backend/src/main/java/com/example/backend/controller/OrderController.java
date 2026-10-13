@@ -346,7 +346,7 @@ public class OrderController {
         long confirmedHiring = hiringOrders.stream().filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus())).count();
         long canceledHiring = hiringOrders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus())).count();
         long totalEarned = hiringOrders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()))
-                .mapToLong(o -> o.getPrice() != null ? o.getPrice() : 0L).sum();
+                .mapToLong(o -> o.getPlayerReceived() != null ? o.getPlayerReceived() : Math.round((o.getPrice() != null ? o.getPrice() : 0L) * 0.85)).sum();
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalOrders", totalHired + totalHiring);
@@ -655,6 +655,14 @@ public class OrderController {
         dto.setPrice(order.getPrice());
         dto.setStartTime(order.getStartTime());
         dto.setEndTime(order.getEndTime());
+
+        // Chiết khấu 15%
+        long orderPrice = order.getPrice() != null ? order.getPrice() : 0L;
+        long fee = order.getPlatformFee() != null ? order.getPlatformFee() : Math.round(orderPrice * 0.15);
+        long recv = order.getPlayerReceived() != null ? order.getPlayerReceived() : (orderPrice - fee);
+        dto.setDiscountRate(order.getDiscountRate() != null ? order.getDiscountRate() : 0.15);
+        dto.setPlatformFee(fee);
+        dto.setPlayerReceived(recv);
 
         if (playerReviewRepository != null && order.getId() != null) {
             com.example.backend.entity.PlayerReview rev = playerReviewRepository.findByOrderId(order.getId());

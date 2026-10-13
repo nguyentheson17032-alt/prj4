@@ -25,6 +25,15 @@ public class Order {
     private Long price;
     private String status; // PENDING, CONFIRMED, CANCELED, COMPLETED, ...
 
+    @Column(name = "discount_rate")
+    private Double discountRate = 0.15;
+
+    @Column(name = "platform_fee")
+    private Long platformFee;
+
+    @Column(name = "player_received")
+    private Long playerReceived;
+
     @OneToOne
     @JoinColumn(name = "payment_id")
     private Payment payment;

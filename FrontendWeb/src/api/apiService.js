@@ -607,6 +607,27 @@ export const api = {
     return res.data;
   },
 
+  // Admin Commission Management (Chiết khấu 15%)
+  async getAdminCommissionStats() {
+    try {
+      const res = await client.get('/api/admin/commissions/stats');
+      return res.data;
+    } catch (e) {
+      console.error('getAdminCommissionStats error:', e);
+      return null;
+    }
+  },
+
+  async getAdminCommissionTransactions(params = {}) {
+    try {
+      const res = await client.get('/api/admin/commissions/transactions', { params });
+      return Array.isArray(res.data) ? res.data : [];
+    } catch (e) {
+      console.error('getAdminCommissionTransactions error:', e);
+      return [];
+    }
+  },
+
   // Admin Game Players Summary
   async getPlayersSummary() {
     try {

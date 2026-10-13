@@ -355,25 +355,36 @@ public class GamePlayerController {
             }
 
             // Trừ coin ngay khi tạo đơn thuê
-            user.setCoin(user.getCoin() - request.getCoin());
+            long originalCoin = request.getCoin();
+            long platformFee = Math.round(originalCoin * 0.15); // 15% chiết khấu nền tảng
+            long playerReceivedTotal = originalCoin - platformFee; // 85% Idol thực nhận
+
+            user.setCoin(user.getCoin() - originalCoin);
             userService.save(user);
 
-            // Tạo đơn thuê (Order)
+            // Tạo đơn thuê (Order) với thông tin chiết khấu
             Order order = new Order();
             order.setRenter(user);
             order.setPlayer(gamePlayer);
             order.setStartTime(request.getStartTime());
             order.setEndTime(request.getEndTime());
-            order.setPrice(request.getCoin());
+            order.setPrice(originalCoin);
             order.setStatus("PENDING");
+            order.setDiscountRate(0.15);
+            order.setPlatformFee(platformFee);
+            order.setPlayerReceived(playerReceivedTotal);
             orderRepository.save(order);
 
-            // Tạo Payment record với type HIRE (sẽ được cập nhật khi xác nhận)
+            // Tạo Payment record với type HIRE
             Payment payment = new Payment();
             payment.setUser(user); // Người thuê
             payment.setPlayer(gamePlayer.getUser()); // Người được thuê
             payment.setGamePlayer(gamePlayer);
-            payment.setCoin(request.getCoin());
+            payment.setCoin(originalCoin);
+            payment.setOriginalAmount(originalCoin);
+            payment.setDiscountRate(0.15);
+            payment.setPlatformFee(platformFee);
+            payment.setPlayerReceived(playerReceivedTotal);
             payment.setCurrency("COIN");
             payment.setStatus(Payment.PaymentStatus.PENDING);
             payment.setPaymentMethod(Payment.PaymentMethod.HIRE);
@@ -385,6 +396,8 @@ public class GamePlayerController {
                 " đến " + request.getEndTime().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
             payment.setCreatedAt(LocalDateTime.now());
             paymentRepository.save(payment);
+            order.setPayment(payment);
+            orderRepository.save(order);
 
             // Gửi notification cho player để xác nhận đơn thuê (có orderId)
             notificationService.createNotification(
@@ -440,10 +453,12 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Đơn thuê không ở trạng thái chờ xác nhận", null));
             }
 
-            // Cộng 50% coin cho player khi xác nhận đơn
+            // Cộng 50% coin cho player khi xác nhận đơn (đợt 1)
             User user = order.getRenter();
             long totalCoin = order.getPrice();
             long playerReceive50 = Math.round(totalCoin * 0.5);
+            long totalPlatformFee = Math.round(totalCoin * 0.15);
+            long totalPlayerReceived = totalCoin - totalPlatformFee;
             
             // Cộng 50% cho player
             User playerUser = gamePlayer.getUser();
@@ -456,13 +471,17 @@ public class GamePlayerController {
             payment50.setPlayer(gamePlayer.getUser()); // Người được thuê
             payment50.setGamePlayer(gamePlayer);
             payment50.setCoin(playerReceive50);
+            payment50.setOriginalAmount(totalCoin);
+            payment50.setDiscountRate(0.15);
+            payment50.setPlatformFee(totalPlatformFee);
+            payment50.setPlayerReceived(totalPlayerReceived);
             payment50.setCurrency("COIN");
             payment50.setStatus(Payment.PaymentStatus.COMPLETED);
             payment50.setPaymentMethod(Payment.PaymentMethod.HIRE);
             payment50.setType(Payment.PaymentType.HIRE);
             payment50.setStartTime(order.getStartTime());
             payment50.setEndTime(order.getEndTime());
-            payment50.setDescription("Nhận 50% tiền thuê từ " + user.getUsername() + " - " + gamePlayer.getUsername());
+            payment50.setDescription("Nhận 50% tiền thuê (Đợt 1) từ " + user.getUsername() + " - " + gamePlayer.getUsername());
             payment50.setCreatedAt(LocalDateTime.now());
             payment50.setCompletedAt(LocalDateTime.now());
             paymentRepository.save(payment50);
@@ -982,48 +1001,62 @@ public class GamePlayerController {
             order.setStatus("COMPLETED");
             orderRepository.save(order);
 
-            // Cộng nốt 40% coin cho player khi hoàn thành đơn
+            // Cộng nốt 35% coin cho player khi hoàn thành đơn (50% đợt 1 + 35% đợt 2 = 85% tổng nhận)
             long totalCoin = order.getPrice();
-            long playerReceive40 = Math.round(totalCoin * 0.4);
-            long appRevenue = Math.round(totalCoin * 0.1); // 10% doanh thu app
+            long appRevenue = Math.round(totalCoin * 0.15); // 15% chiết khấu hệ thống
+            long playerTotalReceived = totalCoin - appRevenue; // 85% tổng nhận
+            long playerReceive50 = Math.round(totalCoin * 0.5); // 50% đã nhận lúc confirm
+            long playerReceive35 = playerTotalReceived - playerReceive50; // 35% nhận nốt đợt 2
             
             User playerUser = gamePlayer.getUser();
-            playerUser.setCoin(playerUser.getCoin() + playerReceive40);
+            playerUser.setCoin(playerUser.getCoin() + playerReceive35);
             userService.save(playerUser);
 
-            // Tạo Payment record cho 40% còn lại
-            Payment payment40 = new Payment();
-            payment40.setUser(order.getRenter()); // Người thuê
-            payment40.setPlayer(gamePlayer.getUser()); // Người được thuê
-            payment40.setGamePlayer(gamePlayer);
-            payment40.setCoin(playerReceive40);
-            payment40.setCurrency("COIN");
-            payment40.setStatus(Payment.PaymentStatus.COMPLETED);
-            payment40.setPaymentMethod(Payment.PaymentMethod.HIRE);
-            payment40.setType(Payment.PaymentType.HIRE);
-            payment40.setStartTime(order.getStartTime());
-            payment40.setEndTime(order.getEndTime());
-            payment40.setDescription("Nhận 40% tiền thuê còn lại từ " + order.getRenter().getUsername() + " - " + gamePlayer.getUsername());
-            payment40.setCreatedAt(LocalDateTime.now());
-            payment40.setCompletedAt(LocalDateTime.now());
-            paymentRepository.save(payment40);
+            // Tạo Payment record cho 35% còn lại
+            Payment payment35 = new Payment();
+            payment35.setUser(order.getRenter()); // Người thuê
+            payment35.setPlayer(gamePlayer.getUser()); // Người được thuê
+            payment35.setGamePlayer(gamePlayer);
+            payment35.setCoin(playerReceive35);
+            payment35.setOriginalAmount(totalCoin);
+            payment35.setDiscountRate(0.15);
+            payment35.setPlatformFee(appRevenue);
+            payment35.setPlayerReceived(playerTotalReceived);
+            payment35.setCurrency("COIN");
+            payment35.setStatus(Payment.PaymentStatus.COMPLETED);
+            payment35.setPaymentMethod(Payment.PaymentMethod.HIRE);
+            payment35.setType(Payment.PaymentType.HIRE);
+            payment35.setStartTime(order.getStartTime());
+            payment35.setEndTime(order.getEndTime());
+            payment35.setDescription("Nhận 35% tiền thuê còn lại (tổng 85%, phí sàn 15%) từ " + order.getRenter().getUsername() + " - " + gamePlayer.getUsername());
+            payment35.setCreatedAt(LocalDateTime.now());
+            payment35.setCompletedAt(LocalDateTime.now());
+            paymentRepository.save(payment35);
             
-            // Lưu doanh thu app
-            Revenue revenue = new Revenue();
-            revenue.setAmount(appRevenue);
-            revenue.setCreatedAt(LocalDateTime.now());
-            // Tạo một Payment giả để liên kết với Revenue (vì Revenue yêu cầu payment_id)
+            // Lưu doanh thu app 15%
             Payment appPayment = new Payment();
-            appPayment.setUser(null); // Không có user cụ thể
+            appPayment.setUser(order.getRenter());
+            appPayment.setPlayer(gamePlayer.getUser());
             appPayment.setCoin(appRevenue);
+            appPayment.setOriginalAmount(totalCoin);
+            appPayment.setDiscountRate(0.15);
+            appPayment.setPlatformFee(appRevenue);
+            appPayment.setPlayerReceived(playerTotalReceived);
             appPayment.setStatus(Payment.PaymentStatus.COMPLETED);
             appPayment.setType(Payment.PaymentType.HIRE);
+            appPayment.setPaymentMethod(Payment.PaymentMethod.HIRE);
+            appPayment.setCurrency("COIN");
             appPayment.setCreatedAt(LocalDateTime.now());
+            appPayment.setCompletedAt(LocalDateTime.now());
             appPayment.setStartTime(order.getStartTime());
             appPayment.setEndTime(order.getEndTime());
             appPayment.setGamePlayer(gamePlayer);
+            appPayment.setDescription("Phí chiết khấu hệ thống 15% từ đơn thuê #" + order.getId() + " - " + gamePlayer.getUsername());
             paymentRepository.save(appPayment);
             
+            Revenue revenue = new Revenue();
+            revenue.setAmount(appRevenue);
+            revenue.setCreatedAt(LocalDateTime.now());
             revenue.setPayment(appPayment);
             revenueRepository.save(revenue);
 

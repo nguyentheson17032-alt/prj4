@@ -370,6 +370,23 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
               {selectedGift.price.toLocaleString('vi-VN')} đ
             </span>
           </div>
+
+          <div style={{
+            fontSize: '0.78rem',
+            color: 'var(--text-muted)',
+            padding: '8px 12px',
+            background: 'rgba(99, 102, 241, 0.08)',
+            border: '1px dashed rgba(99, 102, 241, 0.3)',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <span>💡 Chiết khấu hệ thống: <strong>15%</strong></span>
+            <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+              Idol thực nhận: {Math.round(selectedGift.price * 0.85).toLocaleString('vi-VN')} đ
+            </span>
+          </div>
         </div>
 
         <div className="modal-footer">
