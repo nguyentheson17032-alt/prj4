@@ -58,6 +58,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
   const { user, refreshUser } = useAuth();
   const [filterType, setFilterType] = useState('ALL');
   const [transactions, setTransactions] = useState([]);
+  const [frozenAmount, setFrozenAmount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
         const currentUserId = user?.id ? String(user.id) : (localStorage.getItem('userId') || null);
         const currentUsername = (user?.username || localStorage.getItem('username') || '').toLowerCase().trim();
 
+        let totalFrozen = 0;
         // 1. Giao dịch Thuê / Nhận tiền thuê (Orders)
         if (ordersData.status === 'fulfilled' && Array.isArray(ordersData.value)) {
           ordersData.value.forEach(o => {
@@ -91,6 +93,12 @@ export const WalletPage = ({ onOpenDeposit }) => {
               (currentUserId && (String(orderPlayerUserId) === currentUserId || String(orderPlayerId) === currentUserId)) ||
               (currentUsername && orderPlayerName === currentUsername)
             );
+
+            if (isPlayer && o.status === 'COMPLETED' && o.payoutStatus === 'PENDING' && !(o.isReviewed && Number(o.reviewRating || 0) >= 4)) {
+              const op = Number(o.totalPrice || o.price || 0);
+              const fee = o.platformFee != null ? o.platformFee : Math.round(op * 0.15);
+              totalFrozen += (o.playerReceived != null ? o.playerReceived : (op - fee));
+            }
 
             const orderRenterId = o.renterId || o.renter?.id;
             const orderRenterName = (o.renterName || o.renter?.username || o.renter?.fullName || '').toLowerCase().trim();
@@ -253,6 +261,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
 
         list.sort((a, b) => b.rawDate - a.rawDate);
         setTransactions(list);
+        setFrozenAmount(totalFrozen);
       } catch (err) {
         console.error('Lỗi khi tải lịch sử giao dịch:', err);
       } finally {
@@ -291,6 +300,18 @@ export const WalletPage = ({ onOpenDeposit }) => {
             <div className="balance-amount">
               {(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ
             </div>
+
+            {frozenAmount > 0 && (
+              <div style={{ marginTop: '10px', marginBottom: '14px', padding: '10px 14px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontSize: '0.85rem', fontWeight: 600 }}>
+                  <Clock size={16} />
+                  <span>Đang đóng băng:</span>
+                </div>
+                <span style={{ color: '#f59e0b', fontWeight: 800, fontSize: '0.98rem' }}>
+                  {frozenAmount.toLocaleString('vi-VN')} đ
+                </span>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button

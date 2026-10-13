@@ -39,6 +39,8 @@ public class OrderReviewController {
     private final UserService userService;
     private final NotificationService notificationService;
     private final GamePlayerService gamePlayerService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.backend.service.OrderPayoutService orderPayoutService;
 
     public OrderReviewController(PlayerReviewRepository playerReviewRepository, 
                                OrderRepository orderRepository, 
@@ -113,6 +115,13 @@ public class OrderReviewController {
                     null,
                     orderId.toString()
                 );
+            }
+
+            // Nếu đánh giá 4 sao trở lên -> chuyển tiền đóng băng vào số dư khả dụng ngay lập tức
+            if (request.getRating() != null && request.getRating() >= 4.0) {
+                if (orderPayoutService != null && "PENDING".equalsIgnoreCase(order.getPayoutStatus())) {
+                    orderPayoutService.releaseOrderPayout(order, "Được đánh giá " + request.getRating() + " sao");
+                }
             }
 
             Map<String, Object> response = new HashMap<>();

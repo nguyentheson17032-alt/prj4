@@ -168,7 +168,14 @@ export const OrdersPage = () => {
     try {
       await api.reviewOrder(orderId, rating, comment);
       addToast('Cảm ơn bạn đã gửi đánh giá cho Player!', 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, isReviewed: true, reviewRating: rating } : o));
+      setOrders(prev => prev.map(o => o.id === orderId ? {
+        ...o,
+        isReviewed: true,
+        reviewRating: rating,
+        payoutStatus: Number(rating) >= 4 ? 'RELEASED' : o.payoutStatus,
+        isPayoutFrozen: Number(rating) >= 4 ? false : o.isPayoutFrozen
+      } : o));
+      if (refreshUser) refreshUser();
     } catch (e) {
       console.warn('Backend review order warning:', e.message);
       const errMsg = e.response?.data?.message || e.message || 'Lỗi khi gửi đánh giá!';
@@ -580,12 +587,32 @@ export const OrdersPage = () => {
                                   );
                                 }
 
+                                // Chỉ được tố cáo trong vòng 24h sau khi đơn thuê kết thúc
+                                const endStr = order.endTime || order.createdAt;
+                                let isExpired = false;
+                                if (endStr) {
+                                  try {
+                                    const endD = new Date(typeof endStr === 'string' ? endStr.replace(' ', 'T') : endStr);
+                                    if (!isNaN(endD.getTime())) {
+                                      isExpired = (Date.now() - endD.getTime()) > 24 * 60 * 60 * 1000;
+                                    }
+                                  } catch (e) {}
+                                }
+
+                                if (isExpired) {
+                                  return (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }} title="Đã qua 24h sau khi đơn kết thúc, không thể khiếu nại">
+                                      Hết hạn khiếu nại (quá 24h)
+                                    </span>
+                                  );
+                                }
+
                                 return (
                                   (order.player?.id || order.playerId) && (
                                     <button
                                       className="btn btn-outline btn-sm"
                                       style={{ borderColor: '#f43f5e', color: '#f43f5e' }}
-                                      title="Tố cáo / Khiếu nại về idol này"
+                                      title="Tố cáo / Khiếu nại về idol này (trong vòng 24h sau khi kết thúc)"
                                       onClick={() => setSelectedPlayerForReport({
                                         id: order.player?.id || order.playerId,
                                         fullName: order.playerName || order.player?.fullName || 'Idol',
@@ -603,17 +630,78 @@ export const OrdersPage = () => {
                             )}
                           </div>
                         ) : (
-                          // Người được thuê (Idol / Player) chỉ xem kết quả đánh giá từ khách
-                          order.isReviewed ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.85rem', fontWeight: 600 }}>
-                              <Star size={15} fill="#f59e0b" color="#f59e0b" />
-                              <span>Khách đã đánh giá {order.reviewRating || 5} ⭐</span>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontStyle: 'italic' }}>
-                              Chờ khách đánh giá
-                            </span>
-                          )
+                          // Người được thuê (Idol / Player): hiển thị đánh giá & trạng thái tiền nhận (Đóng băng hoặc Khả dụng)
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
+                            {order.isReviewed ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                <Star size={15} fill="#f59e0b" color="#f59e0b" />
+                                <span>Khách đã đánh giá {order.reviewRating || 5} ⭐</span>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontStyle: 'italic' }}>
+                                Chờ khách đánh giá
+                              </span>
+                            )}
+
+                            {/* Trạng thái tiền nhận: Đóng băng (Pending) hay Vào số dư khả dụng (Released) */}
+                            {order.payoutStatus === 'RELEASED' || (order.isReviewed && Number(order.reviewRating || 0) >= 4) ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  color: '#10b981',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  background: 'rgba(16,185,129,0.1)',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(16,185,129,0.2)'
+                                }}
+                                title="Đơn được đánh giá từ 4 sao hoặc đã qua 24h, tiền đã vào số dư khả dụng"
+                              >
+                                <CheckCircle2 size={13} />
+                                <span>Đã vào số dư khả dụng (+{Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN')} đ)</span>
+                              </div>
+                            ) : order.payoutStatus === 'REFUNDED' ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  color: '#f43f5e',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  background: 'rgba(244,63,94,0.1)',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(244,63,94,0.2)'
+                                }}
+                              >
+                                <XCircle size={13} />
+                                <span>Đã xử lý hoàn tiền</span>
+                              </div>
+                            ) : (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  color: '#f59e0b',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  background: 'rgba(245,158,11,0.1)',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(245,158,11,0.2)'
+                                }}
+                                title="Số tiền đang tạm đóng băng trong 24h sau khi đơn kết thúc hoặc chờ khách đánh giá 4★ trở lên"
+                              >
+                                <Clock size={13} />
+                                <span>Đang đóng băng: {Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN')} đ (chờ 24h hoặc đánh giá ≥4★)</span>
+                              </div>
+                            )}
+                          </div>
                         )
                       )}
 

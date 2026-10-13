@@ -34,6 +34,12 @@ public class Order {
     @Column(name = "player_received")
     private Long playerReceived;
 
+    @Column(name = "payout_status")
+    private String payoutStatus = "PENDING"; // PENDING, RELEASED, REFUNDED
+
+    @Column(name = "payout_released_at")
+    private LocalDateTime payoutReleasedAt;
+
     @OneToOne
     @JoinColumn(name = "payment_id")
     private Payment payment;

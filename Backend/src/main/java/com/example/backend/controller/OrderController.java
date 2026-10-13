@@ -47,6 +47,8 @@ public class OrderController {
     private com.example.backend.repository.PlayerImageRepository playerImageRepository;
     @Autowired(required = false)
     private com.example.backend.repository.ReportRepository reportRepository;
+    @Autowired(required = false)
+    private com.example.backend.service.OrderPayoutService orderPayoutService;
     private final PlayerReviewRepository playerReviewRepository;
     private final OrderService orderService;
 
@@ -183,6 +185,12 @@ public class OrderController {
             orders = orderRepository.findAllByUserId(currentUser.getId());
         } else {
             orders = new ArrayList<>();
+        }
+
+        if (orderPayoutService != null) {
+            try {
+                orderPayoutService.checkAndReleasePendingPayouts();
+            } catch (Exception ignored) {}
         }
 
         orders.sort((o1, o2) -> {
@@ -717,6 +725,31 @@ public class OrderController {
             dto.setIsReported(false);
             dto.setReportStatus(null);
         }
+
+        dto.setPayoutStatus(order.getPayoutStatus() != null ? order.getPayoutStatus() : "PENDING");
+        boolean isCompleted = "COMPLETED".equalsIgnoreCase(order.getStatus());
+        dto.setIsPayoutFrozen(isCompleted && "PENDING".equalsIgnoreCase(dto.getPayoutStatus()));
+
+        LocalDateTime endTime = order.getEndTime() != null ? order.getEndTime() : order.getStartTime();
+        LocalDateTime now = LocalDateTime.now();
+        boolean isExpired = false;
+        Long remainingSecs = null;
+        if (endTime != null) {
+            LocalDateTime deadline = endTime.plusHours(24);
+            if (now.isBefore(deadline)) {
+                remainingSecs = java.time.Duration.between(now, deadline).getSeconds();
+            } else {
+                isExpired = true;
+                remainingSecs = 0L;
+            }
+        }
+        dto.setReportRemainingSeconds(remainingSecs);
+
+        boolean isReportable = isCompleted
+                && !Boolean.TRUE.equals(dto.getIsReported())
+                && !(Boolean.TRUE.equals(dto.getIsReviewed()) && dto.getReviewRating() != null && dto.getReviewRating() >= 4.0)
+                && !isExpired;
+        dto.setIsReportable(isReportable);
 
         return dto;
     }

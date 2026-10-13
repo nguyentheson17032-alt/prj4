@@ -113,6 +113,10 @@ export const normalizeOrder = (o) => {
     statusLabel: o.statusLabel,
     isReported: Boolean(o.isReported),
     reportStatus: o.reportStatus || null,
+    payoutStatus: o.payoutStatus || 'PENDING',
+    isPayoutFrozen: Boolean(o.isPayoutFrozen),
+    isReportable: o.isReportable !== undefined ? Boolean(o.isReportable) : true,
+    reportRemainingSeconds: o.reportRemainingSeconds !== undefined ? Number(o.reportRemainingSeconds) : null,
     player: {
       id: playerId,
       userId: playerUserId,

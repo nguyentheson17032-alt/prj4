@@ -59,6 +59,8 @@ public class GamePlayerController {
     private final OrderRepository orderRepository;
     private final PlayerReviewRepository playerReviewRepository;
     private final OrderService orderService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.backend.service.OrderPayoutService orderPayoutService;
     private static final Logger log = LoggerFactory.getLogger(GamePlayerController.class);
 
     public GamePlayerController(GamePlayerService gamePlayerService, GameRepository gameRepository, UserService userService, PaymentRepository paymentRepository, NotificationService notificationService, RevenueRepository revenueRepository, ReviewRepository reviewRepository, OrderRepository orderRepository, PlayerReviewRepository playerReviewRepository, OrderService orderService) {
@@ -453,39 +455,15 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Đơn thuê không ở trạng thái chờ xác nhận", null));
             }
 
-            // Cộng 50% coin cho player khi xác nhận đơn (đợt 1)
+            // Số tiền người được thuê nhận được sẽ ở trạng thái đóng băng (PENDING) cho đến khi đơn hoàn thành + đánh giá >= 4 sao hoặc qua 24h
             User user = order.getRenter();
             long totalCoin = order.getPrice();
-            long playerReceive50 = Math.round(totalCoin * 0.5);
             long totalPlatformFee = Math.round(totalCoin * 0.15);
             long totalPlayerReceived = totalCoin - totalPlatformFee;
-            
-            // Cộng 50% cho player
-            User playerUser = gamePlayer.getUser();
-            playerUser.setCoin(playerUser.getCoin() + playerReceive50);
-            userService.save(playerUser);
 
-            // Tạo Payment record cho 50% đầu tiên
-            Payment payment50 = new Payment();
-            payment50.setUser(user); // Người thuê
-            payment50.setPlayer(gamePlayer.getUser()); // Người được thuê
-            payment50.setGamePlayer(gamePlayer);
-            payment50.setCoin(playerReceive50);
-            payment50.setOriginalAmount(totalCoin);
-            payment50.setDiscountRate(0.15);
-            payment50.setPlatformFee(totalPlatformFee);
-            payment50.setPlayerReceived(totalPlayerReceived);
-            payment50.setCurrency("COIN");
-            payment50.setStatus(Payment.PaymentStatus.COMPLETED);
-            payment50.setPaymentMethod(Payment.PaymentMethod.HIRE);
-            payment50.setType(Payment.PaymentType.HIRE);
-            payment50.setStartTime(order.getStartTime());
-            payment50.setEndTime(order.getEndTime());
-            payment50.setDescription("Nhận 50% tiền thuê (Đợt 1) từ " + user.getUsername() + " - " + gamePlayer.getUsername());
-            payment50.setCreatedAt(LocalDateTime.now());
-            payment50.setCompletedAt(LocalDateTime.now());
-            paymentRepository.save(payment50);
-
+            order.setPlatformFee(totalPlatformFee);
+            order.setPlayerReceived(totalPlayerReceived);
+            order.setPayoutStatus("PENDING");
             order.setStatus("CONFIRMED");
             orderRepository.save(order);
 
@@ -1009,41 +987,45 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Thời gian thuê chưa kết thúc! Chỉ có thể hoàn thành đơn sau khi hết giờ chơi.", null));
             }
 
-            // Cập nhật trạng thái đơn và player
+            // Cập nhật trạng thái đơn
             order.setStatus("COMPLETED");
-            orderRepository.save(order);
+            order.setPayoutStatus("PENDING");
 
-            // Cộng nốt 35% coin cho player khi hoàn thành đơn (50% đợt 1 + 35% đợt 2 = 85% tổng nhận)
             long totalCoin = order.getPrice();
             long appRevenue = Math.round(totalCoin * 0.15); // 15% chiết khấu hệ thống
             long playerTotalReceived = totalCoin - appRevenue; // 85% tổng nhận
-            long playerReceive50 = Math.round(totalCoin * 0.5); // 50% đã nhận lúc confirm
-            long playerReceive35 = playerTotalReceived - playerReceive50; // 35% nhận nốt đợt 2
-            
-            User playerUser = gamePlayer.getUser();
-            playerUser.setCoin(playerUser.getCoin() + playerReceive35);
-            userService.save(playerUser);
+            order.setPlatformFee(appRevenue);
+            order.setPlayerReceived(playerTotalReceived);
+            orderRepository.save(order);
 
-            // Tạo Payment record cho 35% còn lại
-            Payment payment35 = new Payment();
-            payment35.setUser(order.getRenter()); // Người thuê
-            payment35.setPlayer(gamePlayer.getUser()); // Người được thuê
-            payment35.setGamePlayer(gamePlayer);
-            payment35.setCoin(playerReceive35);
-            payment35.setOriginalAmount(totalCoin);
-            payment35.setDiscountRate(0.15);
-            payment35.setPlatformFee(appRevenue);
-            payment35.setPlayerReceived(playerTotalReceived);
-            payment35.setCurrency("COIN");
-            payment35.setStatus(Payment.PaymentStatus.COMPLETED);
-            payment35.setPaymentMethod(Payment.PaymentMethod.HIRE);
-            payment35.setType(Payment.PaymentType.HIRE);
-            payment35.setStartTime(order.getStartTime());
-            payment35.setEndTime(order.getEndTime());
-            payment35.setDescription("Nhận 35% tiền thuê còn lại (tổng 85%, phí sàn 15%) từ " + order.getRenter().getUsername() + " - " + gamePlayer.getUsername());
-            payment35.setCreatedAt(LocalDateTime.now());
-            payment35.setCompletedAt(LocalDateTime.now());
-            paymentRepository.save(payment35);
+            // Nếu đơn đã có đánh giá từ trước với rating >= 4 sao -> giải phóng tiền ngay
+            PlayerReview existingReview = playerReviewRepository.findByOrderId(order.getId());
+            if (existingReview != null && existingReview.getRating() != null && existingReview.getRating() >= 4.0) {
+                if (orderPayoutService != null) {
+                    orderPayoutService.releaseOrderPayout(order, "Đã được đánh giá " + existingReview.getRating() + " sao");
+                }
+            }
+
+            // Tạo Payment record cho tiền thuê
+            Payment paymentRecv = new Payment();
+            paymentRecv.setUser(order.getRenter()); // Người thuê
+            paymentRecv.setPlayer(gamePlayer.getUser()); // Người được thuê
+            paymentRecv.setGamePlayer(gamePlayer);
+            paymentRecv.setCoin(playerTotalReceived);
+            paymentRecv.setOriginalAmount(totalCoin);
+            paymentRecv.setDiscountRate(0.15);
+            paymentRecv.setPlatformFee(appRevenue);
+            paymentRecv.setPlayerReceived(playerTotalReceived);
+            paymentRecv.setCurrency("COIN");
+            paymentRecv.setStatus(Payment.PaymentStatus.COMPLETED);
+            paymentRecv.setPaymentMethod(Payment.PaymentMethod.HIRE);
+            paymentRecv.setType(Payment.PaymentType.HIRE);
+            paymentRecv.setStartTime(order.getStartTime());
+            paymentRecv.setEndTime(order.getEndTime());
+            paymentRecv.setDescription("Tiền thuê dịch vụ (tổng 85%, phí sàn 15%) từ " + order.getRenter().getUsername() + " - " + gamePlayer.getUsername());
+            paymentRecv.setCreatedAt(LocalDateTime.now());
+            paymentRecv.setCompletedAt(LocalDateTime.now());
+            paymentRepository.save(paymentRecv);
             
             // Lưu doanh thu app 15%
             Payment appPayment = new Payment();
@@ -1170,6 +1152,13 @@ public class GamePlayerController {
                 null,
                 order.getId().toString()
             );
+
+            // Nếu đánh giá từ 4 sao trở lên -> chuyển tiền đóng băng vào số dư khả dụng ngay lập tức
+            if (request.getRating() != null && request.getRating() >= 4.0) {
+                if (orderPayoutService != null && "PENDING".equalsIgnoreCase(order.getPayoutStatus())) {
+                    orderPayoutService.releaseOrderPayout(order, "Được đánh giá " + request.getRating() + " sao");
+                }
+            }
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Đánh giá thành công!", review));
         } catch (Exception e) {
