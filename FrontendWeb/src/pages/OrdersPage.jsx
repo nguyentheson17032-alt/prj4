@@ -9,21 +9,28 @@ import {
   Star,
   Gamepad2,
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  Flag
 } from 'lucide-react';
 import api from '../api/apiService';
 import RateOrderModal from '../components/modals/RateOrderModal';
+import ReportModal from '../components/modals/ReportModal';
+import AuthModal from '../components/modals/AuthModal';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { getUserAvatar } from '../utils/avatarUtils';
 import '../styles/orders.css';
 
 export const OrdersPage = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('ALL'); // ALL, IN_PROGRESS, COMPLETED, CANCELLED
   const [selectedOrderForReview, setSelectedOrderForReview] = useState(null);
+  const [selectedPlayerForReport, setSelectedPlayerForReport] = useState(null);
+  const [reportedOrderIds, setReportedOrderIds] = useState({});
+  const [reportedPlayerIds, setReportedPlayerIds] = useState({});
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [, setTick] = useState(0);
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -67,6 +74,7 @@ export const OrdersPage = () => {
     setLoading(true);
     const data = await api.getOrders();
     setOrders(data || []);
+    if (refreshUser) refreshUser();
     setLoading(false);
   };
 
@@ -198,7 +206,7 @@ export const OrdersPage = () => {
     const s = o.status?.toUpperCase();
     if (activeFilter === 'ALL') return true;
     if (activeFilter === 'IN_PROGRESS') return s === 'IN_PROGRESS' || s === 'PENDING' || s === 'CONFIRMED';
-    if (activeFilter === 'COMPLETED') return s === 'COMPLETED';
+    if (activeFilter === 'COMPLETED') return s === 'COMPLETED' || s === 'REFUNDED';
     if (activeFilter === 'CANCELLED') return s === 'CANCELLED' || s === 'CANCELED' || s === 'REJECTED';
     return true;
   });
@@ -219,6 +227,8 @@ export const OrdersPage = () => {
         return <span className="badge badge-busy">⏳ Chờ Bắt Đầu</span>;
       case 'COMPLETED':
         return <span className="badge badge-primary">✅ Đã Hoàn Tất</span>;
+      case 'REFUNDED':
+        return <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', fontWeight: 700 }}>💰 Đã Hoàn Tiền</span>;
       case 'CANCELLED':
       case 'CANCELED':
         return <span className="badge badge-offline">❌ Đã Hủy</span>;
@@ -476,24 +486,122 @@ export const OrdersPage = () => {
                         })()
                       )}
 
-                      {/* Trạng thái COMPLETED: Chỉ người thuê mới được đánh giá */}
+                      {/* Trạng thái COMPLETED: Chỉ người thuê mới được đánh giá + tố cáo */}
                       {statusUpper === 'COMPLETED' && (
                         isCurrentRenter ? (
-                          order.isReviewed ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.88rem', fontWeight: 700 }}>
-                              <Star size={16} fill="#f59e0b" color="#f59e0b" />
-                              <span>Đã Đánh Giá {order.reviewRating || 5} ⭐</span>
-                            </div>
-                          ) : (
-                            <button
-                              className="btn btn-cyan btn-sm"
-                              onClick={() => setSelectedOrderForReview(order)}
-                              title="Chỉ người thuê mới được đánh giá dịch vụ"
-                            >
-                              <Star size={16} />
-                              <span>Đánh Giá Player</span>
-                            </button>
-                          )
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {order.isReviewed ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.88rem', fontWeight: 700 }}>
+                                <Star size={16} fill="#f59e0b" color="#f59e0b" />
+                                <span>Đã Đánh Giá {order.reviewRating || 5} ⭐</span>
+                              </div>
+                            ) : (
+                              <button
+                                className="btn btn-cyan btn-sm"
+                                onClick={() => setSelectedOrderForReview(order)}
+                                title="Chỉ người thuê mới được đánh giá dịch vụ"
+                              >
+                                <Star size={16} />
+                                <span>Đánh Giá Player</span>
+                              </button>
+                            )}
+
+                            {/* Chỉ mất nút tố cáo khi đã đánh giá từ 4 sao trở lên. Nếu chưa đánh giá hoặc đánh giá dưới 4 sao thì vẫn có thể tố cáo */}
+                            {!(order.isReviewed && Number(order.reviewRating || 5) >= 4) && (
+                              (() => {
+                                const pId = order.player?.id || order.playerId;
+                                const isReported = Boolean(order.isReported || reportedOrderIds[order.id] || (pId && reportedPlayerIds[pId]));
+                                const repStatus = String(order.reportStatus || reportedOrderIds[order.id] || (pId && reportedPlayerIds[pId]) || '').toUpperCase();
+
+                                if (isReported) {
+                                  if (repStatus === 'REJECTED') {
+                                    return (
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          color: '#ef4444',
+                                          fontSize: '0.82rem',
+                                          fontWeight: 700,
+                                          padding: '5px 10px',
+                                          borderRadius: '6px',
+                                          background: 'rgba(239,68,68,0.12)',
+                                          border: '1px solid rgba(239,68,68,0.3)'
+                                        }}
+                                        title="Khiếu nại về idol này đã bị Admin từ chối"
+                                      >
+                                        <XCircle size={14} />
+                                        <span>Đã Khiếu Nại & Bị Từ Chối</span>
+                                      </div>
+                                    );
+                                  }
+                                  if (repStatus === 'RESOLVED') {
+                                    return (
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          color: '#10b981',
+                                          fontSize: '0.82rem',
+                                          fontWeight: 700,
+                                          padding: '5px 10px',
+                                          borderRadius: '6px',
+                                          background: 'rgba(16,185,129,0.12)',
+                                          border: '1px solid rgba(16,185,129,0.3)'
+                                        }}
+                                        title="Khiếu nại đã được Admin chấp thuận"
+                                      >
+                                        <CheckCircle2 size={14} />
+                                        <span>Đã Khiếu Nại & Hoàn Tiền</span>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        color: '#f59e0b',
+                                        fontSize: '0.82rem',
+                                        fontWeight: 700,
+                                        padding: '5px 10px',
+                                        borderRadius: '6px',
+                                        background: 'rgba(245,158,11,0.12)',
+                                        border: '1px solid rgba(245,158,11,0.3)'
+                                      }}
+                                      title="Khiếu nại đang chờ Admin duyệt"
+                                    >
+                                      <Flag size={14} />
+                                      <span>Đã Khiếu Nại</span>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  (order.player?.id || order.playerId) && (
+                                    <button
+                                      className="btn btn-outline btn-sm"
+                                      style={{ borderColor: '#f43f5e', color: '#f43f5e' }}
+                                      title="Tố cáo / Khiếu nại về idol này"
+                                      onClick={() => setSelectedPlayerForReport({
+                                        id: order.player?.id || order.playerId,
+                                        fullName: order.playerName || order.player?.fullName || 'Idol',
+                                        name: order.playerName || order.player?.fullName || 'Idol',
+                                        orderId: order.id,
+                                        orderPrice: order.price || order.finalPrice || order.totalPrice || 0,
+                                      })}
+                                    >
+                                      <Flag size={15} />
+                                      <span>Tố Cáo</span>
+                                    </button>
+                                  )
+                                );
+                              })()
+                            )}
+                          </div>
                         ) : (
                           // Người được thuê (Idol / Player) chỉ xem kết quả đánh giá từ khách
                           order.isReviewed ? (
@@ -507,6 +615,14 @@ export const OrdersPage = () => {
                             </span>
                           )
                         )
+                      )}
+
+                      {/* Trạng thái REFUNDED: Đã xử lý khiếu nại & hoàn tiền */}
+                      {statusUpper === 'REFUNDED' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f43f5e', fontSize: '0.85rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: 'rgba(244,63,94,0.1)' }}>
+                          <Flag size={15} />
+                          <span>Đã Khiếu Nại & Hoàn Tiền</span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -540,6 +656,42 @@ export const OrdersPage = () => {
         isOpen={!!selectedOrderForReview}
         onClose={() => setSelectedOrderForReview(null)}
         onReviewed={handleReviewed}
+      />
+
+      {/* Report Modal */}
+      <ReportModal
+        player={selectedPlayerForReport}
+        isOpen={!!selectedPlayerForReport}
+        onClose={() => setSelectedPlayerForReport(null)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onReported={(orderId, status, pId) => {
+          const reportStatus = status || 'PENDING';
+          if (orderId) {
+            setReportedOrderIds(prev => ({ ...prev, [orderId]: reportStatus }));
+          }
+          if (pId) {
+            setReportedPlayerIds(prev => ({ ...prev, [pId]: reportStatus }));
+          }
+          setOrders(prev => prev.map(o => {
+            const matchesOrder = orderId && o.id === orderId;
+            const matchesPlayer = pId && (o.player?.id === pId || o.playerId === pId);
+            if (matchesOrder || matchesPlayer) {
+              return {
+                ...o,
+                isReported: true,
+                reportStatus: reportStatus
+              };
+            }
+            return o;
+          }));
+          if (refreshUser) refreshUser();
+        }}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
       />
     </div>
   );

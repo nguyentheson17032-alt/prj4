@@ -33,6 +33,8 @@ public class OrderResponseDTO {
     private Double discountRate;
     private Long platformFee;
     private Long playerReceived;
+    private Boolean isReported;
+    private String reportStatus;
 
     public OrderResponseDTO(Long id, String renterName, String playerName, String hireTime, String status, Long price) {
         this.id = id;

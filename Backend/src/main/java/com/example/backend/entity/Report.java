@@ -20,6 +20,10 @@ public class Report {
     @JoinColumn(name = "reported_player_id", nullable = false)
     private GamePlayer reportedPlayer;
 
+    @ManyToOne
+    @JoinColumn(name = "order_id")
+    private Order order;
+
     @Column(nullable = false)
     private String reason;
 
@@ -28,6 +32,9 @@ public class Report {
 
     @Column(length = 1000)
     private String videoUrl; // URL video bằng chứng (có thể null)
+
+    @Column(length = 2000)
+    private String imageUrls; // Danh sách URL ảnh bằng chứng, cách nhau bởi dấu phẩy
 
     @Column(nullable = false)
     private String status; // PENDING, INVESTIGATING, RESOLVED, REJECTED
@@ -40,4 +47,10 @@ public class Report {
 
     @Column
     private String resolution;
+
+    @Column
+    private Integer refundPercentage; // % hoàn tiền (1 - 100)
+
+    @Column
+    private Long refundAmount; // Số Coin hoàn lại cho người thuê
 } 

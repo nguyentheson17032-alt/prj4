@@ -76,13 +76,16 @@ const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissi
   const completedCount = ordersList.filter(o => o.status === 'COMPLETED').length;
   const completionRate = ordersList.length ? `${Math.round((completedCount / ordersList.length) * 100)}%` : '100%';
 
-  // Doanh thu sàn 15% tổng hợp từ cả thuê player và donate quà
-  const hireRevenue = useMemo(() => ordersList.reduce((s, o) => s + (o.totalPrice || o.price || 0), 0), [ordersList]);
+  // Doanh thu sàn 15% tổng hợp từ cả thuê player và donate quà (loại trừ đơn bị hủy / đã hoàn tiền)
+  const hireRevenue = useMemo(() => ordersList.filter(o => 
+    o.status !== 'CANCELLED' && o.status !== 'CANCELED' && o.status !== 'REJECTED' && o.status !== 'REFUNDED'
+  ).reduce((s, o) => s + (o.totalPrice || o.price || 0), 0), [ordersList]);
+
   const hireFee = commissionStats?.hireCommissionRevenue != null ? commissionStats.hireCommissionRevenue : Math.round(hireRevenue * 0.15);
   const donateFee = commissionStats?.donateCommissionRevenue || 0;
   const totalPlatformRevenue = commissionStats?.totalCommissionRevenue != null ? commissionStats.totalCommissionRevenue : (hireFee + donateFee);
   const totalGmv = commissionStats?.totalTransactionVolume != null ? commissionStats.totalTransactionVolume : (hireRevenue + (donateFee ? Math.round(donateFee / 0.15) : 0));
-  const hireCount = commissionStats?.hireTransactions != null ? commissionStats.hireTransactions : ordersList.length;
+  const hireCount = commissionStats?.hireTransactions != null ? commissionStats.hireTransactions : ordersList.filter(o => o.status !== 'CANCELLED' && o.status !== 'CANCELED' && o.status !== 'REJECTED' && o.status !== 'REFUNDED').length;
   const donateCount = commissionStats?.donateTransactions || 0;
 
   const weeklyData = useMemo(() => {
@@ -1300,16 +1303,70 @@ const PaymentsTab = () => {
 // ─────────────────────────────────────────────
 // REPORTS TAB
 // ─────────────────────────────────────────────
-const ReportsTab = ({ reportsList, setReportsList, loading }) => {
+const ReportsTab = ({ reportsList, setReportsList, loading, onStatsRefresh }) => {
   const { addToast } = useToast();
+  const [expandedId, setExpandedId] = useState(null);
+  const [resolutionTexts, setResolutionTexts] = useState({});
+  const [refundPercentages, setRefundPercentages] = useState({});
 
-  const handleResolve = (id) => {
-    setReportsList(prev => prev.map(r => r.id === id ? { ...r, status: 'RESOLVED' } : r));
-    addToast('Đã xử lý khiếu nại!', 'success');
+  const handleResolve = async (id) => {
+    const report = reportsList.find(r => r.id === id);
+    const percent = refundPercentages[id] !== undefined ? Number(refundPercentages[id]) : 100;
+    const finalPercent = (percent > 0 && percent <= 100) ? percent : 100;
+    const defaultResolution = report?.order 
+      ? `Admin chấp thuận khiếu nại (Hoàn tiền ${finalPercent}%)`
+      : 'Admin đã chấp thuận khiếu nại';
+    const resolution = resolutionTexts[id]?.trim() || defaultResolution;
+
+    try {
+      await api.updateReportStatus(id, 'RESOLVED', resolution, finalPercent);
+      setReportsList(prev => prev.map(r => r.id === id ? {
+        ...r,
+        status: 'RESOLVED',
+        resolution,
+        refundPercentage: finalPercent,
+        order: r.order ? { ...r.order, status: 'REFUNDED' } : r.order
+      } : r));
+      setExpandedId(null);
+      if (onStatsRefresh) onStatsRefresh();
+      addToast(`Đã chấp thuận khiếu nại & hoàn tiền ${finalPercent}% thành công!`, 'success');
+    } catch (e) {
+      addToast('Lỗi khi xử lý khiếu nại!', 'error');
+    }
+  };
+
+  const handleReject = async (id) => {
+    const resolution = resolutionTexts[id]?.trim() || 'Admin từ chối';
+    try {
+      await api.updateReportStatus(id, 'REJECTED', resolution);
+      setReportsList(prev => prev.map(r => r.id === id ? { ...r, status: 'REJECTED', resolution } : r));
+      setExpandedId(null);
+      addToast('Đã từ chối khiếu nại!', 'success');
+    } catch (e) {
+      addToast('Lỗi khi từ chối khiếu nại!', 'error');
+    }
   };
 
   const pending = reportsList.filter(r => r.status === 'PENDING');
-  const resolved = reportsList.filter(r => r.status === 'RESOLVED');
+  const processed = reportsList.filter(r => r.status === 'RESOLVED' || r.status === 'REJECTED');
+
+  const getReporterName = (r) => r.reporter?.username || r.reporter?.fullName || r.reportedBy || 'Khách hàng';
+  const getTargetName = (r) => r.reportedPlayer?.username || r.reportedPlayer?.user?.username || r.targetUser || 'Game thủ';
+
+  const ReportStatusBadge = ({ status }) => {
+    const map = {
+      PENDING: { label: 'Chờ xử lý', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+      INVESTIGATING: { label: 'Đang điều tra', bg: 'rgba(99,102,241,0.15)', color: '#6366f1' },
+      RESOLVED: { label: 'Đã xử lý', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+      REJECTED: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    };
+    const s = map[status?.toUpperCase()] || map.PENDING;
+    return (
+      <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '20px', background: s.bg, color: s.color, fontWeight: 700 }}>
+        {s.label}
+      </span>
+    );
+  };
 
   return (
     <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
@@ -1317,7 +1374,7 @@ const ReportsTab = ({ reportsList, setReportsList, loading }) => {
         <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Khiếu Nại & Vi Phạm ({reportsList.length})</h3>
         <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem' }}>
           <span style={{ color: '#f59e0b', fontWeight: 700 }}>{pending.length} chờ xử lý</span>
-          <span style={{ color: '#10b981', fontWeight: 700 }}>{resolved.length} đã xử lý</span>
+          <span style={{ color: '#10b981', fontWeight: 700 }}>{processed.length} đã xử lý</span>
         </div>
       </div>
       {loading ? (
@@ -1329,28 +1386,223 @@ const ReportsTab = ({ reportsList, setReportsList, loading }) => {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {reportsList.map(r => (
-            <div key={r.id} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--primary)' }}>#{r.id}</span>
-                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(244,63,94,0.15)', color: '#f43f5e', fontWeight: 700 }}>{r.type || 'Khiếu nại'}</span>
+          {reportsList.map(r => {
+            const isExpanded = expandedId === r.id;
+            const imageList = r.imageUrls ? r.imageUrls.split(',').map(s => s.trim()).filter(Boolean) : [];
+            return (
+              <div key={r.id} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', cursor: 'pointer' }}
+                onClick={() => setExpandedId(isExpanded ? null : r.id)}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--primary)' }}>#{r.id}</span>
+                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(244,63,94,0.15)', color: '#f43f5e', fontWeight: 700 }}>
+                      {r.reason || 'Khiếu nại'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}
+                    </span>
+                    <ReportStatusBadge status={r.status || 'PENDING'} />
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.createdAt || '—'}</span>
-                  <StatusBadge status={r.status || 'PENDING'} />
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: isExpanded ? '12px' : 0, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span><strong>{getReporterName(r)}</strong> tố cáo <strong>{getTargetName(r)}</strong></span>
+                  {r.order?.id && (
+                    <span style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.12)', color: '#0284c7', fontSize: '0.78rem', fontWeight: 600 }}>
+                      Đơn #{r.order.id} ({Number(r.order.price || 0).toLocaleString('vi-VN')} đ)
+                    </span>
+                  )}
                 </div>
+
+                {isExpanded && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}
+                    onClick={e => e.stopPropagation()}>
+                    {r.order && (
+                      <div style={{ marginBottom: '12px', fontSize: '0.85rem', padding: '12px 14px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <span>
+                            💰 <strong>Đơn thuê #{r.order.id}</strong> • Giá đơn: <strong style={{ color: '#059669' }}>{Number(r.order.price || 0).toLocaleString('vi-VN')} đ</strong>
+                          </span>
+                          <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, background: r.order.status === 'REFUNDED' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: r.order.status === 'REFUNDED' ? '#ef4444' : '#10b981' }}>
+                            {r.order.status === 'REFUNDED' ? 'Đã Hoàn Tiền' : r.order.status}
+                          </span>
+                        </div>
+
+                        {/* Nếu đơn PENDING: Cho phép nhập % hoàn tiền */}
+                        {r.status === 'PENDING' && (() => {
+                          const orderPrice = Number(r.order.price || 0);
+                          const curPercent = refundPercentages[r.id] !== undefined ? refundPercentages[r.id] : 100;
+                          const numPercent = Number(curPercent) || 0;
+                          const playerRecv = Number(r.order.playerReceived || Math.round(orderPrice * 0.85));
+                          const renterRefundVal = Math.round(orderPrice * (numPercent / 100));
+                          const playerDeductVal = Math.round(playerRecv * (numPercent / 100));
+
+                          return (
+                            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0284c7' }}>
+                                  🎯 Tỷ lệ hoàn tiền: <span style={{ color: '#10b981' }}>{numPercent}%</span>
+                                </label>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  {[20, 40, 50, 70, 100].map(p => (
+                                    <button
+                                      key={p}
+                                      type="button"
+                                      className="btn btn-sm"
+                                      style={{
+                                        padding: '2px 7px',
+                                        fontSize: '0.75rem',
+                                        height: 'auto',
+                                        borderRadius: '6px',
+                                        background: numPercent === p ? '#0284c7' : 'rgba(255,255,255,0.06)',
+                                        color: numPercent === p ? '#fff' : 'var(--text-secondary)',
+                                        border: '1px solid ' + (numPercent === p ? '#0284c7' : 'var(--border-color)')
+                                      }}
+                                      onClick={() => setRefundPercentages(prev => ({ ...prev, [r.id]: p }))}
+                                    >
+                                      {p}%
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <input
+                                  type="range"
+                                  min="1"
+                                  max="100"
+                                  value={numPercent}
+                                  onChange={e => setRefundPercentages(prev => ({ ...prev, [r.id]: Math.min(100, Math.max(1, Number(e.target.value))) }))}
+                                  style={{ flex: 1, accentColor: '#0284c7', cursor: 'pointer' }}
+                                />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    value={curPercent}
+                                    onChange={e => {
+                                      const val = e.target.value === '' ? '' : Math.min(100, Math.max(1, Number(e.target.value)));
+                                      setRefundPercentages(prev => ({ ...prev, [r.id]: val }));
+                                    }}
+                                    style={{
+                                      width: '56px',
+                                      padding: '3px 6px',
+                                      borderRadius: '6px',
+                                      border: '1px solid var(--border-color)',
+                                      background: 'var(--bg-primary)',
+                                      color: 'var(--text-primary)',
+                                      fontSize: '0.84rem',
+                                      fontWeight: 700,
+                                      textAlign: 'center'
+                                    }}
+                                  />
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 700 }}>%</span>
+                                </div>
+                              </div>
+
+                              {/* Hộp xem trước số tiền hoàn & phạt */}
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '8px',
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                background: 'rgba(0,0,0,0.18)',
+                                fontSize: '0.8rem'
+                              }}>
+                                <div>
+                                  <div style={{ color: 'var(--text-muted)' }}>Khách nhận lại ({numPercent}%):</div>
+                                  <div style={{ color: '#10b981', fontWeight: 800, fontSize: '0.92rem' }}>
+                                    +{renterRefundVal.toLocaleString('vi-VN')} Coin
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ color: 'var(--text-muted)' }}>Idol bị thu hồi ({numPercent}%):</div>
+                                  <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.92rem' }}>
+                                    -{playerDeductVal.toLocaleString('vi-VN')} Coin
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.85rem', marginBottom: '10px' }}>
+                      <strong>Mô tả:</strong> {r.description || '—'}
+                    </div>
+                    {/* Link bằng chứng (Google Drive / Link đính kèm) */}
+                    {(r.videoUrl || r.imageUrls) && (
+                      <div style={{ marginBottom: '12px', fontSize: '0.85rem' }}>
+                        <strong>Link bằng chứng:</strong>{' '}
+                        <a
+                          href={r.videoUrl || r.imageUrls}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            color: '#0284c7',
+                            fontWeight: 600,
+                            textDecoration: 'underline',
+                            wordBreak: 'break-all',
+                            marginLeft: '4px'
+                          }}
+                        >
+                          🔗 {r.videoUrl || r.imageUrls}
+                        </a>
+                      </div>
+                    )}
+                    {imageList.length > 1 && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <strong style={{ fontSize: '0.85rem' }}>Ảnh bằng chứng:</strong>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                          {imageList.map((url, idx) => (
+                            <a key={idx} href={url} target="_blank" rel="noreferrer">
+                              <img src={url} alt={`Bằng chứng ${idx + 1}`}
+                                style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                                onError={e => { e.target.style.display = 'none'; }} />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {r.resolution && (
+                      <div style={{ fontSize: '0.85rem', marginBottom: '10px', color: r.status === 'REJECTED' ? '#ef4444' : '#10b981', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <strong>Kết quả xử lý:</strong> <span>{r.resolution}</span>
+                        {r.refundPercentage && (
+                          <span style={{ fontSize: '0.76rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 700 }}>
+                            Hoàn {r.refundPercentage}% ({Number(r.refundAmount || 0).toLocaleString('vi-VN')} Coin)
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {r.status === 'PENDING' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <textarea
+                          placeholder="Ghi chú kết quả xử lý (tuỳ chọn)..."
+                          value={resolutionTexts[r.id] || ''}
+                          onChange={e => setResolutionTexts(prev => ({ ...prev, [r.id]: e.target.value }))}
+                          rows={2}
+                          style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', resize: 'vertical', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem', height: 'auto' }}
+                            onClick={() => handleResolve(r.id)}>
+                            <CheckCircle2 size={14} /> <span>Chấp thuận & Hoàn tiền</span>
+                          </button>
+                          <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.8rem', height: 'auto', borderColor: '#ef4444', color: '#ef4444' }}
+                            onClick={() => handleReject(r.id)}>
+                            <X size={14} /> <span>Từ chối</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                <strong>{r.reportedBy || 'Khách hàng'}</strong> → <strong>{r.targetUser || 'Game thủ'}</strong>: "{r.content || r.reason || '—'}"
-              </div>
-              {r.status !== 'RESOLVED' && (
-                <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem', height: 'auto' }} onClick={() => handleResolve(r.id)}>
-                  <CheckCircle2 size={14} /> <span>Đã xử lý</span>
-                </button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1534,7 +1786,21 @@ export const AdminPage = () => {
           {activeSection === 'orders' && <OrdersTab ordersList={ordersList} loading={loading} />}
           {activeSection === 'games' && <GamesTab gamesList={gamesList} setGamesList={setGamesList} loading={loading} />}
           {activeSection === 'payments' && <PaymentsTab />}
-          {activeSection === 'reports' && <ReportsTab reportsList={reportsList} setReportsList={setReportsList} loading={loading} />}
+          {activeSection === 'reports' && (
+            <ReportsTab
+              reportsList={reportsList}
+              setReportsList={setReportsList}
+              loading={loading}
+              onStatsRefresh={async () => {
+                try {
+                  const comm = await api.getAdminCommissionStats();
+                  if (comm) setCommissionStats(comm);
+                  const allOrd = await api.getAllOrdersAdmin();
+                  if (allOrd) setOrdersList(allOrd);
+                } catch (ignored) {}
+              }}
+            />
+          )}
         </main>
       </div>
     </div>

@@ -13,15 +13,18 @@ import {
   Heart,
   Share2,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  AlertTriangle
 } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
 import AudioWave from '../components/common/AudioWave';
 import api from '../api/apiService';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getUserAvatar } from '../utils/avatarUtils';
 
 export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
+  const { user } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -214,7 +217,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
             </div>
 
             {/* Quick Action CTAs */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <button
                 className="btn btn-secondary"
                 onClick={() => {

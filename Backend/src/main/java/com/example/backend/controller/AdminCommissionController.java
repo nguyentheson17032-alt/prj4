@@ -39,6 +39,7 @@ public class AdminCommissionController {
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final PlayerImageRepository playerImageRepository;
+    private final com.example.backend.repository.ReportRepository reportRepository;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
 
@@ -59,9 +60,30 @@ public class AdminCommissionController {
 
             long hireGmv = 0L;
             long hireCommission = 0L;
+            long activeHireCount = 0L;
+
             for (Order o : validOrders) {
                 long price = o.getPrice() != null ? o.getPrice() : 0L;
                 long fee = o.getPlatformFee() != null ? o.getPlatformFee() : Math.round(price * 0.15);
+
+                if ("REFUNDED".equalsIgnoreCase(o.getStatus())) {
+                    int refundPercent = 100;
+                    if (reportRepository != null) {
+                        com.example.backend.entity.Report rep = reportRepository.findByOrderId(o.getId());
+                        if (rep != null && rep.getRefundPercentage() != null && rep.getRefundPercentage() > 0) {
+                            refundPercent = rep.getRefundPercentage();
+                        }
+                    }
+                    long refundedPrice = Math.round(price * (refundPercent / 100.0));
+                    long refundedFee = Math.round(fee * (refundPercent / 100.0));
+                    price = Math.max(0L, price - refundedPrice);
+                    fee = Math.max(0L, fee - refundedFee);
+                }
+
+                if (price > 0 || !"REFUNDED".equalsIgnoreCase(o.getStatus())) {
+                    activeHireCount++;
+                }
+
                 hireGmv += price;
                 hireCommission += fee;
             }
@@ -95,8 +117,8 @@ public class AdminCommissionController {
                     .donateCommissionRevenue(donateCommission)
                     .totalTransactionVolume(totalGmv)
                     .totalPlayerEarnings(totalPlayerEarnings)
-                    .totalTransactions((long) (validOrders.size() + completedDonates.size()))
-                    .hireTransactions((long) validOrders.size())
+                    .totalTransactions((long) (activeHireCount + completedDonates.size()))
+                    .hireTransactions(activeHireCount)
                     .donateTransactions((long) completedDonates.size())
                     .discountRatePercent(15.0)
                     .build();
@@ -182,6 +204,24 @@ public class AdminCommissionController {
                         String gameName = (o.getPlayer() != null && o.getPlayer().getGame() != null && o.getPlayer().getGame().getName() != null)
                                 ? o.getPlayer().getGame().getName() : "Game";
 
+                        String status = o.getStatus() != null ? o.getStatus() : "PENDING";
+                        String desc = "Thuê " + playerName + " (" + gameName + ")";
+
+                        if ("REFUNDED".equalsIgnoreCase(o.getStatus())) {
+                            int refundPercent = 100;
+                            if (reportRepository != null) {
+                                com.example.backend.entity.Report rep = reportRepository.findByOrderId(o.getId());
+                                if (rep != null && rep.getRefundPercentage() != null && rep.getRefundPercentage() > 0) {
+                                    refundPercent = rep.getRefundPercentage();
+                                }
+                            }
+                            long refundedFee = Math.round(fee * (refundPercent / 100.0));
+                            long refundedRecv = Math.round(recv * (refundPercent / 100.0));
+                            fee = Math.max(0L, fee - refundedFee);
+                            recv = Math.max(0L, recv - refundedRecv);
+                            desc = "Thuê " + playerName + " (" + gameName + ") [Đã hoàn " + refundPercent + "%]";
+                        }
+
                         CommissionTransactionDTO dto = CommissionTransactionDTO.builder()
                                 .id(o.getId())
                                 .transactionCode("HIRE-" + o.getId())
@@ -201,8 +241,8 @@ public class AdminCommissionController {
                                 .discountRate(0.15)
                                 .platformFee(fee)
                                 .playerReceived(recv)
-                                .status(o.getStatus() != null ? o.getStatus() : "PENDING")
-                                .description("Thuê " + playerName + " (" + gameName + ")")
+                                .status(status)
+                                .description(desc)
                                 .build();
 
                         result.add(dto);

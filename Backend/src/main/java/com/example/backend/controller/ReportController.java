@@ -43,24 +43,34 @@ public class ReportController {
     @Operation(summary = "Create a new report")
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Report> createReport(
+    public ResponseEntity<?> createReport(
             @Valid @RequestBody ReportRequest request,
             Authentication authentication) {
         try {
             User reporter = userService.findByUsername(authentication.getName());
-            User reportedUser = userService.findById(request.getReportedPlayerId());
             
+            String proofLink = request.getEvidenceUrl() != null && !request.getEvidenceUrl().trim().isEmpty()
+                    ? request.getEvidenceUrl().trim()
+                    : (request.getVideo() != null && !request.getVideo().trim().isEmpty()
+                            ? request.getVideo().trim()
+                            : request.getImageUrls());
+
             Report report = reportService.createReport(
                     request.getReportedPlayerId(),
                     reporter.getId(),
+                    request.getOrderId(),
                     request.getReason(),
                     request.getDescription(),
-                    request.getVideo()
+                    proofLink,
+                    proofLink
             );
             
-            // Gửi thông báo cho admin về tố cáo mới
+            // Gửi thông báo cho admin về tố cáo mới (lấy đúng User sở hữu GamePlayer)
             try {
-                adminNotificationService.notifyAdminsAboutReport(reporter, reportedUser, request.getReason());
+                User reportedUser = report.getReportedPlayer() != null ? report.getReportedPlayer().getUser() : null;
+                if (reportedUser != null) {
+                    adminNotificationService.notifyAdminsAboutReport(reporter, reportedUser, request.getReason());
+                }
             } catch (Exception e) {
                 System.err.println("[ReportController] Error calling adminNotificationService.notifyAdminsAboutReport: " + e.getMessage());
                 e.printStackTrace();
@@ -68,17 +78,16 @@ public class ReportController {
             
             return ResponseEntity.ok(report);
         } catch (ReportException e) {
-            if (e.getMessage() != null && e.getMessage().contains("already reported")) {
-                return ResponseEntity.badRequest().body(null);
-            }
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Report failed"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Error creating report"));
         }
     }
 
     @Operation(summary = "Create a new report with video file")
     @PostMapping("/with-video")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Report> createReportWithVideo(
+    public ResponseEntity<?> createReportWithVideo(
             @RequestParam("reportedPlayerId") Long reportedPlayerId,
             @RequestParam("reason") String reason,
             @RequestParam("description") String description,
@@ -86,7 +95,6 @@ public class ReportController {
             Authentication authentication) {
         try {
             User reporter = userService.findByUsername(authentication.getName());
-            User reportedUser = userService.findById(reportedPlayerId);
             
             String videoUrl = null;
             if (videoFile != null && !videoFile.isEmpty()) {
@@ -109,13 +117,13 @@ public class ReportController {
                 }
                 
                 if (!isValidVideo) {
-                    return ResponseEntity.badRequest().body(null);
+                    return ResponseEntity.badRequest().body(java.util.Map.of("message", "Định dạng video không hợp lệ"));
                 }
                 
                 // Validate file size (max 50MB for video)
                 long fileSize = videoFile.getSize();
                 if (fileSize > 50 * 1024 * 1024) {
-                    return ResponseEntity.badRequest().body(null);
+                    return ResponseEntity.badRequest().body(java.util.Map.of("message", "Dung lượng video không được vượt quá 50MB"));
                 }
                 
                 // Store video file
@@ -127,12 +135,16 @@ public class ReportController {
                     reporter.getId(),
                     reason,
                     description,
-                    videoUrl
+                    videoUrl,
+                    null
             );
             
-            // Gửi thông báo cho admin về tố cáo mới
+            // Gửi thông báo cho admin về tố cáo mới (lấy đúng User sở hữu GamePlayer)
             try {
-                adminNotificationService.notifyAdminsAboutReport(reporter, reportedUser, reason);
+                User reportedUser = report.getReportedPlayer() != null ? report.getReportedPlayer().getUser() : null;
+                if (reportedUser != null) {
+                    adminNotificationService.notifyAdminsAboutReport(reporter, reportedUser, reason);
+                }
             } catch (Exception e) {
                 System.err.println("[ReportController] Error calling adminNotificationService.notifyAdminsAboutReport: " + e.getMessage());
                 e.printStackTrace();
@@ -140,12 +152,9 @@ public class ReportController {
             
             return ResponseEntity.ok(report);
         } catch (ReportException e) {
-            if (e.getMessage() != null && e.getMessage().contains("already reported")) {
-                return ResponseEntity.badRequest().body(null);
-            }
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Report failed"));
         } catch (IOException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "Lỗi tải lên tệp tin: " + e.getMessage()));
         }
     }
 
@@ -159,7 +168,8 @@ public class ReportController {
             Report report = reportService.updateReportStatus(
                     id,
                     request.getStatus(),
-                    request.getResolution()
+                    request.getResolution(),
+                    request.getRefundPercentage()
             );
             return ResponseEntity.ok(report);
         } catch (ResourceNotFoundException e) {
@@ -223,6 +233,9 @@ class ReportRequest {
     @NotNull(message = "Reported player ID is required")
     private Long reportedPlayerId;
 
+    // ID đơn hàng liên quan đến khiếu nại (có thể null nếu tố cáo ngoài đơn)
+    private Long orderId;
+
     @NotBlank(message = "Reason is required")
     private String reason;
 
@@ -231,6 +244,12 @@ class ReportRequest {
 
     // URL video bằng chứng (có thể null)
     private String video;
+
+    // Danh sách URL ảnh bằng chứng, cách nhau bởi dấu phẩy (có thể null)
+    private String imageUrls;
+
+    // Link bằng chứng tổng hợp (Google Drive, ảnh, video...)
+    private String evidenceUrl;
 }
 
 @Data
@@ -239,6 +258,9 @@ class UpdateStatusRequest {
     private String status;
 
     private String resolution;
+
+    // % hoàn tiền (1 đến 100), áp dụng khi status là RESOLVED
+    private Integer refundPercentage;
 }
 
 @Data

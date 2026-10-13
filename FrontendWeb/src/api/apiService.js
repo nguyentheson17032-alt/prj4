@@ -111,6 +111,8 @@ export const normalizeOrder = (o) => {
     hours,
     status,
     statusLabel: o.statusLabel,
+    isReported: Boolean(o.isReported),
+    reportStatus: o.reportStatus || null,
     player: {
       id: playerId,
       userId: playerUserId,
@@ -532,6 +534,36 @@ export const api = {
   async getReports() {
     try {
       const res = await client.get('/api/reports');
+      if (Array.isArray(res.data)) return res.data;
+      if (res.data && Array.isArray(res.data.data)) return res.data.data;
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async createReport({ reportedPlayerId, orderId, reason, description, video, imageUrls, evidenceUrl }) {
+    const proof = evidenceUrl || video || imageUrls || null;
+    const res = await client.post('/api/reports', {
+      reportedPlayerId: Number(reportedPlayerId),
+      orderId: orderId ? Number(orderId) : null,
+      reason,
+      description,
+      video: proof,
+      evidenceUrl: proof,
+      imageUrls: proof,
+    });
+    return res.data;
+  },
+
+  async updateReportStatus(reportId, status, resolution = '', refundPercentage = 100) {
+    const res = await client.put(`/api/reports/${reportId}/status`, { status, resolution, refundPercentage });
+    return res.data;
+  },
+
+  async getMyReports() {
+    try {
+      const res = await client.get('/api/reports/reporter');
       if (Array.isArray(res.data)) return res.data;
       if (res.data && Array.isArray(res.data.data)) return res.data.data;
       return [];
