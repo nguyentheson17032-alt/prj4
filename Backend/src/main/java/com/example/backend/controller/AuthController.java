@@ -453,15 +453,24 @@ public class AuthController {
     @PostMapping("/change-password")
     @Transactional
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> request, Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Vui lòng đăng nhập để thực hiện"));
+        }
         String oldPassword = request.get("oldPassword");
         String newPassword = request.get("newPassword");
-        if (oldPassword == null || newPassword == null || newPassword.isBlank()) {
-            return ResponseEntity.badRequest().body("Mật khẩu cũ và mật khẩu mới là bắt buộc");
+        if (oldPassword == null || oldPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu hiện tại và mật khẩu mới là bắt buộc"));
+        }
+        if (newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu mới phải có ít nhất 6 ký tự"));
         }
         User user = userService.findByUsername(authentication.getName());
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Không tìm thấy thông tin tài khoản"));
+        }
         org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
         if (!encoder.matches(oldPassword, user.getPassword())) {
-            return ResponseEntity.badRequest().body("Mật khẩu cũ không đúng");
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu hiện tại không chính xác"));
         }
         user.setPassword(encoder.encode(newPassword));
         userService.save(user);

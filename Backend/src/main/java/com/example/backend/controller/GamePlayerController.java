@@ -1280,26 +1280,100 @@ public class GamePlayerController {
     @Operation(summary = "Get player stats for profile page")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getPlayerStats(@PathVariable Long id) {
         GamePlayer gp = gamePlayerService.findById(id);
-        long completedOrders = orderRepository.countCompletedOrdersByPlayerId(gp.getId());
-        long canceledOrders = orderRepository.countCanceledOrdersByPlayerId(gp.getId());
+        Long userId = gp.getUser() != null ? gp.getUser().getId() : null;
+
+        // Lấy tất cả các GamePlayer của Idol (User) này để tổng hợp thống kê toàn diện
+        List<GamePlayer> userGamePlayers = userId != null ? gamePlayerService.getGamePlayersByUser(userId) : List.of(gp);
+        List<Long> gpIds = userGamePlayers != null && !userGamePlayers.isEmpty()
+                ? userGamePlayers.stream().map(GamePlayer::getId).collect(Collectors.toList())
+                : List.of(gp.getId());
+
+        long completedOrders = 0L;
+        long canceledOrders = 0L;
+        long totalHours = 0L;
+
+        for (Long pId : gpIds) {
+            completedOrders += orderRepository.countCompletedOrdersByPlayerId(pId);
+            canceledOrders += orderRepository.countCanceledOrdersByPlayerId(pId);
+
+            List<Order> completedOrderList = orderRepository.findByPlayer_IdAndStatus(pId, "COMPLETED");
+            BigDecimal pPrice = null;
+            if (userGamePlayers != null) {
+                for (GamePlayer ugp : userGamePlayers) {
+                    if (ugp.getId().equals(pId)) {
+                        pPrice = ugp.getPricePerHour();
+                        break;
+                    }
+                }
+            }
+            final BigDecimal effectivePrice = pPrice != null ? pPrice : gp.getPricePerHour();
+            totalHours += completedOrderList.stream()
+                .mapToLong(o -> {
+                    if (o.getStartTime() != null && o.getEndTime() != null) {
+                        long h = java.time.Duration.between(o.getStartTime(), o.getEndTime()).toHours();
+                        if (h > 0) return h;
+                    }
+                    if (o.getPrice() != null && effectivePrice != null && effectivePrice.compareTo(BigDecimal.ZERO) > 0) {
+                        long h = Math.round((double) o.getPrice() / effectivePrice.doubleValue());
+                        if (h > 0) return h;
+                    }
+                    return 1L;
+                })
+                .sum();
+        }
+
         Double avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gp.getId());
         int reviewCount = playerReviewRepository.findByGamePlayerId(gp.getId()).size();
 
-        // Tính tổng giờ chơi đã được thuê dựa trên số đơn đã hoàn thành
-        List<Order> completedOrderList = orderRepository.findByPlayer_IdAndStatus(gp.getId(), "COMPLETED");
-        long totalHours = completedOrderList.stream()
-            .mapToLong(o -> {
-                if (o.getStartTime() != null && o.getEndTime() != null) {
-                    long h = java.time.Duration.between(o.getStartTime(), o.getEndTime()).toHours();
-                    if (h > 0) return h;
+        // 1. Tính Exp từ số giờ chơi hoàn thành (1 giờ = 600 Exp)
+        long playExp = totalHours * 600L;
+
+        // 2. Tính số quà tặng đã nhận và Exp từ quà tặng (DONATE)
+        long giftExp = 0L;
+        long giftCount = 0L;
+        long giftCoin = 0L;
+
+        // Ưu tiên 1: Lấy từ lịch sử nhận quà trực tiếp của Idol (chính xác 100%, không bị trùng lặp)
+        List<Payment> myDonates = userId != null ? paymentRepository.findDonateHistoryByUserId(userId) : List.of();
+        for (Payment p : myDonates) {
+            if (p.getStatus() != Payment.PaymentStatus.COMPLETED) continue;
+            String desc = p.getDescription() != null ? p.getDescription().toLowerCase() : "";
+            boolean isReceive = desc.startsWith("nhận") || desc.contains("nhận quà") || desc.contains("nhận donate") || p.getPlayerReceived() != null;
+            if (isReceive) {
+                Long orig = p.getOriginalAmount() != null && p.getOriginalAmount() > 0 ? p.getOriginalAmount() : (p.getCoin() != null ? p.getCoin() : 0L);
+                if (orig > 0) {
+                    giftCount++;
+                    giftExp += PaymentController.calculateExpFromCoin(orig, desc);
+                    giftCoin += orig;
                 }
-                if (o.getPrice() != null && gp.getPricePerHour() != null && gp.getPricePerHour().compareTo(BigDecimal.ZERO) > 0) {
-                    long h = Math.round((double) o.getPrice() / gp.getPricePerHour().doubleValue());
-                    if (h > 0) return h;
+            }
+        }
+
+        // Dự phòng 2: Nếu chưa có bản ghi nhận quà theo User, quét qua tất cả Payment DONATE
+        if (giftCount == 0) {
+            List<Payment> donatePayments = paymentRepository.findByTypeOrderByCreatedAtDesc(Payment.PaymentType.DONATE);
+            for (Payment p : donatePayments) {
+                if (p.getStatus() != Payment.PaymentStatus.COMPLETED) continue;
+                Long coin = p.getOriginalAmount() != null && p.getOriginalAmount() > 0 ? p.getOriginalAmount() : (p.getCoin() != null ? p.getCoin() : 0L);
+                if (coin <= 0) continue;
+
+                String desc = p.getDescription() != null ? p.getDescription().toLowerCase() : "";
+                boolean isReceive = desc.startsWith("nhận") || desc.contains("nhận quà") || desc.contains("nhận donate");
+
+                if (!isReceive) {
+                    boolean isMatch = (userId != null && p.getPlayer() != null && p.getPlayer().getId().equals(userId))
+                            || (p.getGamePlayer() != null && gpIds.contains(p.getGamePlayer().getId()))
+                            || (p.getPlayer() != null && gpIds.contains(p.getPlayer().getId()));
+                    if (isMatch) {
+                        giftCount++;
+                        giftExp += PaymentController.calculateExpFromCoin(coin, desc);
+                        giftCoin += coin;
+                    }
                 }
-                return 1L;
-            })
-            .sum();
+            }
+        }
+
+        long totalExp = playExp + giftExp;
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("id", gp.getId());
@@ -1314,6 +1388,14 @@ public class GamePlayerController {
         stats.put("rank", gp.getRank());
         stats.put("game", gp.getGame() != null ? gp.getGame().getName() : "");
         stats.put("description", gp.getDescription());
+
+        // Điểm Exp và Quà tặng
+        stats.put("exp", totalExp);
+        stats.put("playExp", playExp);
+        stats.put("giftExp", giftExp);
+        stats.put("giftCount", giftCount);
+        stats.put("receivedGiftsCount", giftCount);
+        stats.put("giftCoin", giftCoin);
 
         return ResponseEntity.ok(new ApiResponse<>(true, "Player stats retrieved successfully", stats));
     }

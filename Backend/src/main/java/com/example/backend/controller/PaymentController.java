@@ -1091,7 +1091,7 @@ public class PaymentController {
         return ResponseEntity.ok(res);
     }
 
-    private long calculateExpFromCoin(Long coin, String desc) {
+    public static long calculateExpFromCoin(Long coin, String desc) {
         if (coin == null || coin <= 0) return 0;
         if (coin % 1000000L == 0) return (coin / 1000000L) * 8000L;
         if (coin % 500000L == 0) return (coin / 500000L) * 3500L;

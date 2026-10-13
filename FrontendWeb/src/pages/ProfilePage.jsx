@@ -3,12 +3,30 @@ import { createPortal } from 'react-dom';
 import {
   User, Mail, Phone, Lock, Save, Sparkles, ShieldCheck,
   Star, MessageSquare, CheckCircle, XCircle, Clock, Coins,
-  ChevronRight, X, Edit2, TrendingUp, Award, Gamepad2, Pencil
+  ChevronRight, X, Edit2, TrendingUp, Award, Gamepad2, Pencil,
+  Gift, Zap, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getUserAvatar, getFunAvatar, FUN_AVATAR_STYLES } from '../utils/avatarUtils';
 import api from '../api/apiService';
+
+export const calculateExpFromCoin = (coin, desc = '') => {
+  if (!coin || coin <= 0) return 0;
+  if (coin % 1000000 === 0) return (coin / 1000000) * 8000;
+  if (coin % 500000 === 0) return (coin / 500000) * 3500;
+  if (coin % 200000 === 0) return (coin / 200000) * 1200;
+  if (coin % 100000 === 0) return (coin / 100000) * 600;
+  if (coin % 50000 === 0) return (coin / 50000) * 250;
+  if (coin % 30000 === 0) return (coin / 30000) * 150;
+  if (coin >= 1000000) return 8000;
+  if (coin >= 500000) return 3500;
+  if (coin >= 200000) return 1200;
+  if (coin >= 100000) return 600;
+  if (coin >= 50000) return 250;
+  if (coin >= 30000) return 150;
+  return Math.round(coin * 0.006);
+};
 
 const SERVERS = [
   { value: 'VN', label: 'Việt Nam' },
@@ -233,12 +251,127 @@ const ReviewsModal = ({ isOpen, onClose, reviews, playerName, rating, reviewCoun
   );
 };
 
-const StatCard = ({ icon, label, value, color, suffix = '', sublabel = '' }) => (
-  <div className="glass-panel" style={{ padding: '16px 20px', flex: '1', minWidth: '130px', textAlign: 'center' }}>
+// Modal hiển thị danh sách quà tặng đã nhận
+const ReceivedGiftsModal = ({ isOpen, onClose, gifts, playerName, totalGifts, giftExp, giftCoin }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="glass-panel"
+        style={{ width: '100%', maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: '0', overflow: 'hidden' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Gift size={20} color="#ec4899" />
+              <span>Quà Tặng Của {playerName}</span>
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <span>🎁 {totalGifts} món quà</span>
+              <span>· ⚡ +{Number(giftExp || 0).toLocaleString('vi-VN')} Exp</span>
+              {giftCoin > 0 && <span>· 💰 {Number(giftCoin).toLocaleString('vi-VN')} đ</span>}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-muted)' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Gifts list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+          {gifts.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Gift size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
+              <p>Chưa có quà tặng nào từ người hâm mộ</p>
+            </div>
+          ) : (
+            gifts.map((g, i) => {
+              const origCoin = Number(g.originalAmount || g.coin || 0);
+              const recv = Number(g.playerReceived || (origCoin * 0.85));
+              const sender = g.partnerName || 'Người hâm mộ ẩn danh';
+              const cleanDesc = (g.description || '')
+                .replace(/^Nhận quà từ [^:]+:\s*/i, '')
+                .replace(/^Tặng quà cho [^:]+:\s*/i, '')
+                .replace(/\(Đã khấu trừ 15% phí hệ thống\):\s*/i, '');
+
+              return (
+                <div key={g.id || i} style={{ padding: '14px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <img
+                    src={g.partnerAvatar || getUserAvatar({ username: sender })}
+                    alt=""
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>{sender}</span>
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ec4899' }}>
+                        +{recv.toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                    {cleanDesc && (
+                      <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0', lineHeight: 1.4 }}>
+                        💬 "{cleanDesc}"
+                      </p>
+                    )}
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '10px' }}>
+                      <span>{g.createdAt || ''}</span>
+                      {origCoin > 0 && <span>(Gốc: {origCoin.toLocaleString('vi-VN')} đ)</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatCard = ({ icon, label, value, color, suffix = '', sublabel = '', onClick }) => (
+  <div
+    className="glass-panel"
+    onClick={onClick}
+    style={{
+      padding: '18px 14px',
+      textAlign: 'center',
+      cursor: onClick ? 'pointer' : 'default',
+      transition: 'all 0.15s ease',
+      border: onClick ? '1px solid rgba(236,72,153,0.35)' : undefined,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '120px',
+    }}
+  >
     <div style={{ color: color || 'var(--primary)', marginBottom: '6px', display: 'flex', justifyContent: 'center' }}>{icon}</div>
-    <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1.2 }}>{value}<span style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '2px' }}>{suffix}</span></div>
-    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>{label}</div>
-    {sublabel && <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>{sublabel}</div>}
+    <div style={{ fontSize: '1.45rem', fontWeight: 800, lineHeight: 1.2 }}>{value}<span style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '3px' }}>{suffix}</span></div>
+    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: 600 }}>{label}</div>
+    {sublabel && (
+      <div style={{
+        fontSize: '0.74rem',
+        color: 'var(--text-muted)',
+        marginTop: '3px',
+        lineHeight: 1.35,
+        wordBreak: 'break-word',
+      }}>
+        {sublabel}
+      </div>
+    )}
   </div>
 );
 
@@ -270,16 +403,22 @@ export const ProfilePage = () => {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Player state
   const [playerProfile, setPlayerProfile] = useState(null);
   const [allGamePlayers, setAllGamePlayers] = useState([]);
   const [playerStats, setPlayerStats] = useState(null);
   const [reviews, setReviews] = useState([]);
+  const [receivedGifts, setReceivedGifts] = useState([]);
   const [gameInfoInputs, setGameInfoInputs] = useState({});
   const [savingInfoId, setSavingInfoId] = useState(null);
   const [editingGame, setEditingGame] = useState(null); // { gpId, gameName, form }
   const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [showGiftsModal, setShowGiftsModal] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
 
   // Load player data if user is player
@@ -308,6 +447,14 @@ export const ProfilePage = () => {
 
         const revData = await api.getReviewsByPlayerId(players[0].id);
         setReviews(Array.isArray(revData) ? revData : []);
+
+        try {
+          const donateRes = await api.getDonateHistory();
+          const gifts = (donateRes || []).filter(d => d.isReceive || (d.description && d.description.toLowerCase().includes('nhận quà')));
+          setReceivedGifts(gifts);
+        } catch (err) {
+          console.warn('Load donate history error:', err.message);
+        }
       } catch (e) {
         console.warn('Load player data error:', e.message);
       } finally {
@@ -330,12 +477,41 @@ export const ProfilePage = () => {
     addToast('Đã lưu thông tin hồ sơ thành công!', 'success');
   };
 
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!oldPassword || !newPassword) { addToast('Vui lòng điền đầy đủ thông tin mật khẩu!', 'error'); return; }
-    if (newPassword !== confirmPassword) { addToast('Mật khẩu xác nhận không khớp!', 'error'); return; }
-    addToast('Đã đổi mật khẩu thành công!', 'success');
-    setOldPassword(''); setNewPassword(''); setConfirmPassword('');
+    if (!oldPassword || !newPassword) {
+      addToast('Vui lòng điền đầy đủ mật khẩu hiện tại và mật khẩu mới!', 'error');
+      return;
+    }
+    if (newPassword.length < 6) {
+      addToast('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      addToast('Mật khẩu xác nhận không khớp với mật khẩu mới!', 'error');
+      return;
+    }
+    if (oldPassword === newPassword) {
+      addToast('Mật khẩu mới không được trùng với mật khẩu hiện tại!', 'error');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const res = await api.changePassword(oldPassword, newPassword);
+      addToast(res?.message || 'Đã đổi mật khẩu thành công!', 'success');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowOldPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data || err.message || 'Đổi mật khẩu thất bại!';
+      addToast(msg, 'error');
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const openEditModal = (gp) => {
@@ -389,6 +565,24 @@ export const ProfilePage = () => {
     ? stats.totalHours
     : (stats.totalMinutesHired ? Math.round(stats.totalMinutesHired / 60) : (completedOrders > 0 ? completedOrders * 2 : 0));
 
+  // Tính Exp và Quà tặng: kết hợp dữ liệu stats từ backend và lịch sử quà receivedGifts
+  const localGiftExp = receivedGifts.reduce((sum, g) => {
+    const origCoin = Number(g.originalAmount || g.coin || 0);
+    return sum + calculateExpFromCoin(origCoin, g.description);
+  }, 0);
+  const localGiftCoin = receivedGifts.reduce((sum, g) => {
+    return sum + Number(g.originalAmount || g.coin || 0);
+  }, 0);
+
+  const giftCount = stats.giftCount && stats.giftCount > 0
+    ? stats.giftCount
+    : (stats.receivedGiftsCount && stats.receivedGiftsCount > 0 ? stats.receivedGiftsCount : receivedGifts.length);
+
+  const playExp = stats.playExp !== undefined && stats.playExp > 0 ? stats.playExp : (totalHours * 600);
+  const giftExp = (stats.giftExp && stats.giftExp > 0) ? stats.giftExp : localGiftExp;
+  const giftCoin = (stats.giftCoin && stats.giftCoin > 0) ? stats.giftCoin : localGiftCoin;
+  const exp = (stats.exp && stats.exp > 0) ? stats.exp : (playExp + giftExp);
+
   return (
     <div className="container animate-fade-in" style={{ maxWidth: '800px', paddingBottom: '80px' }}>
       <div style={{ marginBottom: '28px' }}>
@@ -423,33 +617,121 @@ export const ProfilePage = () => {
             <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>Đang tải thống kê...</div>
           ) : (
             <>
-              {/* Stats cards */}
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                <StatCard icon={<Star size={22} fill="#f59e0b" color="#f59e0b" />} label="Đánh giá trung bình" value={rating ? rating.toFixed(1) : '—'} suffix="/ 5" color="#f59e0b" />
-                <StatCard icon={<CheckCircle size={22} color="#22c55e" />} label="Đơn hoàn thành" value={completedOrders} suffix="đơn" color="#22c55e" />
-                <StatCard icon={<XCircle size={22} color="#ef4444" />} label="Đơn đã hủy" value={canceledOrders} suffix="đơn" color="#ef4444" />
-                <StatCard icon={<Clock size={22} color="#06b6d4" />} label="Tổng giờ chơi" value={totalHours} suffix="giờ" sublabel="Từ đơn hoàn thành" color="#06b6d4" />
+              {/* Stats cards - 3 ô 1 hàng */}
+              <style>{`
+                .idol-stats-grid {
+                  display: grid;
+                  grid-template-columns: repeat(3, 1fr);
+                  gap: 14px;
+                  margin-bottom: 20px;
+                }
+                @media (max-width: 680px) {
+                  .idol-stats-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                  }
+                }
+                @media (max-width: 440px) {
+                  .idol-stats-grid {
+                    grid-template-columns: 1fr;
+                  }
+                }
+              `}</style>
+              <div className="idol-stats-grid">
+                <StatCard
+                  icon={<Zap size={22} color="#a855f7" />}
+                  label="Điểm EXP"
+                  value={exp != null ? Number(exp).toLocaleString('vi-VN') : '0'}
+                  suffix="Exp"
+                  sublabel={`Chơi: ${playExp.toLocaleString('vi-VN')} · Quà: ${giftExp.toLocaleString('vi-VN')}`}
+                  color="#a855f7"
+                />
+                <StatCard
+                  icon={<Gift size={22} color="#ec4899" />}
+                  label="Số quà đã nhận"
+                  value={giftCount}
+                  suffix="quà"
+                  sublabel={giftCoin > 0 ? `Trị giá: ${Number(giftCoin).toLocaleString('vi-VN')} đ` : (receivedGifts.length > 0 ? `${receivedGifts.length} lượt tặng` : 'Từ người hâm mộ')}
+                  color="#ec4899"
+                  onClick={receivedGifts.length > 0 || giftCount > 0 ? () => setShowGiftsModal(true) : undefined}
+                />
+                <StatCard
+                  icon={<Star size={22} fill="#f59e0b" color="#f59e0b" />}
+                  label="Đánh giá trung bình"
+                  value={rating ? rating.toFixed(1) : '—'}
+                  suffix="/ 5"
+                  sublabel={reviewCount > 0 ? `${reviewCount} lượt đánh giá` : 'Chưa có đánh giá'}
+                  color="#f59e0b"
+                />
+                <StatCard
+                  icon={<CheckCircle size={22} color="#22c55e" />}
+                  label="Đơn hoàn thành"
+                  value={completedOrders}
+                  suffix="đơn"
+                  sublabel="Đã hoàn tất"
+                  color="#22c55e"
+                />
+                <StatCard
+                  icon={<XCircle size={22} color="#ef4444" />}
+                  label="Đơn đã hủy"
+                  value={canceledOrders}
+                  suffix="đơn"
+                  sublabel={canceledOrders === 0 ? 'Tỷ lệ hủy 0%' : 'Đơn bị hủy/từ chối'}
+                  color="#ef4444"
+                />
+                <StatCard
+                  icon={<Clock size={22} color="#06b6d4" />}
+                  label="Tổng giờ chơi"
+                  value={totalHours}
+                  suffix="giờ"
+                  sublabel="Từ đơn hoàn thành"
+                  color="#06b6d4"
+                />
               </div>
 
-              {/* Reviews summary */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '14px 18px', marginBottom: '24px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <MessageSquare size={20} color="var(--primary)" />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{reviewCount} lượt đánh giá</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ color: '#f59e0b' }}>{'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}</span>
-                      <span>{rating ? `${rating.toFixed(1)} / 5` : 'Chưa có đánh giá'}</span>
+              {/* Summary bars: Reviews & Gifts */}
+              <div style={{ display: 'grid', gridTemplateColumns: giftCount > 0 ? 'repeat(auto-fit, minmax(260px, 1fr))' : '1fr', gap: '12px', marginBottom: '24px' }}>
+                {/* Reviews summary */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '14px 18px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <MessageSquare size={20} color="var(--primary)" />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{reviewCount} lượt đánh giá</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: '#f59e0b' }}>{'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}</span>
+                        <span>{rating ? `${rating.toFixed(1)} / 5` : 'Chưa có đánh giá'}</span>
+                      </div>
                     </div>
                   </div>
+                  <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.82rem', gap: '6px', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => setShowReviewsModal(true)}>
+                    <span>Xem chi tiết</span>
+                    <ChevronRight size={14} />
+                  </button>
                 </div>
-                <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.82rem', gap: '6px', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => setShowReviewsModal(true)}>
-                  <span>Xem chi tiết</span>
-                  <ChevronRight size={14} />
-                </button>
+
+                {/* Gifts summary (hiển thị khi có quà) */}
+                {giftCount > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.18)', borderRadius: '12px', padding: '14px 18px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <Gift size={20} color="#ec4899" />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{giftCount} quà tặng từ Fan</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          +{Number(giftExp || 0).toLocaleString('vi-VN')} Exp tích lũy {giftCoin > 0 ? `· ${Number(giftCoin).toLocaleString('vi-VN')} đ` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.82rem', gap: '6px', borderColor: '#ec4899', color: '#ec4899' }} onClick={() => setShowGiftsModal(true)}>
+                      <span>Xem quà nhận</span>
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Per-game cards: 2-column grid */}
@@ -616,31 +898,100 @@ export const ProfilePage = () => {
 
       {/* ========== PASSWORD CHANGE ========== */}
       <form onSubmit={handleChangePassword} className="glass-panel" style={{ padding: '32px' }}>
-        <h3 style={{ fontSize: '1.2rem', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <h3 style={{ fontSize: '1.2rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Lock size={20} color="var(--secondary)" />
           <span>Đổi Mật Khẩu Bảo Mật</span>
         </h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '24px' }}>
+          Để bảo vệ tài khoản, vui lòng đặt mật khẩu mới có ít nhất 6 ký tự và không chia sẻ cho người khác.
+        </p>
 
-        <div className="form-group">
-          <label className="form-label">Mật Khẩu Hiện Tại:</label>
-          <input type="password" className="form-control" placeholder="••••••••" value={oldPassword} onChange={e => setOldPassword(e.target.value)} />
+        <div className="form-group" style={{ marginBottom: '18px' }}>
+          <label className="form-label" style={{ fontWeight: 600 }}>Mật Khẩu Hiện Tại *:</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showOldPassword ? 'text' : 'password'}
+              className="form-control"
+              placeholder="Nhập mật khẩu hiện tại"
+              value={oldPassword}
+              onChange={e => setOldPassword(e.target.value)}
+              style={{ paddingRight: '44px' }}
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowOldPassword(!showOldPassword)}
+              style={{
+                position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', color: showOldPassword ? 'var(--primary)' : 'var(--text-muted)',
+                padding: '6px', display: 'flex', alignItems: 'center', transition: 'color 0.15s'
+              }}
+              title={showOldPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            >
+              {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Mật Khẩu Mới:</label>
-            <input type="password" className="form-control" placeholder="••••••••" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '18px' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Mật Khẩu Mới * (Tối thiểu 6 ký tự):</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                className="form-control"
+                placeholder="Nhập mật khẩu mới"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                style={{ paddingRight: '44px' }}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                style={{
+                  position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: showNewPassword ? 'var(--primary)' : 'var(--text-muted)',
+                  padding: '6px', display: 'flex', alignItems: 'center', transition: 'color 0.15s'
+                }}
+                title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Xác Nhận Mật Khẩu Mới:</label>
-            <input type="password" className="form-control" placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Xác Nhận Mật Khẩu Mới *:</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                className="form-control"
+                placeholder="Nhập lại mật khẩu mới"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                style={{ paddingRight: '44px' }}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: showConfirmPassword ? 'var(--primary)' : 'var(--text-muted)',
+                  padding: '6px', display: 'flex', alignItems: 'center', transition: 'color 0.15s'
+                }}
+                title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-          <button type="submit" className="btn btn-cyan">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+          <button type="submit" className="btn btn-cyan" disabled={changingPassword} style={{ minWidth: '170px', gap: '8px' }}>
             <ShieldCheck size={16} />
-            <span>Cập Nhật Mật Khẩu</span>
+            <span>{changingPassword ? 'Đang cập nhật...' : 'Cập Nhật Mật Khẩu'}</span>
           </button>
         </div>
       </form>
@@ -666,6 +1017,19 @@ export const ProfilePage = () => {
           playerName={playerProfile?.username || user?.username || 'Idol'}
           rating={rating}
           reviewCount={reviewCount}
+        />,
+        document.body
+      )}
+
+      {createPortal(
+        <ReceivedGiftsModal
+          isOpen={showGiftsModal}
+          onClose={() => setShowGiftsModal(false)}
+          gifts={receivedGifts}
+          playerName={playerProfile?.username || user?.username || 'Idol'}
+          totalGifts={giftCount}
+          giftExp={giftExp}
+          giftCoin={giftCoin}
         />,
         document.body
       )}

@@ -192,6 +192,14 @@ export const api = {
     }
   },
 
+  async changePassword(oldPassword, newPassword) {
+    const res = await client.post('/api/auth/change-password', {
+      oldPassword,
+      newPassword
+    });
+    return res.data;
+  },
+
   // Games
   async getGames() {
     try {
