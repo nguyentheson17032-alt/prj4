@@ -8,11 +8,51 @@ import {
   QrCode,
   ShieldCheck,
   Clock,
-  Sparkles
+  Sparkles,
+  Gift
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/apiService';
 import '../styles/wallet.css';
+
+const parseToTimestamp = (dateVal) => {
+  if (!dateVal) return 0;
+  if (typeof dateVal === 'number') return dateVal;
+  if (dateVal instanceof Date) return dateVal.getTime();
+
+  const str = String(dateVal).trim();
+
+  // Dạng "HH:mm dd/MM/yyyy" hoặc "HH:mm:ss dd/MM/yyyy" (ví dụ từ backend: "18:03 12/10/2026")
+  const timeDateMatch = str.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s+(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (timeDateMatch) {
+    const [, hours, minutes, seconds = 0, day, month, year] = timeDateMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds)).getTime();
+  }
+
+  // Dạng "dd/MM/yyyy HH:mm" hoặc "dd/MM/yyyy" (ví dụ: "12/10/2026 18:03" hoặc "12/10/2026")
+  const dateTimeMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (dateTimeMatch) {
+    const [, day, month, year, hours = 0, minutes = 0, seconds = 0] = dateTimeMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds)).getTime();
+  }
+
+  // Dạng ISO chuẩn từ LocalDateTime: "2026-10-13T09:59:12" hoặc tương tự
+  const parsed = new Date(str).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+const formatTransactionDate = (dateVal) => {
+  if (!dateVal) return 'Hôm nay';
+  const ts = parseToTimestamp(dateVal);
+  if (!ts) return String(dateVal);
+  const d = new Date(ts);
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${hours}:${minutes} ${day}/${month}/${year}`;
+};
 
 export const WalletPage = ({ onOpenDeposit }) => {
   const { user, refreshUser } = useAuth();
@@ -30,15 +70,17 @@ export const WalletPage = ({ onOpenDeposit }) => {
     const fetchTransactions = async () => {
       setLoading(true);
       try {
-        const [ordersData, topupsData] = await Promise.allSettled([
+        const [ordersData, topupsData, donatesData] = await Promise.allSettled([
           api.getOrders(),
-          api.getTopupHistory()
+          api.getTopupHistory(),
+          api.getDonateHistory()
         ]);
 
         const list = [];
         const currentUserId = user?.id ? String(user.id) : (localStorage.getItem('userId') || null);
         const currentUsername = (user?.username || localStorage.getItem('username') || '').toLowerCase().trim();
 
+        // 1. Giao dịch Thuê / Nhận tiền thuê (Orders)
         if (ordersData.status === 'fulfilled' && Array.isArray(ordersData.value)) {
           ordersData.value.forEach(o => {
             const orderPlayerUserId = o.playerUserId || o.player?.userId || o.player?.user?.id;
@@ -58,6 +100,9 @@ export const WalletPage = ({ onOpenDeposit }) => {
               (currentUsername && orderRenterName === currentUsername)
             );
 
+            const orderDateStr = o.startTime || o.createdAt;
+            const orderRawDate = parseToTimestamp(orderDateStr);
+
             // Nếu là người được thuê (Player/Idol)
             if (isPlayer && !isRenter) {
               let earnedAmount = Math.round((o.totalPrice || 0) * 0.9);
@@ -72,9 +117,9 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 type: 'RECEIVE',
                 amount: +earnedAmount,
                 description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)`,
-                date: o.createdAt || 'Hôm nay',
+                date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
-                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+                rawDate: orderRawDate
               });
             } else if (isRenter && !isPlayer) {
               // Nếu là người thuê (Renter)
@@ -83,9 +128,9 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 type: 'PAYMENT',
                 amount: -(o.totalPrice || 0),
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
-                date: o.createdAt || 'Hôm nay',
+                date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
-                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+                rawDate: orderRawDate
               });
             } else if (isPlayer && isRenter) {
               // Trường hợp tự thuê bản thân trong thử nghiệm
@@ -95,44 +140,75 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 type: 'RECEIVE',
                 amount: +earnedAmount,
                 description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)`,
-                date: o.createdAt || 'Hôm nay',
+                date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
-                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+                rawDate: orderRawDate
               });
               list.push({
                 id: `ORD-${o.id}-OUT`,
                 type: 'PAYMENT',
                 amount: -(o.totalPrice || 0),
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
-                date: o.createdAt || 'Hôm nay',
+                date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
-                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+                rawDate: orderRawDate
               });
             } else {
-              // Mặc định
               list.push({
                 id: `ORD-${o.id}`,
                 type: 'PAYMENT',
                 amount: -(o.totalPrice || 0),
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
-                date: o.createdAt || 'Hôm nay',
+                date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
-                rawDate: o.createdAt ? new Date(o.createdAt).getTime() : 0
+                rawDate: orderRawDate
               });
             }
           });
         }
 
+        // 2. Giao dịch Nạp tiền (Topups)
         if (topupsData.status === 'fulfilled' && Array.isArray(topupsData.value)) {
           topupsData.value.forEach(t => {
+            const topupDateStr = t.dateTime || t.createdAt;
+            const topupRawDate = parseToTimestamp(topupDateStr);
+
             list.push({
               id: `TOPUP-${t.id}`,
               type: 'DEPOSIT',
               amount: +(t.coin || 0),
               description: `Nạp tiền vào ví (${t.method || 'VIETQR'})`,
-              date: t.dateTime || 'Hôm nay',
+              date: formatTransactionDate(topupDateStr),
               status: t.status || 'COMPLETED',
-              rawDate: t.dateTime ? new Date(t.dateTime).getTime() : 0
+              rawDate: topupRawDate
+            });
+          });
+        }
+
+        // 3. Giao dịch Tặng quà & Nhận quà (Donates)
+        if (donatesData.status === 'fulfilled' && Array.isArray(donatesData.value)) {
+          donatesData.value.forEach(d => {
+            const desc = (d.description || '').toLowerCase();
+            const isReceive = Boolean(
+              d.isReceive ||
+              desc.startsWith('nhận') ||
+              desc.includes('nhận quà') ||
+              desc.includes('nhận donate')
+            );
+
+            const coinAmount = Number(d.coin || d.amount || 0);
+            const donateDateStr = d.createdAt;
+            const donateRawDate = parseToTimestamp(donateDateStr);
+
+            list.push({
+              id: `GIFT-${d.id}`,
+              type: 'DONATE',
+              subType: isReceive ? 'DONATE_RECEIVE' : 'DONATE_SENT',
+              amount: isReceive ? +coinAmount : -coinAmount,
+              description: d.description || (isReceive ? 'Nhận quà tặng từ fan' : 'Tặng quà Idol'),
+              date: formatTransactionDate(donateDateStr),
+              status: d.status || 'COMPLETED',
+              rawDate: donateRawDate
             });
           });
         }
@@ -175,7 +251,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
             </div>
 
             <div className="balance-amount">
-              {(user?.balance || 0).toLocaleString('vi-VN')} đ
+              {(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -208,7 +284,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Lịch Sử Biến Động Số Dư</h3>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 className={`order-tab-btn ${filterType === 'ALL' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
@@ -236,6 +312,13 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 onClick={() => setFilterType('RECEIVE')}
               >
                 Nhận Tiền Thuê
+              </button>
+              <button
+                className={`order-tab-btn ${filterType === 'DONATE' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                onClick={() => setFilterType('DONATE')}
+              >
+                Tặng / Nhận Quà
               </button>
             </div>
           </div>
@@ -265,7 +348,17 @@ export const WalletPage = ({ onOpenDeposit }) => {
                             + Nhận Tiền Thuê
                           </span>
                         )}
-                        {tx.type === 'DONATE' && <span className="badge badge-vip">🎁 Tặng Quà</span>}
+                        {tx.type === 'DONATE' && (
+                          tx.amount > 0 ? (
+                            <span className="badge badge-online" style={{ background: 'rgba(236, 72, 153, 0.15)', color: '#ec4899', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
+                              🎁 + Nhận Quà
+                            </span>
+                          ) : (
+                            <span className="badge badge-vip" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                              🎁 - Tặng Quà
+                            </span>
+                          )
+                        )}
                         {tx.type === 'REFUND' && <span className="badge badge-online">↺ Hoàn Tiền</span>}
                       </td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{tx.description}</td>

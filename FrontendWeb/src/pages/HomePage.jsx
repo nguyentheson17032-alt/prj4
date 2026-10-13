@@ -21,6 +21,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
   const [players, setPlayers] = useState([]);
   const [games, setGames] = useState([]);
   const [users, setUsers] = useState([]);
+  const [leaderboard, setLeaderboard] = useState({ topPlayers: [], topDonators: [] });
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -29,14 +30,21 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [playersData, gamesData, usersData] = await Promise.allSettled([
+        const [playersData, gamesData, usersData, lbData] = await Promise.allSettled([
           api.getPlayers(),
           api.getGames(),
-          api.getUsers()
+          api.getUsers(),
+          api.getLeaderboard()
         ]);
         setPlayers(playersData.status === 'fulfilled' ? playersData.value || [] : []);
         setGames(gamesData.status === 'fulfilled' ? gamesData.value || [] : []);
         setUsers(usersData.status === 'fulfilled' ? usersData.value || [] : []);
+        if (lbData.status === 'fulfilled' && lbData.value) {
+          setLeaderboard({
+            topPlayers: Array.isArray(lbData.value.topPlayers) ? lbData.value.topPlayers : [],
+            topDonators: Array.isArray(lbData.value.topDonators) ? lbData.value.topDonators : []
+          });
+        }
       } catch (e) {
         console.error('Error fetching homepage data:', e);
       } finally {
@@ -201,39 +209,52 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
               <span>Top Player Yêu Thích</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {activePlayers.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '12px 0' }}>
-                  Chưa có player nào
-                </div>
-              ) : (
-                activePlayers
-                  .slice()
-                  .sort((a, b) => ((b.orderCount || 0) * 10 + (b.rating || 0)) - ((a.orderCount || 0) * 10 + (a.rating || 0)))
-                  .slice(0, 4)
-                  .map((p, idx) => {
-                    const realOrders = p.orderCount || 0;
-                    const realExp = realOrders * 150;
-                    const expLabel = realExp >= 1000 ? `${(realExp / 1000).toFixed(1)}k Exp` : `${realExp} Exp`;
+              {(() => {
+                const list = leaderboard.topPlayers.length > 0
+                  ? leaderboard.topPlayers
+                  : activePlayers
+                      .slice()
+                      .sort((a, b) => {
+                        const hoursA = a.totalHours || a.hoursHired || a.orderCount || 0;
+                        const hoursB = b.totalHours || b.hoursHired || b.orderCount || 0;
+                        return ((hoursB * 600) + (b.rating || 0)) - ((hoursA * 600) + (a.rating || 0));
+                      });
 
-                    return (
-                      <div key={p.id} className="leaderboard-item" onClick={() => navigate(`/player/${p.id}`)} style={{ cursor: 'pointer' }}>
-                        <div className={`rank-badge-num ${idx === 0 ? 'rank-top1' : idx === 1 ? 'rank-top2' : idx === 2 ? 'rank-top3' : 'rank-topother'}`}>
-                          {idx + 1}
-                        </div>
-                        <img src={p.avatar} alt={p.fullName} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{p.fullName}</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            {realOrders} đơn • ⭐ {p.rating > 0 ? Number(p.rating).toFixed(1) : 'Chưa có'}
-                          </div>
-                        </div>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-pink)' }}>
-                          {expLabel}
-                        </span>
+                if (list.length === 0) {
+                  return (
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '12px 0' }}>
+                      Chưa có player nào
+                    </div>
+                  );
+                }
+
+                return list.slice(0, 4).map((p, idx) => {
+                  const realOrders = p.orderCount || 0;
+                  const realHours = p.totalHours !== undefined ? p.totalHours : (p.hoursHired || realOrders);
+                  const totalExp = Number(p.exp !== undefined ? p.exp : (realHours * 600));
+                  const expLabel = totalExp >= 1000 ? `${(totalExp / 1000).toFixed(1)}k Exp` : `${totalExp} Exp`;
+
+                  return (
+                    <div key={p.id || idx} className="leaderboard-item" onClick={() => navigate(`/player/${p.id}`)} style={{ cursor: 'pointer' }}>
+                      <div className={`rank-badge-num ${idx === 0 ? 'rank-top1' : idx === 1 ? 'rank-top2' : idx === 2 ? 'rank-top3' : 'rank-topother'}`}>
+                        {idx + 1}
                       </div>
-                    );
-                  })
-              )}
+                      <img src={p.avatar} alt={p.fullName} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.fullName || p.username}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {realHours > 0 ? `${realHours}h chơi • ` : ''}{realOrders} đơn • ⭐ {p.rating > 0 ? Number(p.rating).toFixed(1) : 'Chưa có'}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-pink)' }}>
+                        {expLabel}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 
@@ -244,39 +265,51 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
               <span>Top Phú Hộ Donate</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {users.length > 0 ? (
-                users
-                  .slice()
-                  .sort((a, b) => (Number(b.coin || b.walletBalance || b.balance || 0)) - (Number(a.coin || a.walletBalance || a.balance || 0)))
-                  .slice(0, 4)
-                  .map((u, idx) => {
-                    const balanceVal = Number(u.coin || u.walletBalance || u.balance || 0);
-                    const avatarUrl = u.avatar || u.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.username || 'User')}&background=random`;
-                    return (
-                      <div key={u.id || idx} className="leaderboard-item">
-                        <div className={`rank-badge-num ${idx === 0 ? 'rank-top1' : idx === 1 ? 'rank-top2' : idx === 2 ? 'rank-top3' : 'rank-topother'}`}>
-                          {idx + 1}
-                        </div>
-                        <img src={avatarUrl} alt={u.fullName || u.username} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {u.fullName || u.username}
-                          </div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            {u.roles?.includes('ROLE_ADMIN') ? 'Quản Trị Viên' : 'Thành Viên'}
-                          </div>
-                        </div>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
-                          {balanceVal.toLocaleString('vi-VN')} đ
-                        </span>
+              {(() => {
+                const rawList = leaderboard.topDonators.length > 0
+                  ? leaderboard.topDonators
+                  : users
+                      .slice()
+                      .sort((a, b) => Number(b.totalSpent || 0) - Number(a.totalSpent || 0));
+
+                // Ưu tiên hiển thị những phú hộ thực sự đã ủng hộ donate hoặc thuê player
+                const withSpending = rawList.filter(u => Number(u.totalSpent || 0) > 0);
+                const list = withSpending.length > 0 ? withSpending : rawList;
+
+                if (list.length === 0 || (withSpending.length === 0 && Number(list[0]?.totalSpent || 0) === 0)) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                      Chưa có dữ liệu đóng góp donate / thuê player
+                    </div>
+                  );
+                }
+
+                return list.slice(0, 4).map((u, idx) => {
+                  const spentVal = Number(u.totalSpent || 0);
+                  const avatarUrl = u.avatar || u.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.username || 'User')}&background=random`;
+                  const roleLabel = (u.roles?.includes('ROLE_ADMIN') || u.role === 'ADMIN') ? 'Quản Trị Viên' : 'Thành Viên';
+
+                  return (
+                    <div key={u.id || idx} className="leaderboard-item">
+                      <div className={`rank-badge-num ${idx === 0 ? 'rank-top1' : idx === 1 ? 'rank-top2' : idx === 2 ? 'rank-top3' : 'rank-topother'}`}>
+                        {idx + 1}
                       </div>
-                    );
-                  })
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  Chưa có dữ liệu người dùng nạp/donate
-                </div>
-              )}
+                      <img src={avatarUrl} alt={u.fullName || u.username} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {u.fullName || u.username}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {roleLabel}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
+                        {spentVal.toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>

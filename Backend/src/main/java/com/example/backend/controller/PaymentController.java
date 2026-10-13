@@ -688,45 +688,65 @@ public class PaymentController {
     public ResponseEntity<?> donate(@RequestBody DonateRequest request, Authentication authentication) {
         
         User user = userService.findByUsername(authentication.getName());
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Vui lòng đăng nhập để thực hiện"));
+        }
+
+        if (request == null || request.getPlayerId() == null || request.getCoin() == null || request.getCoin() <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Thông tin tặng quà không hợp lệ"));
+        }
         
-        // Tìm GamePlayer trước, sau đó lấy User từ GamePlayer
+        // Tìm GamePlayer trước, sau đó lấy User từ GamePlayer (hỗ trợ cả gamePlayerId và userId)
         GamePlayer gamePlayer = gamePlayerRepository.findById(request.getPlayerId())
                 .orElse(null);
-        if (gamePlayer == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Không tìm thấy player nhận donate"));
+        User player = null;
+        if (gamePlayer != null) {
+            player = gamePlayer.getUser();
+        } else {
+            List<GamePlayer> gps = gamePlayerRepository.findByUserId(request.getPlayerId());
+            if (gps != null && !gps.isEmpty()) {
+                gamePlayer = gps.get(0);
+                player = gamePlayer.getUser();
+            } else {
+                try {
+                    player = userService.findById(request.getPlayerId());
+                } catch (Exception ignored) {}
+            }
+        }
+
+        if (player == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Không tìm thấy người nhận quà"));
+        }
+
+        if (user.getId().equals(player.getId())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Bạn không thể tự tặng quà cho chính mình"));
         }
         
-        User player = gamePlayer.getUser();
-        if (player == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Player không hợp lệ"));
-        }
+        String recipientDisplayName = gamePlayer != null ? gamePlayer.getUsername() : (player.getFullName() != null ? player.getFullName() : player.getUsername());
         
         
         if (user.getCoin() < request.getCoin()) {
+            // Gửi thông báo cho người donate về việc số dư không đủ
+            try {
+                notificationService.createNotification(
+                    user.getId(),
+                    "Donate thất bại",
+                    "Số dư không đủ để tặng " + request.getCoin() + " xu cho " + recipientDisplayName + ". Số dư hiện tại: " + user.getCoin() + " xu.",
+                    "donate_failed",
+                    null,
+                    null
+                );
+            } catch (Exception e) {
+                System.err.println("[PaymentController] Error sending insufficient balance notification: " + e.getMessage());
+            }
             
-                    // Gửi thông báo cho người donate về việc số dư không đủ
-        try {
-            notificationService.createNotification(
-                user.getId(),
-                "Donate thất bại",
-                "Số dư không đủ để donate " + request.getCoin() + " xu cho " + gamePlayer.getUsername() + ". Số dư hiện tại: " + user.getCoin() + " xu.",
-                "donate_failed",
-                null,
-                null
-            );
-        } catch (Exception e) {
-            System.err.println("[PaymentController] Error sending insufficient balance notification: " + e.getMessage());
-            e.printStackTrace();
-        }
-            
-            return ResponseEntity.badRequest().body(Map.of("message", "Số dư không đủ để donate"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Số dư ví không đủ để tặng quà. Vui lòng nạp thêm!"));
         }
         
         // Trừ xu người donate
         user.setCoin(user.getCoin() - request.getCoin());
         User savedUser = userService.save(user);
         
-        // Log số dư người nhận trước khi cộng
         // Cộng xu cho player
         player.setCoin(player.getCoin() + request.getCoin());
         User savedPlayer = userService.save(player);
@@ -741,7 +761,7 @@ public class PaymentController {
         paymentFrom.setPaymentMethod(Payment.PaymentMethod.DONATE);
         paymentFrom.setType(Payment.PaymentType.DONATE);
         paymentFrom.setCreatedAt(java.time.LocalDateTime.now());
-        paymentFrom.setDescription("Donate cho " + player.getUsername() + ": " + request.getMessage());
+        paymentFrom.setDescription("Tặng quà cho " + recipientDisplayName + ": " + (request.getMessage() != null ? request.getMessage() : ""));
         Payment savedPaymentFrom = paymentRepository.save(paymentFrom);
 
         // Lưu Payment DONATE cho người nhận (cộng xu)
@@ -754,38 +774,31 @@ public class PaymentController {
         paymentTo.setPaymentMethod(Payment.PaymentMethod.DONATE);
         paymentTo.setType(Payment.PaymentType.DONATE);
         paymentTo.setCreatedAt(java.time.LocalDateTime.now());
-        paymentTo.setDescription("Nhận donate từ " + user.getUsername() + ": " + request.getMessage());
+        paymentTo.setDescription("Nhận quà từ " + (user.getFullName() != null ? user.getFullName() : user.getUsername()) + ": " + (request.getMessage() != null ? request.getMessage() : ""));
         Payment savedPaymentTo = paymentRepository.save(paymentTo);
-
-        // Kiểm tra lại số dư sau khi lưu
-        User playerAfterSave = userService.findById(player.getId());
-        
-        // Kiểm tra lại số dư người gửi sau khi lưu
-        User userAfterSave = userService.findById(user.getId());
 
         // Gửi thông báo cho người donate
         try {
             notificationService.createNotification(
                 user.getId(),
-                "✅ Donate thành công",
-                "Bạn đã donate " + request.getCoin() + " xu cho " + gamePlayer.getUsername() + " thành công. Số dư còn lại: " + savedUser.getCoin() + " xu.",
+                "✅ Tặng quà thành công",
+                "Bạn đã tặng quà trị giá " + request.getCoin() + " xu cho " + recipientDisplayName + " thành công. Số dư còn lại: " + savedUser.getCoin() + " xu.",
                 "donate_sent",
-                "/donate-history", // URL để xem lịch sử donate
+                "/donate-history",
                 savedPaymentFrom.getId().toString()
             );
         } catch (Exception e) {
             System.err.println("[PaymentController] Error sending notification to donor: " + e.getMessage());
-            e.printStackTrace();
         }
 
         // Gửi thông báo cho người nhận donate
         try {
             notificationService.createNotification(
                 player.getId(),
-                "🎁 Bạn có donate mới!",
-                user.getUsername() + " đã donate " + request.getCoin() + " xu cho bạn. Lời nhắn: " + request.getMessage(),
+                "🎁 Bạn nhận được quà tặng mới!",
+                (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " đã tặng quà trị giá " + request.getCoin() + " xu cho bạn. Lời nhắn: " + request.getMessage(),
                 "donate_received",
-                "/donate-history", // URL để xem lịch sử donate
+                "/donate-history",
                 savedPaymentTo.getId().toString()
             );
             
@@ -793,26 +806,262 @@ public class PaymentController {
             sendDonatePushNotification(player, user, request.getCoin(), request.getMessage());
         } catch (Exception e) {
             System.err.println("[PaymentController] Error sending notification to recipient: " + e.getMessage());
-            e.printStackTrace();
         }
 
         // Gửi thông báo cho admin về giao dịch donate
         try {
-            adminNotificationService.notifyAdminsAboutDonate(user, player, request.getCoin(), gamePlayer.getUsername());
+            adminNotificationService.notifyAdminsAboutDonate(user, player, request.getCoin(), recipientDisplayName);
         } catch (Exception e) {
             System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutDonate: " + e.getMessage());
-            e.printStackTrace();
         }
 
-        return ResponseEntity.ok(Map.of("message", "Donate thành công"));
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("message", "Tặng quà thành công");
+        resp.put("newBalance", savedUser.getCoin());
+        resp.put("coin", request.getCoin());
+        return ResponseEntity.ok(resp);
     }
 
     @GetMapping("/donate-history")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Payment>> getDonateHistory(Authentication authentication) {
+    public ResponseEntity<?> getDonateHistory(Authentication authentication) {
         User user = userService.findByUsername(authentication.getName());
+        if (user == null) {
+            return ResponseEntity.status(401).body(List.of());
+        }
         List<Payment> donateHistory = paymentRepository.findDonateHistoryByUserId(user.getId());
-        return ResponseEntity.ok(donateHistory);
+        List<Map<String, Object>> result = donateHistory.stream().map(p -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", p.getId());
+            map.put("coin", p.getCoin());
+            map.put("currency", p.getCurrency());
+            map.put("status", p.getStatus() != null ? p.getStatus().name() : "COMPLETED");
+            map.put("description", p.getDescription());
+            map.put("createdAt", p.getCreatedAt() != null ? p.getCreatedAt().toString() : "");
+
+            String desc = p.getDescription() != null ? p.getDescription().toLowerCase() : "";
+            boolean isReceive = desc.startsWith("nhận") || desc.contains("nhận quà") || desc.contains("nhận donate");
+            map.put("isReceive", isReceive);
+            map.put("type", isReceive ? "RECEIVE" : "DONATE");
+
+            if (p.getPlayer() != null) {
+                map.put("partnerId", p.getPlayer().getId());
+                map.put("partnerName", p.getPlayer().getFullName() != null ? p.getPlayer().getFullName() : p.getPlayer().getUsername());
+                map.put("partnerAvatar", p.getPlayer().getAvatarUrl());
+            }
+            return map;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/leaderboard")
+    public ResponseEntity<?> getLeaderboard() {
+        // 1. Lấy tất cả GamePlayer
+        List<GamePlayer> allPlayers = gamePlayerRepository.findAll();
+
+        // 2. Lấy tất cả Payment DONATE
+        List<Payment> donatePayments = paymentRepository.findByTypeOrderByCreatedAtDesc(Payment.PaymentType.DONATE);
+
+        Map<Long, Long> playerGiftExpMap = new HashMap<>();
+        Map<Long, Long> playerGiftCoinMap = new HashMap<>();
+        Map<Long, Long> userDonateSpentMap = new HashMap<>();
+
+        for (Payment p : donatePayments) {
+            if (p.getStatus() != Payment.PaymentStatus.COMPLETED) continue;
+            Long coin = p.getCoin() != null ? p.getCoin() : 0L;
+            if (coin <= 0) continue;
+
+            String desc = p.getDescription() != null ? p.getDescription().toLowerCase() : "";
+            boolean isReceive = desc.startsWith("nhận") || desc.contains("nhận quà") || desc.contains("nhận donate");
+
+            if (!isReceive) {
+                // 1. Bản ghi gửi tặng quà: tính tiền chi tiêu cho Đại Gia
+                if (p.getUser() != null) {
+                    Long senderId = p.getUser().getId();
+                    userDonateSpentMap.put(senderId, userDonateSpentMap.getOrDefault(senderId, 0L) + coin);
+                }
+                // 2. Tính điểm Exp quà tặng cho Idol nhận quà (từ p.getPlayer())
+                if (p.getPlayer() != null) {
+                    Long recipientId = p.getPlayer().getId();
+                    long expAward = calculateExpFromCoin(coin, desc);
+                    playerGiftExpMap.put(recipientId, playerGiftExpMap.getOrDefault(recipientId, 0L) + expAward);
+                    playerGiftCoinMap.put(recipientId, playerGiftCoinMap.getOrDefault(recipientId, 0L) + coin);
+                }
+            } else {
+                // Dự phòng nếu bản ghi nhận quà đứng độc lập
+                if (p.getUser() != null && p.getPlayer() == null) {
+                    Long recipientId = p.getUser().getId();
+                    long expAward = calculateExpFromCoin(coin, desc);
+                    playerGiftExpMap.put(recipientId, playerGiftExpMap.getOrDefault(recipientId, 0L) + expAward);
+                }
+            }
+        }
+
+        // 3. Lấy tất cả đơn thuê (Orders)
+        List<Order> allOrders = orderRepository.findAll();
+        Map<Long, Long> userHireSpentMap = new HashMap<>();
+        Map<Long, Long> playerCompletedOrderCountMap = new HashMap<>();
+        Map<Long, Long> playerTotalHoursMap = new HashMap<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (Order o : allOrders) {
+            String status = o.getStatus() != null ? o.getStatus().toUpperCase() : "";
+            boolean isCanceledOrRejected = "CANCELED".equals(status) || "REJECTED".equals(status);
+            Long price = o.getPrice() != null ? o.getPrice() : 0L;
+
+            // 1. Tiền thuê mà Renter đã chi: tính các đơn hợp lệ đã thanh toán (không bị hủy/từ chối)
+            if (!isCanceledOrRejected && price > 0 && o.getRenter() != null) {
+                Long renterId = o.getRenter().getId();
+                userHireSpentMap.put(renterId, userHireSpentMap.getOrDefault(renterId, 0L) + price);
+            }
+
+            // 2. ĐƠN ĐÃ HOÀN THÀNH: chỉ tính số giờ chơi và Exp từ những đơn ĐÃ HOÀN THÀNH
+            boolean isCompleted = "COMPLETED".equalsIgnoreCase(status)
+                    || "FINISH".equalsIgnoreCase(status)
+                    || "FINISHED".equalsIgnoreCase(status)
+                    || ("CONFIRMED".equalsIgnoreCase(status) && o.getEndTime() != null && o.getEndTime().isBefore(now))
+                    || (o.getPayment() != null && o.getPayment().getStatus() == Payment.PaymentStatus.COMPLETED && !isCanceledOrRejected && !"PENDING".equalsIgnoreCase(status));
+
+            if (isCompleted && o.getPlayer() != null) {
+                Long gpId = o.getPlayer().getId();
+                playerCompletedOrderCountMap.put(gpId, playerCompletedOrderCountMap.getOrDefault(gpId, 0L) + 1);
+
+                // Tính số giờ chơi thực tế của đơn ĐÃ HOÀN THÀNH này
+                long hours = 0;
+                if (o.getStartTime() != null && o.getEndTime() != null) {
+                    hours = java.time.Duration.between(o.getStartTime(), o.getEndTime()).toHours();
+                    if (hours <= 0) {
+                        long mins = java.time.Duration.between(o.getStartTime(), o.getEndTime()).toMinutes();
+                        hours = mins > 0 ? Math.max(1L, Math.round((double) mins / 60.0)) : 1L;
+                    }
+                }
+                if (hours <= 0 && price > 0 && o.getPlayer().getPricePerHour() != null && o.getPlayer().getPricePerHour().doubleValue() > 0) {
+                    hours = Math.max(1L, Math.round((double) price / o.getPlayer().getPricePerHour().doubleValue()));
+                }
+                if (hours <= 0) {
+                    hours = 1L;
+                }
+                playerTotalHoursMap.put(gpId, playerTotalHoursMap.getOrDefault(gpId, 0L) + hours);
+            }
+        }
+
+        // 4. Danh sách Top Player kèm Exp (Số giờ chơi của đơn ĐÃ HOÀN THÀNH * 600 + Exp Quà Tặng) - Gộp theo userId
+        Map<Long, Map<String, Object>> userPlayerMap = new java.util.LinkedHashMap<>();
+
+        for (GamePlayer gp : allPlayers) {
+            if ("BANNED".equalsIgnoreCase(gp.getStatus())) continue;
+            Long gpId = gp.getId();
+            Long userId = gp.getUser() != null ? gp.getUser().getId() : gpId;
+
+            // Chỉ tính số đơn và số giờ từ các đơn ĐÃ HOÀN THÀNH thực tế
+            long completedOrders = playerCompletedOrderCountMap.getOrDefault(gpId, 0L);
+            long orderHours = playerTotalHoursMap.getOrDefault(gpId, 0L);
+
+            if (!userPlayerMap.containsKey(userId)) {
+                Map<String, Object> pMap = new HashMap<>();
+                pMap.put("id", gp.getId());
+                pMap.put("userId", userId);
+                pMap.put("username", gp.getUsername());
+                String fullName = gp.getUser() != null && gp.getUser().getFullName() != null ?
+                        gp.getUser().getFullName() : gp.getUsername();
+                pMap.put("fullName", fullName);
+                String avatar = gp.getUser() != null ? gp.getUser().getAvatarUrl() : null;
+                pMap.put("avatar", avatar);
+                pMap.put("orderCount", completedOrders);
+                pMap.put("totalHours", orderHours);
+                pMap.put("rating", gp.getRating() != null ? gp.getRating() : 5.0);
+                pMap.put("pricePerHour", gp.getPricePerHour());
+                userPlayerMap.put(userId, pMap);
+            } else {
+                Map<String, Object> existing = userPlayerMap.get(userId);
+                long prevOrders = (long) existing.get("orderCount");
+                long prevHours = (long) existing.get("totalHours");
+                existing.put("orderCount", prevOrders + completedOrders);
+                existing.put("totalHours", prevHours + orderHours);
+                Double currentRating = (Double) existing.get("rating");
+                if (gp.getRating() != null && (currentRating == null || currentRating < gp.getRating())) {
+                    existing.put("rating", gp.getRating());
+                }
+            }
+        }
+
+        List<Map<String, Object>> topPlayerList = new java.util.ArrayList<>();
+        for (Map.Entry<Long, Map<String, Object>> entry : userPlayerMap.entrySet()) {
+            Long userId = entry.getKey();
+            Map<String, Object> pMap = entry.getValue();
+
+            long totalHours = (long) pMap.get("totalHours");
+            long playExp = totalHours * 600L; // Số giờ chơi * 600 Exp
+            long giftExp = playerGiftExpMap.getOrDefault(userId, 0L);
+            long totalExp = playExp + giftExp;
+
+            pMap.put("totalHours", totalHours);
+            pMap.put("playExp", playExp);
+            pMap.put("giftExp", giftExp);
+            pMap.put("exp", totalExp);
+            topPlayerList.add(pMap);
+        }
+
+        // Sắp xếp Player theo exp giảm dần
+        topPlayerList.sort((a, b) -> {
+            Long expA = (Long) a.get("exp");
+            Long expB = (Long) b.get("exp");
+            if (!expB.equals(expA)) return expB.compareTo(expA);
+            Double ratA = (Double) a.get("rating");
+            Double ratB = (Double) b.get("rating");
+            return ratB.compareTo(ratA);
+        });
+
+        // 5. Danh sách Top Phú Hộ (Chỉ tính Donate Quà + Thuê Player)
+        List<User> allUsers = userService.findAll();
+        List<Map<String, Object>> topDonatorList = new java.util.ArrayList<>();
+
+        for (User u : allUsers) {
+            Long uId = u.getId();
+            long donateSpent = userDonateSpentMap.getOrDefault(uId, 0L);
+            long hireSpent = userHireSpentMap.getOrDefault(uId, 0L);
+            long totalSpent = donateSpent + hireSpent;
+
+            Map<String, Object> uMap = new HashMap<>();
+            uMap.put("id", u.getId());
+            uMap.put("username", u.getUsername());
+            uMap.put("fullName", u.getFullName() != null ? u.getFullName() : u.getUsername());
+            uMap.put("avatar", u.getAvatarUrl());
+            uMap.put("roles", u.getRoles());
+            uMap.put("donateSpent", donateSpent);
+            uMap.put("hireSpent", hireSpent);
+            uMap.put("totalSpent", totalSpent);
+            topDonatorList.add(uMap);
+        }
+
+        // Sắp xếp Phú Hộ theo totalSpent giảm dần
+        topDonatorList.sort((a, b) -> {
+            Long spentA = (Long) a.get("totalSpent");
+            Long spentB = (Long) b.get("totalSpent");
+            return spentB.compareTo(spentA);
+        });
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("topPlayers", topPlayerList);
+        res.put("topDonators", topDonatorList);
+        return ResponseEntity.ok(res);
+    }
+
+    private long calculateExpFromCoin(Long coin, String desc) {
+        if (coin == null || coin <= 0) return 0;
+        if (coin % 1000000L == 0) return (coin / 1000000L) * 8000L;
+        if (coin % 500000L == 0) return (coin / 500000L) * 3500L;
+        if (coin % 200000L == 0) return (coin / 200000L) * 1200L;
+        if (coin % 100000L == 0) return (coin / 100000L) * 600L;
+        if (coin % 50000L == 0) return (coin / 50000L) * 250L;
+        if (coin % 30000L == 0) return (coin / 30000L) * 150L;
+        if (coin >= 1000000L) return 8000L;
+        if (coin >= 500000L) return 3500L;
+        if (coin >= 200000L) return 1200L;
+        if (coin >= 100000L) return 600L;
+        if (coin >= 50000L) return 250L;
+        if (coin >= 30000L) return 150L;
+        return Math.round(coin * 0.006);
     }
 
     @Data

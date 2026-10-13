@@ -548,6 +548,36 @@ export const api = {
     }
   },
 
+  // Donate / Gift
+  async donateToPlayer(playerId, coin, message = '') {
+    const res = await client.post('/api/payments/donate', {
+      playerId: Number(playerId),
+      coin: Number(coin),
+      message: message || ''
+    });
+    return res.data;
+  },
+
+  async getDonateHistory() {
+    try {
+      const res = await client.get('/api/payments/donate-history');
+      if (Array.isArray(res.data)) return res.data;
+      if (res.data && Array.isArray(res.data.data)) return res.data.data;
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async getLeaderboard() {
+    try {
+      const res = await client.get('/api/payments/leaderboard');
+      return res.data;
+    } catch (e) {
+      return null;
+    }
+  },
+
   // Admin Payment Management
   async getAdminTopupPayments() {
     try {
