@@ -80,6 +80,9 @@ public class User {
     private boolean credentialsNonExpired = true;
     private boolean accountNonLocked = true;
 
+    @Transient
+    private UserBan activeBan;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -27,6 +27,12 @@ public class UserController {
     private final OrderRepository orderRepository;
     private final PlayerReviewRepository playerReviewRepository;
 
+    @Autowired(required = false)
+    private com.example.backend.repository.UserBanRepository userBanRepository;
+
+    @Autowired(required = false)
+    private com.example.backend.service.UserBanService userBanService;
+
     @Autowired
     public UserController(UserService userService, OrderRepository orderRepository, PlayerReviewRepository playerReviewRepository) {
         this.userService = userService;
@@ -151,7 +157,79 @@ public class UserController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllUsers() {
-        return ResponseEntity.ok(userService.findAll());
+        if (userBanService != null) {
+            try {
+                userBanService.processExpiredBans();
+            } catch (Exception ignored) {}
+        }
+        List<User> users = userService.findAll();
+        if (userBanRepository != null) {
+            try {
+                List<com.example.backend.entity.UserBan> activeBans = userBanRepository.findAllActiveBans();
+                Map<Long, com.example.backend.entity.UserBan> banMap = new HashMap<>();
+                for (com.example.backend.entity.UserBan b : activeBans) {
+                    if (b.getUser() != null) {
+                        banMap.putIfAbsent(b.getUser().getId(), b);
+                    }
+                }
+                for (User u : users) {
+                    if (banMap.containsKey(u.getId())) {
+                        u.setActiveBan(banMap.get(u.getId()));
+                    } else if (!u.isEnabled() || !u.isAccountNonLocked()) {
+                        u.setEnabled(true);
+                        u.setAccountNonLocked(true);
+                        userService.save(u);
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore ban map errors, proceed with users
+            }
+        }
+        return ResponseEntity.ok(users);
+    }
+
+    @PutMapping("/{userId}/ban")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> banUserQuick(
+            @PathVariable Long userId,
+            @RequestBody(required = false) Map<String, Object> body,
+            org.springframework.security.core.Authentication auth) {
+        if (userBanService == null) return ResponseEntity.badRequest().body("Ban service unavailable");
+        try {
+            Long adminId = userService.findByUsername(auth.getName()).getId();
+            String reason = body != null && body.get("reason") != null ? body.get("reason").toString() : "Khóa tài khoản bởi Admin";
+            String desc = body != null && body.get("description") != null ? body.get("description").toString() : "";
+            Integer days = null;
+            if (body != null && body.get("days") != null) {
+                try { days = Integer.parseInt(body.get("days").toString()); } catch (Exception ignored) {}
+            }
+            if (days != null && days > 0) {
+                com.example.backend.entity.UserBan ban = userBanService.banUserTemporarily(userId, adminId, reason, desc, LocalDateTime.now().plusDays(days));
+                return ResponseEntity.ok(ban);
+            } else {
+                com.example.backend.entity.UserBan ban = userBanService.banUserPermanently(userId, adminId, reason, desc);
+                return ResponseEntity.ok(ban);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Thao tác thất bại"));
+        }
+    }
+
+    @PutMapping("/{userId}/unban")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> unbanUserQuick(
+            @PathVariable Long userId,
+            @RequestBody(required = false) Map<String, Object> body,
+            org.springframework.security.core.Authentication auth) {
+        if (userBanService == null) return ResponseEntity.badRequest().body("Ban service unavailable");
+        try {
+            Long adminId = userService.findByUsername(auth.getName()).getId();
+            String reason = body != null && body.get("reason") != null ? body.get("reason").toString() : "Mở khóa bởi Admin";
+            com.example.backend.entity.UserBan ban = userBanService.unbanUser(userId, adminId, reason);
+            return ResponseEntity.ok(ban);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Thao tác thất bại"));
+        }
     }
 
     @GetMapping("/details")

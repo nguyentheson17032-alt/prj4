@@ -649,10 +649,10 @@ public class OrderController {
         if (order.getStartTime() != null && order.getEndTime() != null) {
             dto.setHireTime(order.getStartTime().format(formatter) + " - " + order.getEndTime().format(formatter));
             dto.setHours(java.time.Duration.between(order.getStartTime(), order.getEndTime()).toHours());
-            dto.setCreatedAt(order.getStartTime().format(formatter));
+            dto.setCreatedAt(order.getStartTime().toString());
         } else if (order.getStartTime() != null) {
             dto.setHireTime(order.getStartTime().format(formatter));
-            dto.setCreatedAt(order.getStartTime().format(formatter));
+            dto.setCreatedAt(order.getStartTime().toString());
             dto.setHours(1L);
         } else {
             dto.setHireTime("");
@@ -693,6 +693,8 @@ public class OrderController {
         if (rep != null) {
             dto.setIsReported(true);
             dto.setReportStatus(rep.getStatus());
+            dto.setRefundPercentage(rep.getRefundPercentage());
+            dto.setRefundAmount(rep.getRefundAmount());
         } else {
             dto.setIsReported(false);
             dto.setReportStatus(null);

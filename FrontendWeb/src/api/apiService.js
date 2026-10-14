@@ -141,7 +141,16 @@ export const api = {
       const res = await client.post('/api/auth/login', { username, password });
       return { success: true, data: res.data };
     } catch (err) {
-      const message = err.response?.data?.message || err.response?.data || err.message || 'Đăng nhập thất bại';
+      const data = err.response?.data;
+      if (data && (data.status === 'BANNED' || data.error === 'ACCOUNT_BANNED')) {
+        return {
+          success: false,
+          isBanned: true,
+          banDetails: data.banDetails,
+          error: data.message || 'Tài khoản của bạn đã bị khóa.'
+        };
+      }
+      const message = (typeof data === 'string' ? data : (data?.message || data?.error)) || err.message || 'Đăng nhập thất bại';
       return { success: false, error: message };
     }
   },
@@ -525,14 +534,67 @@ export const api = {
     }
   },
 
-  async banUser(userId) {
-    const res = await client.put(`/api/users/${userId}/ban`);
+  async banUser(userId, options = {}) {
+    if (options.days && Number(options.days) > 0) {
+      return this.banUserTemporarily({
+        userId,
+        reason: options.reason || 'Vi phạm tiêu chuẩn cộng đồng',
+        description: options.description || '',
+        days: Number(options.days)
+      });
+    } else {
+      return this.banUserPermanently({
+        userId,
+        reason: options.reason || 'Vi phạm tiêu chuẩn cộng đồng',
+        description: options.description || ''
+      });
+    }
+  },
+
+  async banUserTemporarily({ userId, reason, description, days, banExpiresAt }) {
+    const res = await client.post('/api/user-bans/ban-temporary', {
+      userId,
+      reason,
+      description,
+      days,
+      banExpiresAt
+    });
     return res.data;
   },
 
-  async unbanUser(userId) {
-    const res = await client.put(`/api/users/${userId}/unban`);
+  async banUserPermanently({ userId, reason, description }) {
+    const res = await client.post('/api/user-bans/ban-permanent', {
+      userId,
+      reason,
+      description
+    });
     return res.data;
+  },
+
+  async unbanUser(userId, unbanReason) {
+    const res = await client.post('/api/user-bans/unban', {
+      userId,
+      unbanReason: unbanReason || 'Mở khóa bởi Admin'
+    });
+    return res.data;
+  },
+
+  async getUserActiveBan(userId) {
+    try {
+      const res = await client.get(`/api/user-bans/check/${userId}`);
+      return res.data;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async getActiveBans() {
+    try {
+      const res = await client.get('/api/user-bans/active');
+      return res.data || [];
+    } catch (e) {
+      return [];
+    }
   },
 
   async getReports() {

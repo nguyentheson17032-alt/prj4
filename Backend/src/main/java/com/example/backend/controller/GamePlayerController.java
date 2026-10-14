@@ -1473,6 +1473,7 @@ public class GamePlayerController {
         for (GamePlayer gp : gamePlayers) {
             GamePlayerSummaryDTO dto = new GamePlayerSummaryDTO();
             dto.setId(gp.getId());
+            dto.setUserId(gp.getUser() != null ? gp.getUser().getId() : null);
             dto.setName(gp.getUser() != null ? gp.getUser().getFullName() : "");
             dto.setEmail(gp.getUser() != null ? gp.getUser().getEmail() : "");
             dto.setPlayerName(gp.getUsername()); // Tên player khi đăng ký làm player
@@ -1495,6 +1496,11 @@ public class GamePlayerController {
             dto.setGameName(gp.getGame() != null ? gp.getGame().getName() : "");
             // Avatar URL
             dto.setAvatarUrl(gp.getUser() != null ? gp.getUser().getAvatarUrl() : "");
+            // Giá thuê & thông tin chi tiết
+            dto.setPricePerHour(gp.getPricePerHour());
+            dto.setBio(gp.getDescription());
+            dto.setServer(gp.getServer());
+            dto.setRole(gp.getRole());
             result.add(dto);
         }
         return ResponseEntity.ok(new ApiResponse<>(true, "Game player summary", result));

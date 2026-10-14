@@ -35,7 +35,7 @@ public class UserBanController {
     @Operation(summary = "Ban user permanently")
     @PostMapping("/ban-permanent")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserBan> banUserPermanently(
+    public ResponseEntity<?> banUserPermanently(
             @Valid @RequestBody BanUserRequest request,
             Authentication authentication) {
         try {
@@ -50,57 +50,70 @@ public class UserBanController {
             
             return ResponseEntity.ok(userBan);
         } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(java.util.Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Không thể khóa tài khoản"));
         }
     }
 
     @Operation(summary = "Ban user temporarily")
     @PostMapping("/ban-temporary")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserBan> banUserTemporarily(
+    public ResponseEntity<?> banUserTemporarily(
             @Valid @RequestBody TemporaryBanUserRequest request,
             Authentication authentication) {
         try {
             Long adminId = userService.findByUsername(authentication.getName()).getId();
+
+            LocalDateTime expiresAt = request.getBanExpiresAt();
+            if (expiresAt == null && request.getDays() != null && request.getDays() > 0) {
+                expiresAt = LocalDateTime.now().plusDays(request.getDays());
+            }
+            if (expiresAt == null) {
+                expiresAt = LocalDateTime.now().plusDays(7);
+            }
             
             UserBan userBan = userBanService.banUserTemporarily(
                     request.getUserId(),
                     adminId,
                     request.getReason(),
                     request.getDescription(),
-                    request.getBanExpiresAt()
+                    expiresAt
             );
             
             return ResponseEntity.ok(userBan);
         } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(java.util.Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Không thể khóa tài khoản"));
         }
     }
 
     @Operation(summary = "Unban user")
     @PostMapping("/unban")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserBan> unbanUser(
+    public ResponseEntity<?> unbanUser(
             @Valid @RequestBody UnbanUserRequest request,
             Authentication authentication) {
         try {
             Long adminId = userService.findByUsername(authentication.getName()).getId();
             
+            String reason = request.getUnbanReason();
+            if (reason == null || reason.trim().isEmpty()) {
+                reason = "Mở khóa bởi Admin";
+            }
+
             UserBan userBan = userBanService.unbanUser(
                     request.getUserId(),
                     adminId,
-                    request.getUnbanReason()
+                    reason
             );
             
             return ResponseEntity.ok(userBan);
         } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(java.util.Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Không thể mở khóa tài khoản"));
         }
     }
 
@@ -243,8 +256,9 @@ public class UserBanController {
 
         private String description;
 
-        @NotNull(message = "Ban expiration date is required")
         private LocalDateTime banExpiresAt;
+
+        private Integer days;
     }
 
     @Data

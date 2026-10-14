@@ -19,6 +19,7 @@ import AuthModal from '../components/modals/AuthModal';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { getUserAvatar } from '../utils/avatarUtils';
+import { getRefundPercentage } from '../components/modals/OrderDetailModal';
 import '../styles/orders.css';
 
 export const OrdersPage = () => {
@@ -233,8 +234,14 @@ export const OrdersPage = () => {
         return <span className="badge badge-busy">⏳ Chờ Bắt Đầu</span>;
       case 'COMPLETED':
         return <span className="badge badge-primary">✅ Đã Hoàn Tất</span>;
-      case 'REFUNDED':
-        return <span className="badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', fontWeight: 700 }}>💰 Đã Hoàn Tiền</span>;
+      case 'REFUNDED': {
+        const refundPct = getRefundPercentage(order);
+        return (
+          <span className="badge" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)', fontWeight: 700 }}>
+            💰 {refundPct ? `Đã Hoàn Tiền ${refundPct}%` : 'Đã Hoàn Tiền'}
+          </span>
+        );
+      }
       case 'CANCELLED':
       case 'CANCELED':
         return <span className="badge badge-offline">❌ Đã Hủy</span>;

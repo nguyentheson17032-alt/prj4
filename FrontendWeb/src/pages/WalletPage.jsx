@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/apiService';
+import { getRefundPercentage } from '../components/modals/OrderDetailModal';
 import '../styles/wallet.css';
 
 const parseToTimestamp = (dateVal) => {
@@ -86,12 +87,12 @@ export const WalletPage = ({ onOpenDeposit }) => {
         if (ordersData.status === 'fulfilled' && Array.isArray(ordersData.value)) {
           ordersData.value.forEach(o => {
             const orderPlayerUserId = o.playerUserId || o.player?.userId || o.player?.user?.id;
-            const orderPlayerId = o.playerId || o.player?.id;
-            const orderPlayerName = (o.playerName || o.player?.username || o.player?.fullName || '').toLowerCase().trim();
+            const orderPlayerUsername = (o.player?.user?.username || o.player?.username || '').toLowerCase().trim();
 
+            // Người dùng là Game thủ (Player) chỉ khi ID tài khoản User trùng khớp
             const isPlayer = Boolean(
-              (currentUserId && (String(orderPlayerUserId) === currentUserId || String(orderPlayerId) === currentUserId)) ||
-              (currentUsername && orderPlayerName === currentUsername)
+              (currentUserId && orderPlayerUserId && String(orderPlayerUserId) === String(currentUserId)) ||
+              (currentUsername && orderPlayerUsername && orderPlayerUsername === currentUsername)
             );
 
             if (isPlayer && o.status === 'COMPLETED' && o.payoutStatus === 'PENDING' && !(o.isReviewed && Number(o.reviewRating || 0) >= 4)) {
@@ -101,19 +102,51 @@ export const WalletPage = ({ onOpenDeposit }) => {
             }
 
             const orderRenterId = o.renterId || o.renter?.id;
-            const orderRenterName = (o.renterName || o.renter?.username || o.renter?.fullName || '').toLowerCase().trim();
+            const orderRenterUsername = (o.renterUsername || o.renter?.username || o.renterName || '').toLowerCase().trim();
 
+            // Người dùng là Người thuê (Renter)
             const isRenter = Boolean(
-              (currentUserId && String(orderRenterId) === currentUserId) ||
-              (currentUsername && orderRenterName === currentUsername)
+              (currentUserId && orderRenterId && String(orderRenterId) === String(currentUserId)) ||
+              (currentUsername && orderRenterUsername && orderRenterUsername === currentUsername)
             );
 
             const orderDateStr = o.startTime || o.createdAt;
             const orderRawDate = parseToTimestamp(orderDateStr);
+            const origPrice = Number(o.totalPrice || o.price || 0);
+            const refundPercent = getRefundPercentage(o);
+            const refundAmount = o.refundAmount != null && o.refundAmount > 0
+              ? Number(o.refundAmount)
+              : (refundPercent ? Math.round(origPrice * (refundPercent / 100)) : 0);
 
-            // Nếu là người được thuê (Player/Idol)
-            if (isPlayer && !isRenter) {
-              const origPrice = Number(o.totalPrice || o.price || 0);
+            // ─── Trường hợp 1: Là Người thuê (Renter) ───
+            if (isRenter && !isPlayer) {
+              // 1. Khoản trừ tiền thuê ban đầu
+              list.push({
+                id: `ORD-${o.id}-OUT`,
+                type: 'PAYMENT',
+                amount: -origPrice,
+                description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
+                date: formatTransactionDate(orderDateStr),
+                status: o.status || 'COMPLETED',
+                rawDate: orderRawDate
+              });
+
+              // 2. Nếu đơn hàng có hoàn tiền (REFUNDED hoặc có % hoàn)
+              if ((o.status === 'REFUNDED' || refundPercent > 0) && refundAmount > 0) {
+                list.push({
+                  id: `ORD-${o.id}-REFUND`,
+                  type: 'REFUND',
+                  amount: +refundAmount,
+                  description: `Nhận tiền hoàn đơn thuê #${o.id}${refundPercent ? ` (${refundPercent}%)` : ''} - ${o.playerName || 'Player'}`,
+                  feeDetail: `Hoàn tiền ${refundPercent ? `${refundPercent}% ` : ''}từ đơn thuê #${o.id} do chấp thuận khiếu nại`,
+                  date: formatTransactionDate(o.resolvedAt || o.endTime || orderDateStr),
+                  status: 'COMPLETED',
+                  rawDate: orderRawDate + 1000
+                });
+              }
+            }
+            // ─── Trường hợp 2: Là Game thủ được thuê (Player) ───
+            else if (isPlayer && !isRenter) {
               const feeAmount = o.platformFee != null ? o.platformFee : Math.round(origPrice * 0.15);
               const playerFinal = o.playerReceived != null ? o.playerReceived : (origPrice - feeAmount);
 
@@ -141,11 +174,11 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 earnedAmount = actualRemaining;
                 txStatus = 'REFUNDED';
                 if (actualRemaining > 0) {
-                  stageText = ' (Đã khấu trừ khiếu nại & chuyển phần còn lại vào số dư khả dụng)';
-                  feeDetail = `Đã trừ phần phạt từ số dư đóng băng | Chuyển thực nhận còn lại (+${actualRemaining.toLocaleString('vi-VN')} đ) vào số dư khả dụng`;
+                  stageText = refundPercent ? ` (Sau khi trừ ${refundPercent}% hoàn tiền)` : ' (Sau khi trừ hoàn tiền)';
+                  feeDetail = `Đã trừ ${refundPercent ? `${refundPercent}% ` : ''}khiếu nại | Thực nhận còn lại: +${actualRemaining.toLocaleString('vi-VN')} đ`;
                 } else {
-                  stageText = ' (Khấu trừ 100% từ số dư đóng băng do chấp thuận khiếu nại)';
-                  feeDetail = `Bị khấu trừ toàn bộ từ số dư đóng băng do khiếu nại được chấp thuận`;
+                  stageText = ' (Khấu trừ 100% do khiếu nại được chấp thuận)';
+                  feeDetail = `Bị hoàn tiền 100% cho người thuê do khiếu nại`;
                 }
               } else if (isReleased) {
                 txStatus = 'COMPLETED';
@@ -166,23 +199,38 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 isFrozen: isFrozen,
                 rawDate: orderRawDate
               });
-            } else if (isRenter && !isPlayer) {
-              // Nếu là người thuê (Renter)
+            }
+            // ─── Trường hợp 3: Tự thuê chính mình (test mode) ───
+            else if (isPlayer && isRenter) {
+              const feeAmount = o.platformFee != null ? o.platformFee : Math.round(origPrice * 0.15);
+              const playerFinal = o.playerReceived != null ? o.playerReceived : (origPrice - feeAmount);
+
+              // Khoản trả tiền thuê
               list.push({
-                id: `ORD-${o.id}`,
+                id: `ORD-${o.id}-OUT`,
                 type: 'PAYMENT',
-                amount: -(o.totalPrice || 0),
+                amount: -origPrice,
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
                 date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
                 rawDate: orderRawDate
               });
-            } else if (isPlayer && isRenter) {
-              // Trường hợp tự thuê bản thân trong thử nghiệm
-              const origPrice = Number(o.totalPrice || o.price || 0);
-              const feeAmount = o.platformFee != null ? o.platformFee : Math.round(origPrice * 0.15);
-              const playerFinal = o.playerReceived != null ? o.playerReceived : (origPrice - feeAmount);
 
+              // Khoản nhận hoàn tiền nếu có
+              if ((o.status === 'REFUNDED' || refundPercent > 0) && refundAmount > 0) {
+                list.push({
+                  id: `ORD-${o.id}-REFUND`,
+                  type: 'REFUND',
+                  amount: +refundAmount,
+                  description: `Nhận tiền hoàn đơn thuê #${o.id}${refundPercent ? ` (${refundPercent}%)` : ''} - ${o.playerName || 'Player'}`,
+                  feeDetail: `Hoàn tiền ${refundPercent ? `${refundPercent}% ` : ''}từ đơn thuê #${o.id} do chấp thuận khiếu nại`,
+                  date: formatTransactionDate(o.resolvedAt || o.endTime || orderDateStr),
+                  status: 'COMPLETED',
+                  rawDate: orderRawDate + 1000
+                });
+              }
+
+              // Khoản Idol nhận tiền
               list.push({
                 id: `ORD-${o.id}-IN`,
                 type: 'RECEIVE',
@@ -190,30 +238,35 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 originalPrice: origPrice,
                 feeAmount: feeAmount,
                 feeDetail: `Giá gốc: ${origPrice.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${feeAmount.toLocaleString('vi-VN')} đ`,
-                description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)`,
+                description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)${refundPercent ? ` (Sau khi trừ ${refundPercent}% hoàn tiền)` : ''}`,
                 date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
                 rawDate: orderRawDate
               });
-              list.push({
-                id: `ORD-${o.id}-OUT`,
-                type: 'PAYMENT',
-                amount: -(o.totalPrice || 0),
-                description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
-                date: formatTransactionDate(orderDateStr),
-                status: o.status || 'COMPLETED',
-                rawDate: orderRawDate
-              });
-            } else {
+            }
+            // ─── Mặc định: Coi như người thuê ───
+            else {
               list.push({
                 id: `ORD-${o.id}`,
                 type: 'PAYMENT',
-                amount: -(o.totalPrice || 0),
+                amount: -origPrice,
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
                 date: formatTransactionDate(orderDateStr),
                 status: o.status || 'COMPLETED',
                 rawDate: orderRawDate
               });
+              if ((o.status === 'REFUNDED' || refundPercent > 0) && refundAmount > 0) {
+                list.push({
+                  id: `ORD-${o.id}-REFUND`,
+                  type: 'REFUND',
+                  amount: +refundAmount,
+                  description: `Nhận tiền hoàn đơn thuê #${o.id}${refundPercent ? ` (${refundPercent}%)` : ''} - ${o.playerName || 'Player'}`,
+                  feeDetail: `Hoàn tiền ${refundPercent ? `${refundPercent}% ` : ''}từ đơn thuê #${o.id} do chấp thuận khiếu nại`,
+                  date: formatTransactionDate(o.resolvedAt || o.endTime || orderDateStr),
+                  status: 'COMPLETED',
+                  rawDate: orderRawDate + 1000
+                });
+              }
             }
           });
         }
@@ -452,6 +505,13 @@ export const WalletPage = ({ onOpenDeposit }) => {
               >
                 Tặng / Nhận Quà
               </button>
+              <button
+                className={`order-tab-btn ${filterType === 'REFUND' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                onClick={() => setFilterType('REFUND')}
+              >
+                Tiền Hoàn
+              </button>
             </div>
           </div>
 
@@ -497,7 +557,19 @@ export const WalletPage = ({ onOpenDeposit }) => {
                             </span>
                           )
                         )}
-                        {tx.type === 'REFUND' && <span className="badge badge-online">↺ Hoàn Tiền</span>}
+                        {tx.type === 'REFUND' && (
+                          <span
+                            className="badge"
+                            style={{
+                              background: 'rgba(168, 85, 247, 0.15)',
+                              color: '#a855f7',
+                              border: '1px solid rgba(168, 85, 247, 0.35)',
+                              fontWeight: 700
+                            }}
+                          >
+                            ↺ Nhận Tiền Hoàn
+                          </span>
+                        )}
                       </td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
                         <div style={{ fontWeight: 600 }}>{tx.description}</div>

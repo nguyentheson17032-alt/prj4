@@ -39,6 +39,8 @@ public class OrderResponseDTO {
     private Boolean isReportable;
     private Long reportRemainingSeconds;
     private Boolean isPayoutFrozen;
+    private Integer refundPercentage;
+    private Long refundAmount;
 
     public OrderResponseDTO(Long id, String renterName, String playerName, String hireTime, String status, Long price) {
         this.id = id;

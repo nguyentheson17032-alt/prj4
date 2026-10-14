@@ -126,32 +126,64 @@ public class UserBanService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
         
-        User unbannedBy = userRepository.findById(unbannedByUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin user not found with id: " + unbannedByUserId));
+        User unbannedBy = null;
+        if (unbannedByUserId != null) {
+            unbannedBy = userRepository.findById(unbannedByUserId).orElse(null);
+        }
+        if (unbannedBy == null) {
+            unbannedBy = userRepository.findAll().stream()
+                    .filter(u -> u.getRoles() != null && u.getRoles().stream().anyMatch(r -> r.toUpperCase().contains("ADMIN")))
+                    .findFirst().orElse(user);
+        }
 
-        // Tìm ban record hiện tại
-        UserBan activeBan = userBanRepository.findActiveBanByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("No active ban found for user: " + userId));
+        // Tìm tất cả active bans của user
+        List<UserBan> activeBans = userBanRepository.findActiveBansByUserId(userId);
+        UserBan savedBan = null;
 
-        // Cập nhật ban record
-        activeBan.setStatus("UNBANNED");
-        activeBan.setUnbannedAt(LocalDateTime.now());
-        activeBan.setUnbannedBy(unbannedBy);
-        activeBan.setUnbanReason(unbanReason);
+        if (!activeBans.isEmpty()) {
+            for (UserBan b : activeBans) {
+                b.setStatus("UNBANNED");
+                b.setUnbannedAt(LocalDateTime.now());
+                b.setUnbannedBy(unbannedBy);
+                b.setUnbanReason(unbanReason);
+                savedBan = userBanRepository.save(b);
+            }
+        } else {
+            // Kiểm tra xem có bất kỳ ban record nào gần nhất không
+            List<UserBan> allBans = userBanRepository.findAllBansByUserId(userId);
+            if (!allBans.isEmpty()) {
+                UserBan latestBan = allBans.get(0);
+                latestBan.setStatus("UNBANNED");
+                latestBan.setUnbannedAt(LocalDateTime.now());
+                latestBan.setUnbannedBy(unbannedBy);
+                latestBan.setUnbanReason(unbanReason);
+                savedBan = userBanRepository.save(latestBan);
+            } else {
+                UserBan newBan = new UserBan();
+                newBan.setUser(user);
+                newBan.setBannedBy(unbannedBy);
+                newBan.setReason("Admin unban");
+                newBan.setStatus("UNBANNED");
+                newBan.setBanType("TEMPORARY");
+                newBan.setUnbannedAt(LocalDateTime.now());
+                newBan.setUnbannedBy(unbannedBy);
+                newBan.setUnbanReason(unbanReason);
+                savedBan = userBanRepository.save(newBan);
+            }
+        }
 
-        // Lưu ban record
-        UserBan savedBan = userBanRepository.save(activeBan);
-
-        // Enable user account
+        // Enable user account unconditionally
         user.setEnabled(true);
         user.setAccountNonLocked(true);
         userRepository.save(user);
 
         // Gửi email thông báo
         try {
-            emailService.sendUnbanNotification(user, unbannedBy.getUsername(), savedBan.getUnbannedAt());
-            savedBan.setUnbanEmailSent(true);
-            userBanRepository.save(savedBan);
+            if (savedBan != null && unbannedBy != null) {
+                emailService.sendUnbanNotification(user, unbannedBy.getUsername(), savedBan.getUnbannedAt());
+                savedBan.setUnbanEmailSent(true);
+                userBanRepository.save(savedBan);
+            }
         } catch (Exception e) {
             System.err.println("Lỗi gửi email thông báo unban: " + e.getMessage());
         }

@@ -14,10 +14,15 @@ import java.util.Optional;
 public interface UserBanRepository extends JpaRepository<UserBan, Long> {
 
     /**
-     * Tìm ban record hiện tại của user
+     * Tìm tất cả active ban records của user
      */
     @Query("SELECT ub FROM UserBan ub WHERE ub.user.id = :userId AND ub.status = 'ACTIVE' ORDER BY ub.bannedAt DESC")
-    Optional<UserBan> findActiveBanByUserId(@Param("userId") Long userId);
+    List<UserBan> findActiveBansByUserId(@Param("userId") Long userId);
+
+    default Optional<UserBan> findActiveBanByUserId(Long userId) {
+        List<UserBan> list = findActiveBansByUserId(userId);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
 
     /**
      * Tìm tất cả ban records của user

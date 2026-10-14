@@ -14,6 +14,11 @@ import { useToast } from '../context/ToastContext';
 import { getUserAvatar } from '../utils/avatarUtils';
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/apiService';
+import { BanUserModal } from '../components/modals/BanUserModal';
+import { UnbanUserModal } from '../components/modals/UnbanUserModal';
+import { UserDetailModal } from '../components/modals/UserDetailModal';
+import { OrderDetailModal, getRefundPercentage } from '../components/modals/OrderDetailModal';
+import { PlayerDetailModal, getPrimaryGame } from '../components/modals/PlayerDetailModal';
 
 // ─────────────────────────────────────────────
 // Sidebar nav items
@@ -32,24 +37,70 @@ const NAV_ITEMS = [
 // ─────────────────────────────────────────────
 // Status badge helper
 // ─────────────────────────────────────────────
-const StatusBadge = ({ status }) => {
+// ─────────────────────────────────────────────
+// Date Parsing & Formatting Helpers
+// ─────────────────────────────────────────────
+const parseDateToDateObj = (dateVal) => {
+  if (!dateVal) return null;
+  if (dateVal instanceof Date) return isNaN(dateVal.getTime()) ? null : dateVal;
+  if (typeof dateVal === 'number') return new Date(dateVal);
+
+  const str = String(dateVal).trim();
+  // Format "HH:mm dd/MM/yyyy" or "HH:mm:ss dd/MM/yyyy"
+  const timeDateMatch = str.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s+(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (timeDateMatch) {
+    const [, hours, minutes, seconds = 0, day, month, year] = timeDateMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+  }
+  // Format "dd/MM/yyyy HH:mm" or "dd/MM/yyyy"
+  const dateTimeMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (dateTimeMatch) {
+    const [, day, month, year, hours = 0, minutes = 0, seconds = 0] = dateTimeMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
+  }
+  // Standard ISO or any standard parseable date
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const formatOrderDateTime = (dateVal) => {
+  const d = parseDateToDateObj(dateVal);
+  if (!d) return '—';
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${hours}:${minutes} ${day}/${month}/${year}`;
+};
+
+// ─────────────────────────────────────────────
+// Status badge helper
+// ─────────────────────────────────────────────
+const StatusBadge = ({ status, order }) => {
   const map = {
-    PENDING:   { label: 'Chờ duyệt',   bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
-    COMPLETED: { label: 'Hoàn thành',  bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
-    AVAILABLE: { label: 'Sẵn sàng',    bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
-    BANNED:    { label: 'Đã khóa',     bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    REJECTED:  { label: 'Từ chối',     bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    PLAYING:   { label: 'Đang chơi',   bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
-    CONFIRMED: { label: 'Đã xác nhận', bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
-    CANCELLED: { label: 'Đã hủy',      bg: 'rgba(107,114,128,0.15)', color: '#6b7280' },
-    processed: { label: 'Đã xử lý',    bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
-    pending:   { label: 'Chờ xử lý',   bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
-    rejected:  { label: 'Từ chối',     bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    PENDING:   { label: 'Chờ duyệt',    bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
+    COMPLETED: { label: 'Hoàn thành',   bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
+    AVAILABLE: { label: 'Sẵn sàng',     bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
+    BANNED:    { label: 'Đã khóa',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    REJECTED:  { label: 'Từ chối',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    PLAYING:   { label: 'Đang chơi',    bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
+    CONFIRMED: { label: 'Đã xác nhận',  bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
+    CANCELLED: { label: 'Đã hủy',       bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    CANCELED:  { label: 'Đã hủy',       bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    REFUNDED:  { label: 'Đã hoàn tiền', bg: 'rgba(168,85,247,0.15)',  color: '#a855f7' },
+    processed: { label: 'Đã xử lý',     bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
+    pending:   { label: 'Chờ xử lý',    bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
+    rejected:  { label: 'Từ chối',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
   };
+
+  const refundPct = (status === 'REFUNDED' || order?.status === 'REFUNDED') ? getRefundPercentage(order) : null;
   const s = map[status] || { label: status, bg: 'rgba(107,114,128,0.15)', color: '#6b7280' };
+  const label = (status === 'REFUNDED' && refundPct) ? `Đã hoàn tiền ${refundPct}%` : s.label;
+
   return (
-    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: s.bg, color: s.color }}>
-      {s.label}
+    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: s.bg, color: s.color, whiteSpace: 'nowrap' }}>
+      {label}
     </span>
   );
 };
@@ -71,35 +122,83 @@ const MetricCard = ({ label, value, sub, icon: Icon, color }) => (
 // ─────────────────────────────────────────────
 // OVERVIEW TAB
 // ─────────────────────────────────────────────
-const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissionStats, loading }) => {
+const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissionStats, commissionTransactions, loading }) => {
   const pendingCount = playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING').length;
   const completedCount = ordersList.filter(o => o.status === 'COMPLETED').length;
   const completionRate = ordersList.length ? `${Math.round((completedCount / ordersList.length) * 100)}%` : '100%';
 
-  // Doanh thu sàn 15% tổng hợp từ cả thuê player và donate quà (loại trừ đơn bị hủy / đã hoàn tiền)
-  const hireRevenue = useMemo(() => ordersList.filter(o => 
-    o.status !== 'CANCELLED' && o.status !== 'CANCELED' && o.status !== 'REJECTED' && o.status !== 'REFUNDED'
-  ).reduce((s, o) => s + (o.totalPrice || o.price || 0), 0), [ordersList]);
+  // Tổng doanh thu sàn là số tiền sàn ăn được từ chiết khấu (15%) từ cả đơn thuê và donate quà tặng
+  const totalPlatformRevenue = commissionStats?.totalCommissionRevenue != null
+    ? commissionStats.totalCommissionRevenue
+    : (commissionStats?.hireCommissionRevenue || 0) + (commissionStats?.donateCommissionRevenue || 0);
 
-  const hireFee = commissionStats?.hireCommissionRevenue != null ? commissionStats.hireCommissionRevenue : Math.round(hireRevenue * 0.15);
+  const hireFee = commissionStats?.hireCommissionRevenue != null ? commissionStats.hireCommissionRevenue : 0;
   const donateFee = commissionStats?.donateCommissionRevenue || 0;
-  const totalPlatformRevenue = commissionStats?.totalCommissionRevenue != null ? commissionStats.totalCommissionRevenue : (hireFee + donateFee);
-  const totalGmv = commissionStats?.totalTransactionVolume != null ? commissionStats.totalTransactionVolume : (hireRevenue + (donateFee ? Math.round(donateFee / 0.15) : 0));
-  const hireCount = commissionStats?.hireTransactions != null ? commissionStats.hireTransactions : ordersList.filter(o => o.status !== 'CANCELLED' && o.status !== 'CANCELED' && o.status !== 'REJECTED' && o.status !== 'REFUNDED').length;
+  const hireCount = commissionStats?.hireTransactions != null ? commissionStats.hireTransactions : 0;
   const donateCount = commissionStats?.donateTransactions || 0;
 
+  // Sơ đồ doanh thu sàn 7 ngày gần nhất (số tiền sàn ăn được 15% từng ngày từ thuê và donate)
   const weeklyData = useMemo(() => {
     const days = ['CN','T2','T3','T4','T5','T6','T7'];
     const now = new Date();
     const result = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now); d.setDate(d.getDate() - (6 - i));
-      const dateStr = d.toISOString().split('T')[0];
-      const val = ordersList.filter(o => o.createdAt?.startsWith(dateStr)).reduce((s, o) => s + (o.totalPrice || o.price || 0), 0);
-      return { day: days[d.getDay()], date: `${d.getDate()}/${d.getMonth()+1}`, val };
+      const d = new Date(now);
+      d.setDate(d.getDate() - (6 - i));
+      const targetDay = d.getDate();
+      const targetMonth = d.getMonth();
+      const targetYear = d.getFullYear();
+
+      let dayPlatformFee = 0;
+      let hirePart = 0;
+      let donatePart = 0;
+
+      if (commissionTransactions && commissionTransactions.length > 0) {
+        commissionTransactions.forEach(t => {
+          const st = (t.status || '').toUpperCase();
+          if (st === 'CANCELLED' || st === 'CANCELED' || st === 'REJECTED') return;
+          const dateObj = parseDateToDateObj(t.createdAt);
+          if (!dateObj) return;
+          if (dateObj.getDate() === targetDay && dateObj.getMonth() === targetMonth && dateObj.getFullYear() === targetYear) {
+            const fee = Number(t.platformFee) || 0;
+            dayPlatformFee += fee;
+            if (t.type === 'DONATE') donatePart += fee;
+            else hirePart += fee;
+          }
+        });
+      } else {
+        ordersList.forEach(o => {
+          const st = (o.status || '').toUpperCase();
+          if (st === 'CANCELLED' || st === 'CANCELED' || st === 'REJECTED') return;
+          const dateObj = parseDateToDateObj(o.startTime || o.createdAt || o.hireTime);
+          if (!dateObj) return;
+          if (dateObj.getDate() === targetDay && dateObj.getMonth() === targetMonth && dateObj.getFullYear() === targetYear) {
+            let fee = o.platformFee != null ? o.platformFee : Math.round((o.totalPrice || o.price || 0) * 0.15);
+            if (st === 'REFUNDED') {
+              const refundPct = o.refundPercentage || 0;
+              fee = Math.max(0, Math.round(fee * (1 - refundPct / 100)));
+            }
+            dayPlatformFee += fee;
+            hirePart += fee;
+          }
+        });
+      }
+
+      return {
+        day: days[d.getDay()],
+        date: `${targetDay}/${targetMonth + 1}`,
+        val: dayPlatformFee,
+        hirePart,
+        donatePart
+      };
     });
+
     const maxVal = Math.max(...result.map(r => r.val), 1);
     return result.map(r => ({ ...r, height: r.val > 0 ? `${Math.max(15, Math.round((r.val/maxVal)*90))}%` : '8px' }));
-  }, [ordersList]);
+  }, [commissionTransactions, ordersList]);
+
+  const weeklyTotalCommission = useMemo(() => {
+    return weeklyData.reduce((acc, r) => acc + r.val, 0);
+  }, [weeklyData]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -119,12 +218,35 @@ const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissi
 
       {/* Revenue Chart */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 20px' }}>Doanh Thu 7 Ngày Gần Nhất</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+              Doanh Thu Sàn 7 Ngày Gần Nhất (Chiết khấu 15%)
+            </h3>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px', display: 'inline-block' }}>
+              Số tiền sàn thu về: <strong style={{ color: '#10b981' }}>{weeklyTotalCommission.toLocaleString('vi-VN')} đ</strong> (từ đơn thuê & donate)
+            </span>
+          </div>
+        </div>
+
         <div style={{ height: '200px', display: 'flex', alignItems: 'flex-end', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
           {weeklyData.map((item, idx) => (
             <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.val > 0 ? `${(item.val/1000).toFixed(0)}k` : '0'}</span>
-              <div title={`${item.day}: ${item.val.toLocaleString('vi-VN')} đ`} style={{ width: '100%', maxWidth: '32px', height: item.height, borderRadius: '6px 6px 0 0', background: item.val > 0 ? 'linear-gradient(180deg, var(--primary), var(--secondary))' : 'rgba(255,255,255,0.06)', transition: 'all 0.3s', cursor: 'pointer' }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                {item.val > 0 ? (item.val >= 1000 ? `${(item.val / 1000).toFixed(0)}k` : `${item.val} đ`) : '0'}
+              </span>
+              <div
+                title={`${item.day} (${item.date}): ${item.val.toLocaleString('vi-VN')} đ (Thuê: ${item.hirePart.toLocaleString('vi-VN')} đ • Donate: ${item.donatePart.toLocaleString('vi-VN')} đ)`}
+                style={{
+                  width: '100%',
+                  maxWidth: '32px',
+                  height: item.height,
+                  borderRadius: '6px 6px 0 0',
+                  background: item.val > 0 ? 'linear-gradient(180deg, #10b981, #6366f1)' : 'rgba(255,255,255,0.06)',
+                  transition: 'all 0.3s',
+                  cursor: 'pointer'
+                }}
+              />
               <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{item.day}</span>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{item.date}</span>
             </div>
@@ -136,17 +258,32 @@ const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissi
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
         <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '20px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 14px' }}>Phân Bổ Trạng Thái Đơn</h3>
-          {['COMPLETED','CONFIRMED','PENDING','CANCELLED'].map(s => {
-            const cnt = ordersList.filter(o => o.status === s).length;
+          {[
+            { key: 'COMPLETED', label: 'Hoàn thành', color: '#10b981', matches: ['COMPLETED'] },
+            { key: 'CONFIRMED', label: 'Đã xác nhận', color: '#06b6d4', matches: ['CONFIRMED', 'IN_PROGRESS'] },
+            { key: 'PENDING', label: 'Chờ duyệt', color: '#f59e0b', matches: ['PENDING'] },
+            { key: 'CANCELLED', label: 'Đã hủy', color: '#ef4444', matches: ['CANCELLED', 'CANCELED', 'REJECTED'] },
+            { key: 'REFUNDED', label: 'Đã hoàn tiền', color: '#a855f7', matches: ['REFUNDED'] },
+          ].map(item => {
+            const cnt = ordersList.filter(o => item.matches.includes(o.status?.toUpperCase())).length;
             const pct = ordersList.length ? Math.round((cnt / ordersList.length) * 100) : 0;
             return (
-              <div key={s} style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.83rem', marginBottom: '4px' }}>
-                  <StatusBadge status={s} />
-                  <span style={{ color: 'var(--text-muted)' }}>{cnt} ({pct}%)</span>
+              <div key={item.key} style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.83rem', marginBottom: '4px' }}>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    background: `${item.color}22`,
+                    color: item.color
+                  }}>
+                    {item.label}
+                  </span>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{cnt} ({pct}%)</span>
                 </div>
-                <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px' }}>
-                  <div style={{ width: `${pct || 1}%`, height: '100%', borderRadius: '3px', background: 'var(--primary)' }} />
+                <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: '3px', background: item.color, transition: 'width 0.4s ease' }} />
                 </div>
               </div>
             );
@@ -592,100 +729,585 @@ const CommissionTab = () => {
 // ─────────────────────────────────────────────
 // USERS TAB
 // ─────────────────────────────────────────────
-const UsersTab = ({ usersList, loading }) => {
+const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers }) => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, ACTIVE, BANNED
+  const [sortBy, setSortBy] = useState('NEWEST'); // NEWEST, BALANCE_DESC, USERNAME_ASC
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  const [selectedUserToBan, setSelectedUserToBan] = useState(null);
+  const [selectedUserUnban, setSelectedUserUnban] = useState(null);
+  const [selectedUserDetail, setSelectedUserDetail] = useState(null);
+
   const { addToast } = useToast();
 
-  const filtered = usersList
-    .filter(u => roleFilter === 'ALL' || (u.roles && u.roles.some(r => r.includes(roleFilter))))
-    .filter(u => !search || u.username?.toLowerCase().includes(search.toLowerCase()) || u.fullName?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+  // Metrics
+  const totalUsers = usersList.length;
+  const bannedCount = useMemo(() => {
+    return usersList.filter(u => u.enabled === false || u.accountNonLocked === false || u.activeBan != null).length;
+  }, [usersList]);
+  const activeCount = totalUsers - bannedCount;
+  const playerCount = useMemo(() => {
+    return usersList.filter(u => u.roles && u.roles.some(r => r.includes('PLAYER'))).length;
+  }, [usersList]);
 
-  const handleBan = async (u) => {
-    try {
-      const action = u.enabled !== false ? 'ban' : 'unban';
-      await api.request?.({ method: 'put', url: `/api/users/${u.id}/${action}` });
-      addToast(`Đã ${action === 'ban' ? 'khóa' : 'mở khóa'} ${u.username}`, 'success');
-    } catch {
-      addToast('Thao tác thất bại', 'error');
-    }
+  // Filtering & Sorting
+  const filteredUsers = useMemo(() => {
+    return usersList
+      .filter(u => {
+        // Role filter
+        if (roleFilter !== 'ALL') {
+          const matchRole = u.roles && u.roles.some(r => r.includes(roleFilter));
+          if (!matchRole) return false;
+        }
+
+        // Status filter
+        const isBanned = u.enabled === false || u.accountNonLocked === false || u.activeBan != null;
+        if (statusFilter === 'ACTIVE' && isBanned) return false;
+        if (statusFilter === 'BANNED' && !isBanned) return false;
+
+        // Search text
+        if (search.trim()) {
+          const term = search.toLowerCase().trim();
+          const username = (u.username || '').toLowerCase();
+          const fullName = (u.fullName || '').toLowerCase();
+          const email = (u.email || '').toLowerCase();
+          const phone = (u.phoneNumber || u.phone || '').toLowerCase();
+          return username.includes(term) || fullName.includes(term) || email.includes(term) || phone.includes(term);
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'BALANCE_DESC') {
+          const balA = Number(a.coin ?? a.walletBalance ?? a.balance ?? 0);
+          const balB = Number(b.coin ?? b.walletBalance ?? b.balance ?? 0);
+          return balB - balA;
+        }
+        if (sortBy === 'USERNAME_ASC') {
+          return (a.username || '').localeCompare(b.username || '');
+        }
+        // Default NEWEST (by id desc)
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [usersList, roleFilter, statusFilter, search, sortBy]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredUsers.length / pageSize) || 1;
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter, statusFilter, sortBy]);
+
+  const handleBanSuccess = (userId, banData) => {
+    setUsersList?.(prev => prev.map(u => {
+      if (u.id === userId) {
+        return {
+          ...u,
+          enabled: false,
+          accountNonLocked: false,
+          activeBan: {
+            reason: banData.reason,
+            description: banData.description,
+            banType: banData.banType,
+            banExpiresAt: banData.banExpiresAt,
+            bannedAt: new Date().toISOString()
+          }
+        };
+      }
+      return u;
+    }));
+    addToast('Đã khóa tài khoản thành công!', 'success');
+    reloadUsers?.();
+  };
+
+  const handleUnbanSuccess = (userId) => {
+    setUsersList?.(prev => prev.map(u => {
+      if (u.id === userId) {
+        return {
+          ...u,
+          enabled: true,
+          accountNonLocked: true,
+          activeBan: null
+        };
+      }
+      return u;
+    }));
+    addToast('Đã mở khóa tài khoản thành công!', 'success');
+    reloadUsers?.();
   };
 
   return (
-    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-        <div>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Danh Sách Người Dùng ({usersList.length})</h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Quản lý tài khoản và phân quyền</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '200px' }} placeholder="Tìm username, email..." value={search} onChange={e => setSearch(e.target.value)} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* ── Top Summary Metric Cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Users size={22} />
           </div>
-          <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
-            <option value="ALL">Tất cả vai trò</option>
-            <option value="ADMIN">Admin</option>
-            <option value="PLAYER">Game thủ</option>
-            <option value="USER">Thành viên</option>
-          </select>
+          <div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Tổng Người Dùng</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '2px' }}>{totalUsers}</div>
+          </div>
+        </div>
+
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <UserCheck size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Đang Hoạt Động</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>{activeCount}</div>
+          </div>
+        </div>
+
+        <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '16px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Ban size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.78rem', color: '#f87171', fontWeight: 700, textTransform: 'uppercase' }}>Đang Bị Khóa</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444', marginTop: '2px' }}>{bannedCount}</div>
+          </div>
+        </div>
+
+        <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: 'rgba(6, 182, 212, 0.15)', color: '#06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Gamepad2 size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Game Thủ / Idol</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#06b6d4', marginTop: '2px' }}>{playerCount}</div>
+          </div>
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Thành viên</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Email</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Số dư ví</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Vai trò</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
-              <th style={{ padding: '10px 14px', textAlign: 'right' }}>Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không có kết quả</td></tr>
-            ) : filtered.map(u => {
-              const isAdmin = u.roles?.some(r => r.includes('ADMIN'));
-              const isPlayer = u.roles?.some(r => r.includes('PLAYER'));
-              const isBanned = u.enabled === false;
-              return (
-                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <img src={getUserAvatar(u)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{u.fullName || u.username}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>@{u.username}</div>
-                      </div>
+      {/* ── Main User Table Panel ── */}
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+        {/* Header Title */}
+        <div style={{ marginBottom: '18px' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Quản Lý Người Dùng & Phân Quyền</h3>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            Kiểm soát tài khoản, áp dụng chế tài kỷ luật khóa/mở khóa tức thì
+          </p>
+        </div>
+
+        {/* Controls Toolbar: Responsive Search & Filters */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap',
+            width: '100%',
+            marginBottom: '20px'
+          }}
+        >
+          {/* Search Box */}
+          <div style={{ position: 'relative', flex: '2 1 240px', minWidth: '180px' }}>
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)',
+                pointerEvents: 'none'
+              }}
+            />
+            <input
+              className="form-control"
+              style={{
+                paddingLeft: '36px',
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px'
+              }}
+              placeholder="Tìm tên, username, email, sđt..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Role Filter */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px',
+                cursor: 'pointer'
+              }}
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+            >
+              <option value="ALL">Tất cả vai trò</option>
+              <option value="ADMIN">🛡️ Admin</option>
+              <option value="PLAYER">🎮 Game thủ</option>
+              <option value="USER">👤 Thành viên</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px',
+                cursor: 'pointer'
+              }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">🟢 Đang hoạt động</option>
+              <option value="BANNED">🔒 Đang bị khóa</option>
+            </select>
+          </div>
+
+          {/* Sort Filter */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px',
+                cursor: 'pointer'
+              }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="NEWEST">Mới nhất</option>
+              <option value="BALANCE_DESC">Số dư ví cao nhất</option>
+              <option value="USERNAME_ASC">Tên đăng nhập (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* User Table */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Thành viên</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Email & Liên Hệ</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Số dư ví</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Vai trò</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Trạng thái</th>
+                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                      <RefreshCw size={18} className="animate-spin" />
+                      <span>Đang tải danh sách tài khoản...</span>
                     </div>
                   </td>
-                  <td style={{ padding: '14px', color: 'var(--text-muted)' }}>{u.email || '—'}</td>
-                  <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>{((u.coin ?? u.walletBalance ?? u.balance ?? 0)).toLocaleString('vi-VN')} đ</td>
-                  <td style={{ padding: '14px' }}>
-                    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: isAdmin ? 'rgba(244,63,94,0.15)' : isPlayer ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.08)', color: isAdmin ? '#f43f5e' : isPlayer ? '#06b6d4' : 'var(--text-muted)' }}>
-                      {isAdmin ? '🛡️ Admin' : isPlayer ? '🎮 Game thủ' : '👤 Thành viên'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px' }}><StatusBadge status={isBanned ? 'BANNED' : 'AVAILABLE'} /></td>
-                  <td style={{ padding: '14px', textAlign: 'right' }}>
-                    {!isAdmin && (
-                      <button className="btn btn-outline" style={{ padding: '5px 10px', fontSize: '0.75rem', height: 'auto', borderColor: isBanned ? '#10b981' : '#ef4444', color: isBanned ? '#10b981' : '#ef4444' }} onClick={() => handleBan(u)}>
-                        {isBanned ? <Unlock size={13} /> : <Lock size={13} />}
-                        <span style={{ marginLeft: '4px' }}>{isBanned ? 'Mở khóa' : 'Khóa'}</span>
-                      </button>
-                    )}
+                </tr>
+              ) : paginatedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>
+                    Không tìm thấy người dùng nào phù hợp với bộ lọc
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ) : (
+                paginatedUsers.map(u => {
+                  const isAdmin = u.roles?.some(r => r.includes('ADMIN'));
+                  const isPlayer = u.roles?.some(r => r.includes('PLAYER'));
+                  const isBanned = u.enabled === false || u.accountNonLocked === false || u.activeBan != null;
+                  const activeBan = u.activeBan;
+                  const walletVal = Number(u.coin ?? u.walletBalance ?? u.balance ?? 0);
+
+                  return (
+                    <tr
+                      key={u.id}
+                      style={{
+                        borderBottom: '1px solid var(--border-color)',
+                        transition: 'background 0.15s',
+                        background: isBanned ? 'rgba(239, 68, 68, 0.03)' : 'transparent'
+                      }}
+                    >
+                      {/* Member Info */}
+                      <td style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <img
+                            src={getUserAvatar(u)}
+                            alt=""
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: isBanned ? '2px solid #ef4444' : '2px solid rgba(255,255,255,0.08)'
+                            }}
+                          />
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontWeight: 700, color: '#f8fafc' }}>{u.fullName || u.username}</span>
+                              <span style={{ fontSize: '0.7rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                                #{u.id}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              @{u.username}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Email & Phone */}
+                      <td style={{ padding: '14px' }}>
+                        <div style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>{u.email || '—'}</div>
+                        {(u.phoneNumber || u.phone) && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            📞 {u.phoneNumber || u.phone}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Wallet Balance */}
+                      <td style={{ padding: '14px', fontWeight: 800, color: walletVal > 0 ? '#10b981' : 'var(--text-muted)' }}>
+                        {walletVal.toLocaleString('vi-VN')} đ
+                      </td>
+
+                      {/* Role Badge */}
+                      <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
+                        <span
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap',
+                            display: 'inline-block',
+                            background: isAdmin ? 'rgba(244,63,94,0.15)' : isPlayer ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.08)',
+                            color: isAdmin ? '#f43f5e' : isPlayer ? '#06b6d4' : 'var(--text-muted)'
+                          }}
+                        >
+                          {isAdmin ? '🛡️ Admin' : isPlayer ? '🎮 Game thủ' : '👤 Thành viên'}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '14px' }}>
+                        {isBanned ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                color: '#ef4444',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                width: 'fit-content'
+                              }}
+                            >
+                              <Lock size={11} />
+                              Bị khóa
+                            </span>
+                            {activeBan && (
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  color: '#f87171',
+                                  maxWidth: '180px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title={activeBan.reason}
+                              >
+                                {activeBan.banType === 'TEMPORARY' ? '⏳ Tạm thời' : '🛑 Vĩnh viễn'}
+                                {activeBan.reason ? `: ${activeBan.reason}` : ''}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10b981',
+                              border: '1px solid rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                            Sẵn sàng
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Action buttons */}
+                      <td style={{ padding: '14px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                          <button
+                            className="btn btn-outline"
+                            title="Xem chi tiết người dùng"
+                            style={{ padding: '5px 8px', height: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                            onClick={() => setSelectedUserDetail(u)}
+                          >
+                            <Eye size={13} />
+                          </button>
+
+                          {isAdmin ? (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 8px' }}>
+                              Bảo vệ
+                            </span>
+                          ) : isBanned ? (
+                            <button
+                              className="btn btn-outline"
+                              style={{
+                                padding: '5px 12px',
+                                fontSize: '0.75rem',
+                                height: 'auto',
+                                borderColor: '#10b981',
+                                color: '#10b981',
+                                background: 'rgba(16, 185, 129, 0.08)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontWeight: 700
+                              }}
+                              onClick={() => setSelectedUserUnban(u)}
+                            >
+                              <Unlock size={13} />
+                              <span>Mở khóa</span>
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-outline"
+                              style={{
+                                padding: '5px 12px',
+                                fontSize: '0.75rem',
+                                height: 'auto',
+                                borderColor: '#ef4444',
+                                color: '#ef4444',
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontWeight: 700
+                              }}
+                              onClick={() => setSelectedUserToBan(u)}
+                            >
+                              <Lock size={13} />
+                              <span>Khóa</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Pagination Footer ── */}
+        {!loading && filteredUsers.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Hiển thị <strong>{((currentPage - 1) * pageSize) + 1}</strong> - <strong>{Math.min(currentPage * pageSize, filteredUsers.length)}</strong> trên tổng số <strong>{filteredUsers.length}</strong> người dùng
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                className="btn btn-outline"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                style={{ padding: '5px 10px', height: 'auto', fontSize: '0.78rem' }}
+              >
+                Trước
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                .map((page, idx, arr) => {
+                  const prev = arr[idx - 1];
+                  return (
+                    <React.Fragment key={page}>
+                      {prev && page - prev > 1 && (
+                        <span style={{ padding: '0 4px', color: 'var(--text-muted)' }}>...</span>
+                      )}
+                      <button
+                        className={currentPage === page ? 'btn btn-primary' : 'btn btn-outline'}
+                        onClick={() => setCurrentPage(page)}
+                        style={{
+                          padding: '5px 10px',
+                          height: 'auto',
+                          fontSize: '0.78rem',
+                          minWidth: '32px'
+                        }}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
+
+              <button
+                className="btn btn-outline"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                style={{ padding: '5px 10px', height: 'auto', fontSize: '0.78rem' }}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* ── Modals ── */}
+      <BanUserModal
+        isOpen={Boolean(selectedUserToBan)}
+        onClose={() => setSelectedUserToBan(null)}
+        user={selectedUserToBan}
+        onSuccess={handleBanSuccess}
+      />
+
+      <UnbanUserModal
+        isOpen={Boolean(selectedUserUnban)}
+        onClose={() => setSelectedUserUnban(null)}
+        user={selectedUserUnban}
+        onSuccess={handleUnbanSuccess}
+      />
+
+      <UserDetailModal
+        isOpen={Boolean(selectedUserDetail)}
+        onClose={() => setSelectedUserDetail(null)}
+        user={selectedUserDetail}
+      />
     </div>
   );
 };
@@ -698,7 +1320,10 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
   const [summaryData, setSummaryData] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [gameFilter, setGameFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('REVENUE_DESC');
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   useEffect(() => {
     api.getPlayersSummary().then(d => { setSummaryData(d); setSummaryLoading(false); });
@@ -707,11 +1332,103 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
   const pendingPlayers = playersList.filter(p => p.status === 'PENDING' || p.adminStatus === 'PENDING');
   const activePlayers = playersList.filter(p => p.status !== 'PENDING' && p.adminStatus !== 'PENDING');
 
-  const filteredSummary = summaryData.filter(p => {
-    const matchSearch = !search || p.name?.toLowerCase().includes(search.toLowerCase()) || p.playerName?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'ALL' || p.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  // Danh sách các tựa game có trong hệ thống để đưa vào dropdown bộ lọc
+  const availableGameNames = useMemo(() => {
+    const set = new Set();
+    summaryData.forEach(p => {
+      const g = p.gameName || p.game;
+      if (g) set.add(g);
+    });
+    return Array.from(set).sort();
+  }, [summaryData]);
+
+  // Gộp các hồ sơ game theo từng Game thủ duy nhất
+  const groupedPlayers = useMemo(() => {
+    const map = new Map();
+    summaryData.forEach(p => {
+      const key = p.userId ? String(p.userId) : (p.email || p.name || p.playerName || p.id);
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          id: p.id,
+          userId: p.userId,
+          name: p.name || p.fullName || p.playerName,
+          playerName: p.playerName || p.username || '',
+          email: p.email,
+          avatarUrl: p.avatarUrl,
+          games: [],
+          totalOrders: 0,
+          totalReviews: 0,
+          totalRevenue: 0,
+          status: p.status || 'AVAILABLE',
+          ratings: []
+        });
+      }
+      const group = map.get(key);
+      const gName = p.gameName || p.game;
+      if (gName && !group.games.some(g => g.name === gName)) {
+        group.games.push({
+          id: p.id,
+          name: gName,
+          rank: p.rankLabel || '',
+          status: p.status,
+          totalOrders: p.totalOrders || 0,
+          rating: p.rating || 0,
+          totalRevenue: p.totalRevenue || 0,
+          pricePerHour: p.pricePerHour || p.price || 0,
+          server: p.server || '',
+          role: p.role || '',
+          bio: p.bio || p.description || '',
+          totalReviews: p.totalReviews || 0
+        });
+      }
+      group.totalOrders += (p.totalOrders || 0);
+      group.totalReviews += (p.totalReviews || 0);
+      group.totalRevenue += (p.totalRevenue || 0);
+      if (p.rating > 0) {
+        group.ratings.push(p.rating);
+      }
+      if (p.status === 'AVAILABLE') {
+        group.status = 'AVAILABLE';
+      }
+    });
+
+    return Array.from(map.values()).map(g => ({
+      ...g,
+      avgRating: g.ratings.length ? (g.ratings.reduce((a, b) => a + b, 0) / g.ratings.length) : 0
+    }));
+  }, [summaryData]);
+
+  const filteredGrouped = useMemo(() => {
+    return groupedPlayers
+      .filter(p => {
+        // Search
+        if (search.trim()) {
+          const s = search.toLowerCase().trim();
+          const matchName = (p.name || '').toLowerCase().includes(s);
+          const matchUsername = (p.playerName || '').toLowerCase().includes(s);
+          const matchGame = p.games.some(g => (g.name || '').toLowerCase().includes(s));
+          if (!matchName && !matchUsername && !matchGame) return false;
+        }
+        // Game filter
+        if (gameFilter !== 'ALL') {
+          const hasGame = p.games.some(g => g.name === gameFilter);
+          if (!hasGame) return false;
+        }
+        // Status filter
+        if (statusFilter !== 'ALL' && p.status !== statusFilter) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'REVENUE_DESC') return (b.totalRevenue || 0) - (a.totalRevenue || 0);
+        if (sortBy === 'ORDERS_DESC') return (b.totalOrders || 0) - (a.totalOrders || 0);
+        if (sortBy === 'RATING_DESC') return (b.avgRating || 0) - (a.avgRating || 0);
+        if (sortBy === 'NAME_ASC') return (a.name || '').localeCompare(b.name || '');
+        return 0;
+      });
+  }, [groupedPlayers, search, gameFilter, statusFilter, sortBy]);
 
   const handleApprove = async (pid) => {
     try {
@@ -766,18 +1483,117 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
 
       {/* Full player list with summary data */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Danh Sách Game Thủ ({summaryData.length})</h3>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder="Tìm game thủ..." value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
-            <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option value="ALL">Tất cả</option>
-              <option value="AVAILABLE">Sẵn sàng</option>
-              <option value="BANNED">Bị khóa</option>
-              <option value="PENDING">Chờ duyệt</option>
+        {/* Header Title */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '18px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+              Danh Sách Game Thủ ({filteredGrouped.length})
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+              Đã tối ưu gộp {summaryData.length} hồ sơ theo {groupedPlayers.length} Game thủ
+            </p>
+          </div>
+        </div>
+
+        {/* Controls Toolbar: Responsive Search & Filters */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap',
+            width: '100%',
+            marginBottom: '20px'
+          }}
+        >
+          {/* Search Box */}
+          <div style={{ position: 'relative', flex: '2 1 240px', minWidth: '180px' }}>
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)',
+                pointerEvents: 'none'
+              }}
+            />
+            <input
+              className="form-control"
+              style={{
+                paddingLeft: '36px',
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px'
+              }}
+              placeholder="Tìm game thủ, username, game..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Game Filter */}
+          <div style={{ flex: '1 1 150px', minWidth: '135px' }}>
+            <select
+              className="form-control"
+              style={{
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px',
+                cursor: 'pointer'
+              }}
+              value={gameFilter}
+              onChange={(e) => setGameFilter(e.target.value)}
+            >
+              <option value="ALL">🎮 Tất cả game</option>
+              {availableGameNames.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px',
+                cursor: 'pointer'
+              }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="AVAILABLE">🟢 Đang sẵn sàng</option>
+              <option value="BANNED">🔒 Đang bị khóa</option>
+              <option value="PENDING">⏳ Chờ duyệt</option>
+            </select>
+          </div>
+
+          {/* Sort Filter */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{
+                height: '40px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px',
+                cursor: 'pointer'
+              }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="REVENUE_DESC">Doanh thu cao nhất</option>
+              <option value="ORDERS_DESC">Số đơn nhiều nhất</option>
+              <option value="RATING_DESC">Đánh giá cao nhất</option>
+              <option value="NAME_ASC">Tên game thủ (A-Z)</option>
             </select>
           </div>
         </div>
@@ -787,40 +1603,136 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
                 <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game thủ</th>
-                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game đã đăng ký</th>
                 <th style={{ padding: '10px 14px', textAlign: 'left' }}>Đánh giá</th>
                 <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tổng đơn</th>
                 <th style={{ padding: '10px 14px', textAlign: 'left' }}>Doanh thu</th>
                 <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center' }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {summaryLoading ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
-              ) : filteredSummary.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không có game thủ nào</td></tr>
-              ) : filteredSummary.map(p => (
-                <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <img src={getUserAvatar(p)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{p.name || p.fullName}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.playerName || p.username}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '14px', color: 'var(--text-muted)' }}>{p.gameName || p.game || '—'}</td>
-                  <td style={{ padding: '14px' }}>⭐ {(p.rating || 0).toFixed(1)}</td>
-                  <td style={{ padding: '14px', fontWeight: 600 }}>{p.totalOrders || 0}</td>
-                  <td style={{ padding: '14px', color: '#10b981', fontWeight: 700 }}>{(p.totalRevenue || 0).toLocaleString('vi-VN')} đ</td>
-                  <td style={{ padding: '14px' }}><StatusBadge status={p.status || 'AVAILABLE'} /></td>
-                </tr>
-              ))}
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+              ) : filteredGrouped.length === 0 ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không có game thủ nào phù hợp</td></tr>
+              ) : (
+                filteredGrouped.map(p => {
+                  const primaryGame = getPrimaryGame(p.games);
+                  const hasMultiple = p.games && p.games.length > 1;
+
+                  return (
+                    <tr key={p.key} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      {/* Game thủ */}
+                      <td style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <img src={getUserAvatar(p)} alt="" style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#f8fafc' }}>{p.name || p.playerName}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              @{p.playerName || 'player'} {p.email ? `• ${p.email}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Game đã đăng ký */}
+                      <td style={{ padding: '14px' }}>
+                        {primaryGame ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                background: 'rgba(99, 102, 241, 0.12)',
+                                color: '#a5b4fc',
+                                border: '1px solid rgba(99, 102, 241, 0.25)',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <span>🎮 {primaryGame.name}</span>
+                              {primaryGame.rank && <span style={{ opacity: 0.75, fontSize: '0.7rem' }}>({primaryGame.rank})</span>}
+                            </span>
+                            {hasMultiple && (
+                              <span
+                                title={`Đã đăng ký ${p.games.length} game. Nhấn "Xem chi tiết" để xem tất cả.`}
+                                style={{
+                                  color: 'var(--text-muted)',
+                                  fontWeight: 800,
+                                  fontSize: '0.95rem',
+                                  letterSpacing: '1px',
+                                  userSelect: 'none',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => setSelectedPlayer(p)}
+                              >
+                                .....
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Đánh giá */}
+                      <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
+                        ⭐ {p.avgRating > 0 ? p.avgRating.toFixed(1) : '0.0'}
+                      </td>
+
+                      {/* Tổng đơn */}
+                      <td style={{ padding: '14px', fontWeight: 600 }}>{p.totalOrders} đơn</td>
+
+                      {/* Doanh thu */}
+                      <td style={{ padding: '14px', color: '#10b981', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {(p.totalRevenue || 0).toLocaleString('vi-VN')} đ
+                      </td>
+
+                      {/* Trạng thái */}
+                      <td style={{ padding: '14px' }}>
+                        <StatusBadge status={p.status || 'AVAILABLE'} />
+                      </td>
+
+                      {/* Thao tác: Chi tiết */}
+                      <td style={{ padding: '14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPlayer(p)}
+                          className="btn btn-outline"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '0.78rem',
+                            gap: '6px',
+                            borderRadius: '8px',
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}
+                          title="Xem toàn bộ thông tin chi tiết game thủ"
+                        >
+                          <Eye size={13} />
+                          <span>Chi tiết</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Player Detail Modal */}
+      <PlayerDetailModal
+        isOpen={!!selectedPlayer}
+        onClose={() => setSelectedPlayer(null)}
+        player={selectedPlayer}
+      />
     </div>
   );
 };
@@ -830,60 +1742,313 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
 // ─────────────────────────────────────────────
 const OrdersTab = ({ ordersList, loading }) => {
   const [search, setSearch] = useState('');
+  const [gameFilter, setGameFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [dateFilter, setDateFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const filtered = ordersList
-    .filter(o => statusFilter === 'ALL' || o.status === statusFilter)
-    .filter(o => !search || String(o.id).includes(search) || o.renterUsername?.toLowerCase().includes(search.toLowerCase()) || o.playerName?.toLowerCase().includes(search.toLowerCase()));
+  // Available game names extracted from order records
+  const availableGameNames = useMemo(() => {
+    const set = new Set();
+    ordersList.forEach(o => {
+      const g = o.game || o.player?.game;
+      if (g && typeof g === 'string' && g.trim()) {
+        set.add(g.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [ordersList]);
+
+  // Filtered and sorted orders
+  const filtered = useMemo(() => {
+    return ordersList
+      .filter(o => {
+        // Status filter
+        if (statusFilter !== 'ALL') {
+          const st = (o.status || '').toUpperCase();
+          if (statusFilter === 'CANCELLED') {
+            if (st !== 'CANCELLED' && st !== 'CANCELED' && st !== 'REJECTED') return false;
+          } else if (statusFilter === 'REFUNDED') {
+            if (st !== 'REFUNDED') return false;
+          } else if (st !== statusFilter) {
+            return false;
+          }
+        }
+        // Game filter
+        if (gameFilter !== 'ALL') {
+          const g = o.game || o.player?.game || '';
+          if (g !== gameFilter) return false;
+        }
+        // Date filter
+        if (dateFilter !== 'ALL') {
+          const d = parseDateToDateObj(o.startTime || o.createdAt);
+          if (!d) return false;
+          const now = new Date();
+          if (dateFilter === 'TODAY') {
+            if (d.getDate() !== now.getDate() || d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+          } else if (dateFilter === 'WEEK') {
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            if (d < sevenDaysAgo) return false;
+          } else if (dateFilter === 'MONTH') {
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            if (d < thirtyDaysAgo) return false;
+          }
+        }
+        // Search text
+        if (search.trim()) {
+          const s = search.toLowerCase().trim();
+          const matchId = String(o.id).includes(s);
+          const matchRenter = (o.renterName || o.renterUsername || o.renter?.username || '').toLowerCase().includes(s);
+          const matchPlayer = (o.playerName || o.player?.username || '').toLowerCase().includes(s);
+          const matchGame = (o.game || o.player?.game || '').toLowerCase().includes(s);
+          if (!matchId && !matchRenter && !matchPlayer && !matchGame) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'PRICE_DESC') {
+          return Number(b.totalPrice || b.price || 0) - Number(a.totalPrice || a.price || 0);
+        }
+        if (sortBy === 'PRICE_ASC') {
+          return Number(a.totalPrice || a.price || 0) - Number(b.totalPrice || b.price || 0);
+        }
+        const da = parseDateToDateObj(a.startTime || a.createdAt);
+        const db = parseDateToDateObj(b.startTime || b.createdAt);
+        if (sortBy === 'OLDEST') {
+          if (da && db) return da - db;
+          return a.id - b.id;
+        }
+        // Default NEWEST
+        if (da && db) return db - da;
+        return b.id - a.id;
+      });
+  }, [ordersList, search, gameFilter, statusFilter, dateFilter, sortBy]);
+
+  const totalFilteredRevenue = useMemo(() => {
+    return filtered
+      .filter(o => (o.status || '').toUpperCase() === 'COMPLETED')
+      .reduce((sum, o) => sum + Number(o.totalPrice || o.price || 0), 0);
+  }, [filtered]);
 
   return (
     <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Lịch Sử Đơn Hàng ({ordersList.length})</h3>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder="Tìm mã đơn, tên..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="ALL">Tất cả</option>
-            <option value="PENDING">Chờ xác nhận</option>
-            <option value="CONFIRMED">Đã xác nhận</option>
-            <option value="COMPLETED">Hoàn thành</option>
-            <option value="CANCELLED">Đã hủy</option>
+      {/* Title Header */}
+      <div style={{ marginBottom: '18px' }}>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+          Lịch Sử Đơn Hàng ({filtered.length})
+        </h3>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+          Tổng {ordersList.length} đơn | Doanh thu hoàn thành (đã lọc): <strong style={{ color: '#10b981' }}>{totalFilteredRevenue.toLocaleString('vi-VN')} đ</strong>
+        </p>
+      </div>
+
+      {/* Responsive Filter Toolbar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          flexWrap: 'wrap',
+          width: '100%',
+          marginBottom: '20px'
+        }}
+      >
+        {/* Search Box */}
+        <div style={{ position: 'relative', flex: '2 1 220px', minWidth: '180px' }}>
+          <Search
+            size={15}
+            style={{
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-muted)',
+              pointerEvents: 'none'
+            }}
+          />
+          <input
+            className="form-control"
+            style={{ paddingLeft: '36px', height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px' }}
+            placeholder="Tìm mã đơn, người thuê, game thủ, game..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Game Filter */}
+        <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+          <select
+            className="form-control"
+            style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+            value={gameFilter}
+            onChange={(e) => setGameFilter(e.target.value)}
+          >
+            <option value="ALL">🎮 Tất cả game</option>
+            {availableGameNames.map(g => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status Filter */}
+        <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+          <select
+            className="form-control"
+            style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="COMPLETED">🟢 Hoàn thành</option>
+            <option value="CONFIRMED">🔵 Đã xác nhận</option>
+            <option value="PENDING">⏳ Chờ xác nhận</option>
+            <option value="CANCELLED">🔴 Đã hủy</option>
+            <option value="REFUNDED">🟣 Đã hoàn tiền</option>
+          </select>
+        </div>
+
+        {/* Date Filter */}
+        <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+          <select
+            className="form-control"
+            style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          >
+            <option value="ALL">📅 Tất cả thời gian</option>
+            <option value="TODAY">Hôm nay</option>
+            <option value="WEEK">7 ngày gần nhất</option>
+            <option value="MONTH">30 ngày qua</option>
+          </select>
+        </div>
+
+        {/* Sort Filter */}
+        <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+          <select
+            className="form-control"
+            style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="NEWEST">Mới nhất</option>
+            <option value="OLDEST">Cũ nhất</option>
+            <option value="PRICE_DESC">Tổng tiền cao nhất</option>
+            <option value="PRICE_ASC">Tổng tiền thấp nhất</option>
           </select>
         </div>
       </div>
+
+      {/* Orders Table */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Mã đơn</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Người thuê</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game thủ</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tổng tiền</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Thời gian</th>
-              <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Mã đơn</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Người thuê</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Game thủ</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Tổng tiền</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Thời gian</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Trạng thái</th>
+              <th style={{ padding: '12px 14px', textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Chưa có đơn hàng nào</td></tr>
-            ) : filtered.map(o => (
-              <tr key={o.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={{ padding: '14px', fontWeight: 700, color: 'var(--primary)' }}>#{o.id}</td>
-                <td style={{ padding: '14px' }}>{o.renterUsername || o.renterId || '—'}</td>
-                <td style={{ padding: '14px' }}>{o.playerName || o.playerId || '—'}</td>
-                <td style={{ padding: '14px', fontWeight: 700, color: '#10b981' }}>{(o.totalPrice || o.price || 0).toLocaleString('vi-VN')} đ</td>
-                <td style={{ padding: '14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{o.createdAt ? new Date(o.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
-                <td style={{ padding: '14px' }}><StatusBadge status={o.status} /></td>
-              </tr>
-            ))}
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không tìm thấy đơn hàng nào phù hợp</td></tr>
+            ) : filtered.map(o => {
+              const renterDisplayName = o.renterName || o.renterUsername || o.renter?.username || (o.renterId ? `User #${o.renterId}` : '—');
+              const playerDisplayName = o.playerName || o.player?.username || (o.playerId ? `Player #${o.playerId}` : '—');
+
+              return (
+                <tr key={o.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  {/* Mã đơn */}
+                  <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.92rem' }}>#{o.id}</span>
+                  </td>
+
+                  {/* Người thuê */}
+                  <td style={{ padding: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <img
+                        src={o.renterAvatarUrl || getUserAvatar({ username: renterDisplayName })}
+                        alt=""
+                        style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                      />
+                      <div style={{ lineHeight: 1.25 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{renterDisplayName}</div>
+                        {o.renterId && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>ID: #{o.renterId}</div>}
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Game thủ */}
+                  <td style={{ padding: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <img
+                        src={o.playerAvatarUrl || getUserAvatar({ username: playerDisplayName })}
+                        alt=""
+                        style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                      />
+                      <div style={{ lineHeight: 1.25 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{playerDisplayName}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>
+                          {o.game || 'Duo Game'}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Tổng tiền */}
+                  <td style={{ padding: '14px', fontWeight: 700, color: '#10b981', whiteSpace: 'nowrap' }}>
+                    {(o.totalPrice || o.price || 0).toLocaleString('vi-VN')} đ
+                  </td>
+
+                  {/* Thời gian */}
+                  <td style={{ padding: '14px', fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    {formatOrderDateTime(o.startTime || o.createdAt)}
+                  </td>
+
+                  {/* Trạng thái */}
+                  <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
+                    <StatusBadge status={o.status} order={o} />
+                  </td>
+
+                  {/* Thao tác */}
+                  <td style={{ padding: '14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(o)}
+                      className="btn btn-outline"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        gap: '6px',
+                        borderRadius: '8px',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}
+                      title="Xem toàn bộ thông tin chi tiết đơn hàng"
+                    >
+                      <Eye size={13} />
+                      <span>Chi tiết</span>
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal
+        isOpen={Boolean(selectedOrder)}
+        onClose={() => setSelectedOrder(null)}
+        order={selectedOrder}
+      />
     </div>
   );
 };
@@ -1637,13 +2802,14 @@ export const AdminPage = () => {
   const [reportsList, setReportsList] = useState([]);
   const [gamesList, setGamesList] = useState([]);
   const [commissionStats, setCommissionStats] = useState(null);
+  const [commissionTransactions, setCommissionTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [usersR, playersR, ordersR, gamesR, reportsR, commStatsR] = await Promise.allSettled([
-        api.getUsers(), api.getPlayers(), api.getAllOrdersAdmin(), api.getGames(), api.getReports(), api.getAdminCommissionStats()
+      const [usersR, playersR, ordersR, gamesR, reportsR, commStatsR, commTxR] = await Promise.allSettled([
+        api.getUsers(), api.getPlayers(), api.getAllOrdersAdmin(), api.getGames(), api.getReports(), api.getAdminCommissionStats(), api.getAdminCommissionTransactions({ type: 'ALL' })
       ]);
       if (usersR.status === 'fulfilled' && Array.isArray(usersR.value)) setUsersList(usersR.value);
       if (playersR.status === 'fulfilled' && Array.isArray(playersR.value)) setPlayersList(playersR.value);
@@ -1651,6 +2817,7 @@ export const AdminPage = () => {
       if (gamesR.status === 'fulfilled' && Array.isArray(gamesR.value)) setGamesList(gamesR.value);
       if (reportsR.status === 'fulfilled' && Array.isArray(reportsR.value)) setReportsList(reportsR.value);
       if (commStatsR.status === 'fulfilled' && commStatsR.value) setCommissionStats(commStatsR.value);
+      if (commTxR.status === 'fulfilled' && Array.isArray(commTxR.value)) setCommissionTransactions(commTxR.value);
     } catch (err) {
       console.error('Admin data load error:', err);
     } finally {
@@ -1695,7 +2862,7 @@ export const AdminPage = () => {
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
       {/* Sidebar */}
       <aside style={{
-        width: SIDEBAR_WIDTH, minHeight: '100vh', background: 'var(--card-bg)',
+        width: SIDEBAR_WIDTH, minHeight: '100vh', background: isDark ? '#0f172a' : '#ffffff',
         borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column',
         position: 'fixed', top: 0, left: 0, zIndex: 100, transition: 'width 0.25s ease', overflow: 'hidden'
       }}>
@@ -1756,9 +2923,17 @@ export const AdminPage = () => {
       <div style={{ marginLeft: SIDEBAR_WIDTH, flex: 1, transition: 'margin-left 0.25s ease', minWidth: 0 }}>
         {/* Top header */}
         <header style={{
-          position: 'sticky', top: 0, zIndex: 90, background: 'var(--card-bg)',
-          borderBottom: '1px solid var(--border-color)', padding: '0 24px',
-          display: 'flex', alignItems: 'center', height: '64px', gap: '16px'
+          position: 'sticky',
+          top: 0,
+          zIndex: 90,
+          background: isDark ? '#0f172a' : '#ffffff',
+          borderBottom: '1px solid var(--border-color)',
+          boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.4)' : '0 2px 10px rgba(0, 0, 0, 0.05)',
+          padding: '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          height: '64px',
+          gap: '16px'
         }}>
           <div style={{ flex: 1 }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -1780,9 +2955,19 @@ export const AdminPage = () => {
 
         {/* Page content */}
         <main style={{ padding: '24px' }}>
-          {activeSection === 'overview' && <OverviewTab ordersList={ordersList} usersList={usersList} playersList={playersList} reportsList={reportsList} commissionStats={commissionStats} loading={loading} />}
+          {activeSection === 'overview' && (
+            <OverviewTab
+              ordersList={ordersList}
+              usersList={usersList}
+              playersList={playersList}
+              reportsList={reportsList}
+              commissionStats={commissionStats}
+              commissionTransactions={commissionTransactions}
+              loading={loading}
+            />
+          )}
           {activeSection === 'commission' && <CommissionTab />}
-          {activeSection === 'users' && <UsersTab usersList={usersList} loading={loading} />}
+          {activeSection === 'users' && <UsersTab usersList={usersList} setUsersList={setUsersList} loading={loading} reloadUsers={loadData} />}
           {activeSection === 'players' && <PlayersTab playersList={playersList} setPlayersList={setPlayersList} loading={loading} />}
           {activeSection === 'orders' && <OrdersTab ordersList={ordersList} loading={loading} />}
           {activeSection === 'games' && <GamesTab gamesList={gamesList} setGamesList={setGamesList} loading={loading} />}

@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class GamePlayerSummaryDTO {
     private Long id;
+    private Long userId;
     private String name;
     private String email;
     private String playerName; // Tên player khi đăng ký làm player
@@ -16,4 +17,8 @@ public class GamePlayerSummaryDTO {
     private double rating;
     private String gameName;
     private String avatarUrl;
+    private java.math.BigDecimal pricePerHour;
+    private String bio;
+    private String server;
+    private String role;
 } 

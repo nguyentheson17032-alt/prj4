@@ -104,7 +104,12 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('email', userData.email || '');
       return { success: true, user: userData };
     }
-    return { success: false, error: res.error || 'Đăng nhập thất bại, vui lòng kiểm tra lại' };
+    return {
+      success: false,
+      isBanned: res.isBanned || false,
+      banDetails: res.banDetails || null,
+      error: res.error || 'Đăng nhập thất bại, vui lòng kiểm tra lại'
+    };
   };
 
   const register = async (userData) => {

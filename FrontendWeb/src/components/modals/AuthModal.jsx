@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Lock, User, Mail, Phone, Gamepad2, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { AccountBannedModal } from './AccountBannedModal';
 import '../../styles/modals.css';
 
 // Reusable inline error block
@@ -66,6 +67,10 @@ export const AuthModal = ({ isOpen, onClose }) => {
   const [loginError, setLoginError] = useState('');
   const [registerError, setRegisterError] = useState('');
 
+  // Banned state
+  const [bannedModalOpen, setBannedModalOpen] = useState(false);
+  const [banDetails, setBanDetails] = useState(null);
+
   if (!isOpen) return null;
 
   const switchMode = (m) => {
@@ -107,6 +112,10 @@ export const AuthModal = ({ isOpen, onClose }) => {
         onClose();
       }
     } else {
+      if (res.isBanned || res.banDetails) {
+        setBanDetails(res.banDetails);
+        setBannedModalOpen(true);
+      }
       const msg = res.error || 'Đăng nhập thất bại, vui lòng kiểm tra lại thông tin.';
       setLoginError(msg);
     }
@@ -353,6 +362,13 @@ export const AuthModal = ({ isOpen, onClose }) => {
           )}
         </div>
       </div>
+
+      <AccountBannedModal
+        isOpen={bannedModalOpen}
+        onClose={() => setBannedModalOpen(false)}
+        banDetails={banDetails}
+        username={username}
+      />
     </div>
   );
 };

@@ -14,10 +14,12 @@ public class UserBan {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"roles", "avatarData", "profileImageData", "password", "activeBan"})
     private User user;
 
     @ManyToOne
     @JoinColumn(name = "banned_by", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"roles", "avatarData", "profileImageData", "password", "activeBan"})
     private User bannedBy;
 
     @Column(nullable = false)

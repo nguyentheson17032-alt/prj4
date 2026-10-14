@@ -50,6 +50,18 @@ public class AuthController {
     @Autowired(required = false)
     private OrderPayoutService orderPayoutService;
 
+    @Autowired(required = false)
+    private com.example.backend.repository.UserBanRepository userBanRepository;
+
+    @Autowired(required = false)
+    private com.example.backend.service.UserBanService userBanService;
+
+    @Autowired(required = false)
+    private com.example.backend.repository.UserRepository userRepository;
+
+    @Autowired(required = false)
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     public AuthController(AuthenticationManager authenticationManager,
                          JwtTokenUtil jwtTokenUtil,
                          UserService userService,
@@ -153,10 +165,61 @@ public class AuthController {
                 return ResponseEntity.badRequest().body("Mật khẩu không được để trống");
             }
 
+            // Check if user exists and ban status
+            User existingUser = userService.findByUsername(loginRequest.getUsername().trim());
+            if (existingUser == null && userRepository != null) {
+                existingUser = userRepository.findByEmail(loginRequest.getUsername().trim()).orElse(null);
+            }
+
+            if (existingUser != null) {
+                // Auto-check expired temporary ban
+                if (userBanRepository != null) {
+                    try {
+                        java.util.Optional<com.example.backend.entity.UserBan> activeBanOpt = userBanRepository.findActiveBanByUserId(existingUser.getId());
+                        if (activeBanOpt.isPresent()) {
+                            com.example.backend.entity.UserBan ban = activeBanOpt.get();
+                            if ("TEMPORARY".equalsIgnoreCase(ban.getBanType()) && ban.getBanExpiresAt() != null) {
+                                if (java.time.LocalDateTime.now().isAfter(ban.getBanExpiresAt())) {
+                                    ban.setStatus("EXPIRED");
+                                    userBanRepository.save(ban);
+                                    existingUser.setEnabled(true);
+                                    existingUser.setAccountNonLocked(true);
+                                    userService.save(existingUser);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Lỗi kiểm tra ban hết hạn: {}", e.getMessage());
+                    }
+                }
+
+                // Check if currently locked / disabled / active ban
+                boolean isAccountLocked = !existingUser.isEnabled() || !existingUser.isAccountNonLocked();
+                java.util.Optional<com.example.backend.entity.UserBan> currentActiveBan = userBanRepository != null ? 
+                    userBanRepository.findActiveBanByUserId(existingUser.getId()) : java.util.Optional.empty();
+
+                if (isAccountLocked || currentActiveBan.isPresent()) {
+                    // Check password first
+                    boolean passwordMatches = false;
+                    if (passwordEncoder != null) {
+                        passwordMatches = passwordEncoder.matches(loginRequest.getPassword(), existingUser.getPassword());
+                    } else {
+                        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+                        passwordMatches = encoder.matches(loginRequest.getPassword(), existingUser.getPassword());
+                    }
+
+                    if (passwordMatches) {
+                        return buildBanResponse(existingUser, currentActiveBan.orElse(null));
+                    } else {
+                        return ResponseEntity.status(401).body("Tên đăng nhập hoặc mật khẩu không đúng");
+                    }
+                }
+            }
+
             // Authenticate
             Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                    loginRequest.getUsername(),
+                    loginRequest.getUsername().trim(),
                     loginRequest.getPassword()
                 )
             );
@@ -166,7 +229,10 @@ public class AuthController {
             String refreshToken = jwtTokenUtil.generateRefreshToken(userDetails);
 
             // Get user info
-            User user = userService.findByUsername(loginRequest.getUsername());
+            User user = userService.findByUsername(loginRequest.getUsername().trim());
+            if (user == null && userRepository != null) {
+                user = userRepository.findByEmail(loginRequest.getUsername().trim()).orElse(null);
+            }
 
             String avatar = user.getAvatarUrl();
             if (avatar == null || avatar.trim().isEmpty()) {
@@ -194,10 +260,64 @@ public class AuthController {
         } catch (BadCredentialsException e) {
             logger.warn("Đăng nhập thất bại cho user: {}", loginRequest.getUsername());
             return ResponseEntity.status(401).body("Tên đăng nhập hoặc mật khẩu không đúng");
+        } catch (org.springframework.security.authentication.LockedException | org.springframework.security.authentication.DisabledException e) {
+            logger.warn("Tài khoản bị khóa đăng nhập: {}", loginRequest.getUsername());
+            User targetUser = userService.findByUsername(loginRequest.getUsername().trim());
+            if (targetUser == null && userRepository != null) {
+                targetUser = userRepository.findByEmail(loginRequest.getUsername().trim()).orElse(null);
+            }
+            if (targetUser != null) {
+                java.util.Optional<com.example.backend.entity.UserBan> b = userBanRepository != null ?
+                    userBanRepository.findActiveBanByUserId(targetUser.getId()) : java.util.Optional.empty();
+                return buildBanResponse(targetUser, b.orElse(null));
+            }
+            return ResponseEntity.status(403).body("Tài khoản của bạn đã bị khóa.");
         } catch (Exception e) {
             logger.error("Lỗi khi đăng nhập: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Lỗi khi đăng nhập: " + e.getMessage());
         }
+    }
+
+    private ResponseEntity<?> buildBanResponse(User user, com.example.backend.entity.UserBan ban) {
+        java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+        if (ban != null) {
+            banDetails.put("reason", ban.getReason() != null ? ban.getReason() : "Vi phạm quy định cộng đồng");
+            banDetails.put("description", ban.getDescription() != null ? ban.getDescription() : "");
+            banDetails.put("banType", ban.getBanType() != null ? ban.getBanType() : "TEMPORARY");
+            banDetails.put("bannedAt", ban.getBannedAt() != null ? ban.getBannedAt().toString() : java.time.LocalDateTime.now().toString());
+            banDetails.put("banExpiresAt", ban.getBanExpiresAt() != null ? ban.getBanExpiresAt().toString() : null);
+            banDetails.put("bannedBy", ban.getBannedBy() != null ? (ban.getBannedBy().getFullName() != null ? ban.getBannedBy().getFullName() : ban.getBannedBy().getUsername()) : "Ban Quản Trị");
+
+            if ("TEMPORARY".equalsIgnoreCase(ban.getBanType()) && ban.getBanExpiresAt() != null) {
+                java.time.Duration diff = java.time.Duration.between(java.time.LocalDateTime.now(), ban.getBanExpiresAt());
+                long totalHours = Math.max(0, diff.toHours());
+                long days = Math.max(0, diff.toDays());
+                long hours = totalHours % 24;
+                long minutes = Math.max(0, diff.toMinutes() % 60);
+                banDetails.put("remainingDays", days);
+                banDetails.put("remainingHours", hours);
+                banDetails.put("remainingMinutes", minutes);
+                banDetails.put("remainingFormatted", days > 0 ? (days + " ngày " + hours + " giờ") : (hours + " giờ " + minutes + " phút"));
+            } else {
+                banDetails.put("remainingDays", -1);
+                banDetails.put("remainingFormatted", "Vĩnh viễn");
+            }
+        } else {
+            banDetails.put("reason", "Tài khoản của bạn đang bị khóa bởi Quản trị viên.");
+            banDetails.put("description", "Vui lòng liên hệ bộ phận hỗ trợ để được hỗ trợ kiểm tra và mở khóa.");
+            banDetails.put("banType", "PERMANENT");
+            banDetails.put("remainingDays", -1);
+            banDetails.put("remainingFormatted", "Vĩnh viễn");
+            banDetails.put("bannedBy", "Ban Quản Trị");
+        }
+
+        java.util.Map<String, Object> errResponse = new java.util.HashMap<>();
+        errResponse.put("status", "BANNED");
+        errResponse.put("error", "ACCOUNT_BANNED");
+        errResponse.put("message", "Tài khoản của bạn đã bị khóa.");
+        errResponse.put("banDetails", banDetails);
+
+        return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(errResponse);
     }
 
     @PostMapping("/refresh-token")
