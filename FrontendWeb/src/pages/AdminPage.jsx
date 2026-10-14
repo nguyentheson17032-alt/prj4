@@ -1329,19 +1329,20 @@ const ReportsTab = ({ reportsList, setReportsList, loading, onStatsRefresh }) =>
       } : r));
       setExpandedId(null);
       if (onStatsRefresh) onStatsRefresh();
-      addToast(`Đã chấp thuận khiếu nại & hoàn tiền ${finalPercent}% thành công!`, 'success');
+      addToast(`Đã chấp thuận khiếu nại & hoàn tiền ${finalPercent}% thành công (Số tiền còn lại đã chuyển vào số dư khả dụng của idol)!`, 'success');
     } catch (e) {
       addToast('Lỗi khi xử lý khiếu nại!', 'error');
     }
   };
 
   const handleReject = async (id) => {
-    const resolution = resolutionTexts[id]?.trim() || 'Admin từ chối';
+    const resolution = resolutionTexts[id]?.trim() || 'Admin từ chối khiếu nại';
     try {
       await api.updateReportStatus(id, 'REJECTED', resolution);
       setReportsList(prev => prev.map(r => r.id === id ? { ...r, status: 'REJECTED', resolution } : r));
       setExpandedId(null);
-      addToast('Đã từ chối khiếu nại!', 'success');
+      if (onStatsRefresh) onStatsRefresh();
+      addToast('Đã từ chối khiếu nại (Toàn bộ số tiền đóng băng đã chuyển vào số dư khả dụng của idol)!', 'success');
     } catch (e) {
       addToast('Lỗi khi từ chối khiếu nại!', 'error');
     }

@@ -33,6 +33,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import com.example.backend.service.FileStorageService;
+import com.example.backend.service.OrderPayoutService;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -44,6 +46,9 @@ public class AuthController {
     private final NotificationService notificationService;
     private final PasswordResetService passwordResetService;
     private final FileStorageService fileStorageService;
+
+    @Autowired(required = false)
+    private OrderPayoutService orderPayoutService;
 
     public AuthController(AuthenticationManager authenticationManager,
                          JwtTokenUtil jwtTokenUtil,
@@ -236,6 +241,20 @@ public class AuthController {
             return ResponseEntity.notFound().build();
         }
 
+        long frozenBalance = 0L;
+        if (orderPayoutService != null) {
+            try {
+                orderPayoutService.checkAndReleasePendingPayouts();
+                User refreshed = userService.findById(user.getId());
+                if (refreshed != null) {
+                    user = refreshed;
+                }
+                frozenBalance = orderPayoutService.getFrozenBalanceForUser(user.getId());
+            } catch (Exception e) {
+                logger.error("Lỗi khi quét kiểm tra giải ngân: {}", e.getMessage());
+            }
+        }
+
         String avatar = user.getAvatarUrl();
         if (avatar == null || avatar.trim().isEmpty()) {
             avatar = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + user.getUsername() + "&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf";
@@ -262,6 +281,8 @@ public class AuthController {
         response.put("coin", userBalance);
         response.put("walletBalance", userBalance);
         response.put("balance", userBalance);
+        response.put("availableBalance", userBalance);
+        response.put("frozenBalance", frozenBalance);
         response.put("avatar", avatar);
         response.put("avatarUrl", avatar);
 

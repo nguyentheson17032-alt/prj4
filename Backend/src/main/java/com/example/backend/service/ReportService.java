@@ -33,9 +33,9 @@ public class ReportService {
     private final NotificationService notificationService;
     private final com.example.backend.repository.PlayerReviewRepository playerReviewRepository;
     private final com.example.backend.repository.RevenueRepository revenueRepository;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private OrderPayoutService orderPayoutService;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public ReportService(ReportRepository reportRepository,
                          GamePlayerRepository gamePlayerRepository,
                          UserRepository userRepository,
@@ -43,7 +43,8 @@ public class ReportService {
                          PaymentRepository paymentRepository,
                          NotificationService notificationService,
                          com.example.backend.repository.PlayerReviewRepository playerReviewRepository,
-                         com.example.backend.repository.RevenueRepository revenueRepository) {
+                         com.example.backend.repository.RevenueRepository revenueRepository,
+                         @org.springframework.beans.factory.annotation.Autowired(required = false) OrderPayoutService orderPayoutService) {
         this.reportRepository = reportRepository;
         this.gamePlayerRepository = gamePlayerRepository;
         this.userRepository = userRepository;
@@ -52,6 +53,7 @@ public class ReportService {
         this.notificationService = notificationService;
         this.playerReviewRepository = playerReviewRepository;
         this.revenueRepository = revenueRepository;
+        this.orderPayoutService = orderPayoutService;
     }
 
     public Report createReport(Long reportedPlayerId, Long reporterId, Long orderId, String reason, String description, String video, String imageUrls) {
@@ -89,8 +91,8 @@ public class ReportService {
             }
         }
 
-        // 1 người chỉ được tố cáo người chơi này 1 lần duy nhất
-        if (reportRepository.existsByReporterIdAndReportedPlayerId(reporterId, reportedPlayerId)) {
+        // 1 người chỉ được tố cáo hồ sơ người chơi này 1 lần duy nhất khi không gắn với đơn hàng cụ thể
+        if (orderId == null && reportRepository.existsByReporterIdAndReportedPlayerId(reporterId, reportedPlayerId)) {
             throw new ReportException("Bạn chỉ được tố cáo người chơi này 1 lần duy nhất");
         }
 
@@ -126,11 +128,26 @@ public class ReportService {
             report.setResolution(resolution);
         }
 
-        // Khi đơn tố cáo bị từ chối (REJECTED): Tiền đóng băng của player được giải phóng vào số dư khả dụng
+        // Khi đơn tố cáo bị từ chối (REJECTED): Tất cả số tiền nhận được từ đơn đó đang ở trạng thái đóng băng sẽ chuyển vào số dư khả dụng
         if ("REJECTED".equals(status) && !"REJECTED".equals(previousStatus)) {
             Order order = report.getOrder();
-            if (order != null && "PENDING".equalsIgnoreCase(order.getPayoutStatus()) && orderPayoutService != null) {
-                orderPayoutService.releaseOrderPayout(order, "Admin đã từ chối khiếu nại");
+            if (order != null) {
+                if (orderPayoutService != null) {
+                    orderPayoutService.releaseOrderPayout(order, "Admin đã từ chối khiếu nại");
+                } else if (!"RELEASED".equalsIgnoreCase(order.getPayoutStatus()) && !"REFUNDED".equalsIgnoreCase(order.getPayoutStatus())) {
+                    long amount = order.getPlayerReceived() != null 
+                            ? order.getPlayerReceived() 
+                            : Math.round((order.getPrice() != null ? order.getPrice() : 0L) * 0.85);
+                    if (order.getPlayer() != null && order.getPlayer().getUser() != null && amount > 0) {
+                        User playerUser = order.getPlayer().getUser();
+                        long oldCoin = playerUser.getCoin() != null ? playerUser.getCoin() : 0L;
+                        playerUser.setCoin(oldCoin + amount);
+                        userRepository.save(playerUser);
+                    }
+                    order.setPayoutStatus("RELEASED");
+                    order.setPayoutReleasedAt(LocalDateTime.now());
+                    orderRepository.save(order);
+                }
             }
         }
 
@@ -200,25 +217,31 @@ public class ReportService {
 
         if (playerUser != null) {
             if ("RELEASED".equalsIgnoreCase(order.getPayoutStatus())) {
-                // Tiền đã giải phóng trước đó -> thu hồi phần phạt
+                // Tiền đã giải phóng trước đó -> thu hồi phần phạt từ số dư khả dụng của player
                 if (playerDeductedCoin > 0) {
                     long playerOldBalance = playerUser.getCoin() != null ? playerUser.getCoin() : 0L;
                     playerUser.setCoin(Math.max(0L, playerOldBalance - playerDeductedCoin));
                     userRepository.save(playerUser);
                 }
             } else {
-                // Tiền đang ở trạng thái đóng băng (PENDING) -> chỉ giải phóng phần còn lại sau phạt (nếu có)
+                // Tiền đang ở trạng thái đóng băng (PENDING):
+                // - Phần phạt (playerDeductedCoin) bị trừ trực tiếp từ "số dư đang đóng băng"
+                // - Số tiền nhận được còn lại từ đơn đó (playerRemainingCoin) được chuyển từ trạng thái đang đóng băng vào Số Dư Khả Dụng!
                 if (playerRemainingCoin > 0) {
                     long playerOldBalance = playerUser.getCoin() != null ? playerUser.getCoin() : 0L;
                     playerUser.setCoin(playerOldBalance + playerRemainingCoin);
                     userRepository.save(playerUser);
                 }
             }
+
+            // Cập nhật lại số tiền player thực nhận từ đơn này sau khi trừ tiền phạt
+            order.setPlayerReceived(playerRemainingCoin);
+            // Đánh dấu payoutStatus là REFUNDED để đơn này được gỡ hoàn toàn khỏi số dư đang đóng băng
             order.setPayoutStatus("REFUNDED");
             order.setPayoutReleasedAt(LocalDateTime.now());
             orderRepository.save(order);
 
-            log.info("[ReportService] Handled player penalty for order #{}: deducted={}, remainingReleased={}",
+            log.info("[ReportService] Handled player penalty for order #{}: deducted={}, remainingReleasedToAvailable={}",
                     order.getId(), playerDeductedCoin, playerRemainingCoin);
 
             try {
@@ -226,13 +249,40 @@ public class ReportService {
                     playerUser.getId(),
                     "Đơn hàng bị xử lý khiếu nại (" + percent + "%)",
                     "Đơn thuê #" + order.getId() + " bị khiếu nại và chấp nhận tố cáo (" + percent + "%). " +
-                    (playerRemainingCoin > 0 ? "Phần tiền còn lại " + playerRemainingCoin + " Coin đã được giải phóng vào số dư khả dụng." : "Đơn hàng bị khấu trừ toàn bộ."),
+                    "Đã trừ " + String.format("%,d", playerDeductedCoin) + " đ từ số dư đóng băng. " +
+                    (playerRemainingCoin > 0 
+                        ? "Số tiền còn lại " + String.format("%,d", playerRemainingCoin) + " đ đã được chuyển từ trạng thái đóng băng vào Số Dư Khả Dụng của bạn." 
+                        : "Đơn hàng bị khấu trừ toàn bộ từ số dư đóng băng."),
                     "PENALTY",
                     "/orders",
                     String.valueOf(order.getId())
                 );
             } catch (Exception e) {
                 log.error("[ReportService] Failed to notify player: {}", e.getMessage());
+            }
+
+            // Lưu lịch sử giao dịch Payment cho người được thuê (Idol)
+            try {
+                Payment playerPayoutPayment = new Payment();
+                if (renter != null) playerPayoutPayment.setUser(renter);
+                playerPayoutPayment.setPlayer(playerUser);
+                if (order.getPlayer() != null) playerPayoutPayment.setGamePlayer(order.getPlayer());
+                playerPayoutPayment.setCoin(playerRemainingCoin);
+                playerPayoutPayment.setOriginalAmount(totalCoin);
+                playerPayoutPayment.setPlatformFee(order.getPlatformFee());
+                playerPayoutPayment.setPlayerReceived(playerRemainingCoin);
+                playerPayoutPayment.setCurrency("COIN");
+                playerPayoutPayment.setStatus(Payment.PaymentStatus.COMPLETED);
+                playerPayoutPayment.setPaymentMethod(Payment.PaymentMethod.HIRE);
+                playerPayoutPayment.setType(Payment.PaymentType.HIRE);
+                playerPayoutPayment.setCreatedAt(LocalDateTime.now());
+                playerPayoutPayment.setCompletedAt(LocalDateTime.now());
+                playerPayoutPayment.setDescription(playerRemainingCoin > 0 
+                    ? "Nhận tiền thuê đơn #" + order.getId() + " sau khi xử lý khiếu nại (khấu trừ " + percent + "% từ số dư đóng băng, chuyển " + String.format("%,d", playerRemainingCoin) + " Coin còn lại vào số dư khả dụng)"
+                    : "Đơn thuê #" + order.getId() + " bị khấu trừ 100% từ số dư đóng băng do khiếu nại được chấp thuận");
+                paymentRepository.save(playerPayoutPayment);
+            } catch (Exception ex) {
+                log.error("[ReportService] Failed to save player payout payment: {}", ex.getMessage());
             }
         }
 

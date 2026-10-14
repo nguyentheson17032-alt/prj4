@@ -29,7 +29,6 @@ export const OrdersPage = () => {
   const [selectedOrderForReview, setSelectedOrderForReview] = useState(null);
   const [selectedPlayerForReport, setSelectedPlayerForReport] = useState(null);
   const [reportedOrderIds, setReportedOrderIds] = useState({});
-  const [reportedPlayerIds, setReportedPlayerIds] = useState({});
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [, setTick] = useState(0);
   const { addToast } = useToast();
@@ -516,9 +515,8 @@ export const OrdersPage = () => {
                             {/* Chỉ mất nút tố cáo khi đã đánh giá từ 4 sao trở lên. Nếu chưa đánh giá hoặc đánh giá dưới 4 sao thì vẫn có thể tố cáo */}
                             {!(order.isReviewed && Number(order.reviewRating || 5) >= 4) && (
                               (() => {
-                                const pId = order.player?.id || order.playerId;
-                                const isReported = Boolean(order.isReported || reportedOrderIds[order.id] || (pId && reportedPlayerIds[pId]));
-                                const repStatus = String(order.reportStatus || reportedOrderIds[order.id] || (pId && reportedPlayerIds[pId]) || '').toUpperCase();
+                                const isReported = Boolean(order.isReported || reportedOrderIds[order.id]);
+                                const repStatus = String(order.reportStatus || reportedOrderIds[order.id] || '').toUpperCase();
 
                                 if (isReported) {
                                   if (repStatus === 'REJECTED') {
@@ -617,6 +615,8 @@ export const OrdersPage = () => {
                                         id: order.player?.id || order.playerId,
                                         fullName: order.playerName || order.player?.fullName || 'Idol',
                                         name: order.playerName || order.player?.fullName || 'Idol',
+                                        avatar: order.player?.avatar || order.playerAvatarUrl,
+                                        game: order.game,
                                         orderId: order.id,
                                         orderPrice: order.price || order.finalPrice || order.totalPrice || 0,
                                       })}
@@ -707,9 +707,22 @@ export const OrdersPage = () => {
 
                       {/* Trạng thái REFUNDED: Đã xử lý khiếu nại & hoàn tiền */}
                       {statusUpper === 'REFUNDED' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f43f5e', fontSize: '0.85rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: 'rgba(244,63,94,0.1)' }}>
-                          <Flag size={15} />
-                          <span>Đã Khiếu Nại & Hoàn Tiền</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f43f5e', fontSize: '0.85rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: 'rgba(244,63,94,0.1)' }}>
+                            <Flag size={15} />
+                            <span>Đã Khiếu Nại & Hoàn Tiền</span>
+                          </div>
+                          {!isCurrentRenter && (
+                            Number(order.playerReceived || 0) > 0 ? (
+                              <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }}>
+                                Đã trừ đóng băng & chuyển +{Number(order.playerReceived).toLocaleString('vi-VN')} đ vào số dư khả dụng
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.78rem', color: '#f43f5e', fontWeight: 600 }}>
+                                Đã khấu trừ 100% từ số dư đóng băng
+                              </span>
+                            )
+                          )}
                         </div>
                       )}
                     </div>
@@ -752,26 +765,21 @@ export const OrdersPage = () => {
         isOpen={!!selectedPlayerForReport}
         onClose={() => setSelectedPlayerForReport(null)}
         onOpenAuth={() => setIsAuthModalOpen(true)}
-        onReported={(orderId, status, pId) => {
+        onReported={(orderId, status) => {
           const reportStatus = status || 'PENDING';
           if (orderId) {
             setReportedOrderIds(prev => ({ ...prev, [orderId]: reportStatus }));
+            setOrders(prev => prev.map(o => {
+              if (o.id === orderId) {
+                return {
+                  ...o,
+                  isReported: true,
+                  reportStatus: reportStatus
+                };
+              }
+              return o;
+            }));
           }
-          if (pId) {
-            setReportedPlayerIds(prev => ({ ...prev, [pId]: reportStatus }));
-          }
-          setOrders(prev => prev.map(o => {
-            const matchesOrder = orderId && o.id === orderId;
-            const matchesPlayer = pId && (o.player?.id === pId || o.playerId === pId);
-            if (matchesOrder || matchesPlayer) {
-              return {
-                ...o,
-                isReported: true,
-                reportStatus: reportStatus
-              };
-            }
-            return o;
-          }));
           if (refreshUser) refreshUser();
         }}
       />

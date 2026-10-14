@@ -238,3 +238,76 @@
 .donate-wallet-bar .topup-link:hover {
   opacity: 0.8;
 }
+
+/* Report Modal - Game Registration Style */
+.report-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(4, 7, 16, 0.82) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  z-index: 999999 !important;
+  overflow-y: auto !important;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+.report-modal-content {
+  background: var(--bg-card, #111827);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  border-radius: var(--radius-xl, 24px);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.8), 0 0 35px rgba(244, 63, 94, 0.15);
+  width: 100%;
+  max-width: 620px;
+  max-height: 92vh;
+  overflow-y: auto;
+  position: relative;
+  margin: auto;
+  animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.report-modal-header {
+  padding: 24px 28px 18px 28px;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.report-reason-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  background: var(--bg-secondary, #182234);
+  border: 1.5px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.86rem;
+  font-weight: 500;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.report-reason-pill:hover {
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.4);
+  color: var(--text-primary, #fff);
+  transform: translateY(-1px);
+}
+
+.report-reason-pill.active {
+  background: rgba(244, 63, 94, 0.16);
+  border-color: #f43f5e;
+  color: #fda4af;
+  font-weight: 700;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.25);
+}

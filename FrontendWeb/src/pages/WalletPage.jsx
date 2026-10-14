@@ -117,13 +117,40 @@ export const WalletPage = ({ onOpenDeposit }) => {
               const feeAmount = o.platformFee != null ? o.platformFee : Math.round(origPrice * 0.15);
               const playerFinal = o.playerReceived != null ? o.playerReceived : (origPrice - feeAmount);
 
+              const isReleased = o.payoutStatus === 'RELEASED' || (o.isReviewed && Number(o.reviewRating || 0) >= 4);
+              const isFrozen = o.status === 'COMPLETED' && !isReleased;
+
               let earnedAmount = playerFinal;
+              let txStatus = o.status || 'COMPLETED';
               let stageText = '';
+              let feeDetail = `Giá gốc: ${origPrice.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${feeAmount.toLocaleString('vi-VN')} đ`;
+
               if (o.status === 'CONFIRMED') {
-                earnedAmount = Math.round(origPrice * 0.5);
-                stageText = ' (Đợt 1: 50%)';
+                txStatus = 'CONFIRMED';
+                stageText = ' (Đang diễn ra - Tạm giữ)';
+                feeDetail = 'Đang diễn ra | Tiền sẽ tự động vào số dư khả dụng sau 24h từ khi kết thúc hoặc khi khách đánh giá ≥4★';
+              } else if (isFrozen) {
+                txStatus = 'FROZEN';
+                stageText = ' (Đang đóng băng)';
+                feeDetail = `Tạm giữ 85%: ${playerFinal.toLocaleString('vi-VN')} đ (Tự động vào số dư khả dụng sau 24h hoặc khi khách đánh giá ≥4★)`;
               } else if (o.status === 'CANCELED' || o.status === 'REJECTED') {
                 earnedAmount = 0;
+                txStatus = 'CANCELED';
+              } else if (o.status === 'REFUNDED') {
+                const actualRemaining = o.playerReceived != null ? Number(o.playerReceived) : 0;
+                earnedAmount = actualRemaining;
+                txStatus = 'REFUNDED';
+                if (actualRemaining > 0) {
+                  stageText = ' (Đã khấu trừ khiếu nại & chuyển phần còn lại vào số dư khả dụng)';
+                  feeDetail = `Đã trừ phần phạt từ số dư đóng băng | Chuyển thực nhận còn lại (+${actualRemaining.toLocaleString('vi-VN')} đ) vào số dư khả dụng`;
+                } else {
+                  stageText = ' (Khấu trừ 100% từ số dư đóng băng do chấp thuận khiếu nại)';
+                  feeDetail = `Bị khấu trừ toàn bộ từ số dư đóng băng do khiếu nại được chấp thuận`;
+                }
+              } else if (isReleased) {
+                txStatus = 'COMPLETED';
+                stageText = ' (Đã vào số dư khả dụng)';
+                feeDetail += ' | Đã cộng vào số dư khả dụng';
               }
 
               list.push({
@@ -132,10 +159,11 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 amount: +earnedAmount,
                 originalPrice: origPrice,
                 feeAmount: feeAmount,
-                feeDetail: o.status === 'COMPLETED' ? `Giá gốc: ${origPrice.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${feeAmount.toLocaleString('vi-VN')} đ` : (o.status === 'CONFIRMED' ? `Đợt 1 nhận 50% | Chiết khấu 15% hệ thống tính khi hoàn tất đơn` : null),
+                feeDetail: feeDetail,
                 description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)${stageText}`,
                 date: formatTransactionDate(orderDateStr),
-                status: o.status || 'COMPLETED',
+                status: txStatus,
+                isFrozen: isFrozen,
                 rawDate: orderRawDate
               });
             } else if (isRenter && !isPlayer) {
@@ -276,6 +304,8 @@ export const WalletPage = ({ onOpenDeposit }) => {
     return t.type === filterType;
   });
 
+  const effectiveFrozen = Math.max(Number(frozenAmount || 0), Number(user?.frozenBalance || 0));
+
   return (
     <div className="container animate-fade-in" style={{ paddingBottom: '80px' }}>
       {/* Header */}
@@ -284,7 +314,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
           Ví PlayZone & <span className="gradient-text">Lịch Sử Giao Dịch</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Quản lý số dư, nạp coin tự động và theo dõi minh bạch mọi biến động số dư.
+          Quản lý số dư khả dụng, theo dõi thu nhập tạm giữ và xem minh bạch mọi biến động số dư.
         </p>
       </div>
 
@@ -293,23 +323,65 @@ export const WalletPage = ({ onOpenDeposit }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="balance-card-hero">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="balance-title">Số Dư Khả Dụng</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="balance-title" style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '0.3px' }}>SỐ DƯ KHẢ DỤNG</span>
+                <span style={{ fontSize: '0.72rem', background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '12px', fontWeight: 700, border: '1px solid rgba(16,185,129,0.3)' }}>
+                  Sẵn sàng sử dụng
+                </span>
+              </div>
               <Wallet size={24} color="#06b6d4" />
             </div>
 
-            <div className="balance-amount">
+            <div className="balance-amount" style={{ color: '#10b981', margin: '14px 0 6px 0', textShadow: '0 0 20px rgba(16,185,129,0.2)' }}>
               {(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ
             </div>
 
-            {frozenAmount > 0 && (
-              <div style={{ marginTop: '10px', marginBottom: '14px', padding: '10px 14px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontSize: '0.85rem', fontWeight: 600 }}>
-                  <Clock size={16} />
-                  <span>Đang đóng băng:</span>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: effectiveFrozen > 0 ? '14px' : '20px' }}>
+              Số dư có thể dùng ngay để thuê Idol, gửi tặng quà hoặc rút tiền.
+            </p>
+
+            {effectiveFrozen > 0 ? (
+              <div style={{
+                marginBottom: '18px',
+                padding: '12px 14px',
+                background: 'rgba(245,158,11,0.1)',
+                border: '1px solid rgba(245,158,11,0.35)',
+                borderRadius: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontSize: '0.88rem', fontWeight: 700 }}>
+                    <Clock size={16} />
+                    <span>Số Dư Đang Đóng Băng (Pending):</span>
+                  </div>
+                  <span style={{ color: '#f59e0b', fontWeight: 900, fontSize: '1.05rem' }}>
+                    {effectiveFrozen.toLocaleString('vi-VN')} đ
+                  </span>
                 </div>
-                <span style={{ color: '#f59e0b', fontWeight: 800, fontSize: '0.98rem' }}>
-                  {frozenAmount.toLocaleString('vi-VN')} đ
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45, background: 'rgba(0,0,0,0.15)', padding: '6px 10px', borderRadius: '6px' }}>
+                  ⚡ <strong>Cơ chế tự động:</strong> Tiền đơn thuê sẽ được tự động cộng vào <strong>Số Dư Khả Dụng</strong> sau 24h kể từ khi đơn kết thúc, hoặc ngay khi khách hàng đánh giá từ 4★ trở lên.
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                marginBottom: '18px',
+                padding: '8px 12px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)'
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Clock size={14} />
+                  <span>Đang đóng băng:</span>
                 </span>
+                <span style={{ fontWeight: 600 }}>0 đ</span>
               </div>
             )}
 
@@ -329,12 +401,13 @@ export const WalletPage = ({ onOpenDeposit }) => {
           <div className="glass-panel" style={{ padding: '20px' }}>
             <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldCheck size={18} color="var(--accent-green)" />
-              <span>Cam Kết Bảo Mật Tài Chính</span>
+              <span>Chính Sách & Bảo Vệ Tài Chính</span>
             </h4>
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              <li>• Khớp lệnh nạp tiền tức thì qua mã VietQR 24/7.</li>
-              <li>• Tiền được giữ an toàn trung gian và chỉ trừ khi bạn xác nhận hài lòng.</li>
-              <li>• Hỗ trợ tra soát đối soát giao dịch trong 5 phút.</li>
+            <ul style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+              <li>• <strong>Số dư khả dụng:</strong> Tiền sẵn sàng trong tài khoản dùng để thuê hoặc rút tiền bất cứ lúc nào.</li>
+              <li>• <strong>Giải ngân tự động sau 24h:</strong> Sau khi hoàn thành đơn thuê, hệ thống tạm giữ thu nhập trong 24h để đảm bảo quyền lợi khiếu nại. Hết 24h, tiền tự động vào số dư khả dụng.</li>
+              <li>• <strong>Giải ngân siêu tốc:</strong> Nếu khách hàng đánh giá đơn từ 4 sao trở lên, tiền lập tức vào số dư khả dụng mà không cần chờ 24h.</li>
+              <li>• <strong>Nạp tiền VietQR:</strong> Khớp lệnh nạp tự động 24/7 chỉ trong vài giây.</li>
             </ul>
           </div>
         </div>
@@ -403,9 +476,15 @@ export const WalletPage = ({ onOpenDeposit }) => {
                         {tx.type === 'DEPOSIT' && <span className="badge badge-online">+ Nạp Tiền</span>}
                         {tx.type === 'PAYMENT' && <span className="badge badge-primary">- Thuê Duo</span>}
                         {tx.type === 'RECEIVE' && (
-                          <span className="badge badge-online" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                            + Nhận Tiền Thuê
-                          </span>
+                          tx.status === 'FROZEN' ? (
+                            <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                              ⏳ Tiền Tạm Giữ
+                            </span>
+                          ) : (
+                            <span className="badge badge-online" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                              + Nhận Tiền Thuê
+                            </span>
+                          )
                         )}
                         {tx.type === 'DONATE' && (
                           tx.amount > 0 ? (
@@ -425,7 +504,7 @@ export const WalletPage = ({ onOpenDeposit }) => {
                         {tx.feeDetail && (
                           <div style={{
                             fontSize: '0.74rem',
-                            color: tx.amount > 0 ? '#10b981' : 'var(--text-muted)',
+                            color: tx.status === 'FROZEN' ? '#f59e0b' : (tx.amount > 0 ? '#10b981' : 'var(--text-muted)'),
                             marginTop: '3px',
                             fontWeight: 500
                           }}>
@@ -435,13 +514,26 @@ export const WalletPage = ({ onOpenDeposit }) => {
                       </td>
                       <td style={{
                         fontWeight: 800,
-                        color: tx.amount > 0 ? 'var(--accent-green)' : 'var(--accent-pink)',
+                        color: tx.status === 'FROZEN' ? '#f59e0b' : (tx.amount > 0 ? 'var(--accent-green)' : 'var(--accent-pink)'),
                         whiteSpace: 'nowrap'
                       }}>
                         <div>
                           {tx.amount > 0 ? `+${tx.amount.toLocaleString('vi-VN')} đ` : `${tx.amount.toLocaleString('vi-VN')} đ`}
                         </div>
-                        {tx.amount > 0 && (tx.type === 'RECEIVE' || tx.subType === 'DONATE_RECEIVE') && tx.status === 'COMPLETED' && (
+                        {tx.status === 'FROZEN' ? (
+                          <span style={{
+                            display: 'inline-block',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            color: '#f59e0b',
+                            marginTop: '2px'
+                          }}>
+                            Đang đóng băng
+                          </span>
+                        ) : tx.amount > 0 && (tx.type === 'RECEIVE' || tx.subType === 'DONATE_RECEIVE') && tx.status === 'COMPLETED' ? (
                           <span style={{
                             display: 'inline-block',
                             fontSize: '0.68rem',
@@ -454,14 +546,18 @@ export const WalletPage = ({ onOpenDeposit }) => {
                           }}>
                             Thực nhận 85%
                           </span>
-                        )}
+                        ) : null}
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{tx.date}</td>
                       <td>
                         {tx.status === 'COMPLETED' ? (
                           <span className="badge badge-online">Thành Công</span>
+                        ) : tx.status === 'FROZEN' ? (
+                          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' }}>⏳ Đang Đóng Băng</span>
+                        ) : tx.status === 'REFUNDED' ? (
+                          <span className="badge" style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)' }}>↺ Khiếu Nại & Xử Lý</span>
                         ) : tx.status === 'CONFIRMED' ? (
-                          <span className="badge badge-primary">Đã Xác Nhận</span>
+                          <span className="badge badge-primary">Đang Diễn Ra</span>
                         ) : tx.status === 'PENDING' ? (
                           <span className="badge badge-warning" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>Chờ Xử Lý</span>
                         ) : tx.status === 'CANCELED' || tx.status === 'REJECTED' ? (

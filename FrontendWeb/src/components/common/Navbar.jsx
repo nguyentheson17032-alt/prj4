@@ -144,10 +144,32 @@ export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
               <div
                 className="balance-chip"
                 onClick={onOpenDeposit}
-                title="Bấm để nạp thêm coin"
+                title={`Số dư khả dụng: ${(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ${user?.frozenBalance > 0 ? ` (Đang đóng băng: ${user.frozenBalance.toLocaleString('vi-VN')} đ)` : ''} - Bấm để nạp thêm`}
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                <Wallet size={16} />
-                <span>{(user?.balance || 0).toLocaleString('vi-VN')} đ</span>
+                <Wallet size={16} color="var(--primary-light, #06b6d4)" />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Khả dụng</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ</span>
+                </div>
+                {user?.frozenBalance > 0 && (
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      color: '#f59e0b',
+                      background: 'rgba(245,158,11,0.15)',
+                      padding: '2px 5px',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}
+                    title={`Đang đóng băng: ${user.frozenBalance.toLocaleString('vi-VN')} đ (Tự động vào số dư khả dụng sau 24h hoặc khi khách đánh giá ≥4★)`}
+                  >
+                    ⏳ {user.frozenBalance.toLocaleString('vi-VN')}đ
+                  </span>
+                )}
                 <span style={{ fontSize: '0.7rem', background: 'var(--accent-amber)', color: '#000', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>+</span>
               </div>
 
@@ -216,9 +238,28 @@ export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
 
                 {showDropdown && (
                   <div className="user-dropdown animate-fade-in">
-                    <div style={{ padding: '6px 12px' }}>
+                    <div style={{ padding: '8px 12px' }}>
                       <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user.fullName}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>@{user.username}</div>
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px 10px',
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        fontSize: '0.8rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#10b981', fontWeight: 600 }}>Số dư khả dụng:</span>
+                          <span style={{ color: '#10b981', fontWeight: 800 }}>{(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ</span>
+                        </div>
+                        {user?.frozenBalance > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', color: '#f59e0b', fontSize: '0.75rem' }}>
+                            <span>Đang đóng băng:</span>
+                            <span style={{ fontWeight: 700 }}>{user.frozenBalance.toLocaleString('vi-VN')} đ</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="dropdown-divider" />
                     {isAdmin && (

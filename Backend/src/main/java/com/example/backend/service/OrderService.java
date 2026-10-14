@@ -1,6 +1,7 @@
 package com.example.backend.service;
 
 import com.example.backend.entity.Order;
+import com.example.backend.entity.PlayerReview;
 import com.example.backend.repository.OrderRepository;
 import com.example.backend.service.NotificationService;
 import com.example.backend.service.GamePlayerService;
@@ -41,6 +42,8 @@ public class OrderService {
     private UserRepository userRepository;
     @Autowired
     private RevenueRepository revenueRepository;
+    @Autowired(required = false)
+    private OrderPayoutService orderPayoutService;
 
     // Chạy mỗi 5 phút
     @Scheduled(fixedRate = 300000)
@@ -119,21 +122,28 @@ public class OrderService {
         
         for (Order order : expiredOrders) {
             try {
-                // Tự động hoàn thành đơn hàng
+                // Tự động hoàn thành đơn hàng khi hết giờ chơi
                 order.setStatus("COMPLETED");
-                orderRepository.save(order);
+                if (order.getPayoutStatus() == null || order.getPayoutStatus().trim().isEmpty()) {
+                    order.setPayoutStatus("PENDING");
+                }
 
-                // Cộng nốt 35% coin cho player khi hoàn thành đơn tự động (50% đã nhận lúc confirm)
                 long totalCoin = order.getPrice() != null ? order.getPrice() : 0L;
                 long platformFee = Math.round(totalCoin * 0.15); // 15% chiết khấu hệ thống
                 long playerTotalReceived = totalCoin - platformFee; // 85% tổng nhận
-                long playerReceive50 = Math.round(totalCoin * 0.5); // 50% đợt 1
-                long playerReceive35 = playerTotalReceived - playerReceive50; // 35% đợt 2
+                order.setPlatformFee(platformFee);
+                order.setPlayerReceived(playerTotalReceived);
+                orderRepository.save(order);
 
-                if (order.getPlayer() != null && order.getPlayer().getUser() != null) {
-                    User playerUser = order.getPlayer().getUser();
-                    playerUser.setCoin(playerUser.getCoin() + playerReceive35);
-                    userRepository.save(playerUser);
+                // TIỀN ĐƯỢC GIỮ Ở TRẠNG THÁI ĐÓNG BĂNG (PENDING)
+                // Tuyệt đối KHÔNG cộng trực tiếp vào Số Dư Khả Dụng (coin) của player ở đây.
+                // Cơ chế tự động: Tiền đơn thuê sẽ được tự động cộng vào Số Dư Khả Dụng sau 24h kể từ khi đơn kết thúc,
+                // hoặc ngay khi khách hàng đánh giá từ 4★ trở lên thông qua OrderPayoutService.
+                if (orderPayoutService != null) {
+                    PlayerReview existingReview = playerReviewRepository.findByOrderId(order.getId());
+                    if (existingReview != null && existingReview.getRating() != null && existingReview.getRating() >= 4.0) {
+                        orderPayoutService.releaseOrderPayout(order, "Đã được đánh giá " + existingReview.getRating() + " sao");
+                    }
                 }
 
                 // Lưu Payment & Revenue 15% cho hệ thống

@@ -686,36 +686,8 @@ public class OrderController {
         }
 
         com.example.backend.entity.Report rep = null;
-        if (reportRepository != null) {
-            if (order.getId() != null) {
-                rep = reportRepository.findByOrderId(order.getId());
-            }
-            if (rep == null && order.getRenter() != null) {
-                List<com.example.backend.entity.Report> reporterReports = reportRepository.findByReporterId(order.getRenter().getId());
-                if (reporterReports != null && !reporterReports.isEmpty()) {
-                    for (com.example.backend.entity.Report r : reporterReports) {
-                        if (r.getOrder() != null && r.getOrder().getId() != null && r.getOrder().getId().equals(order.getId())) {
-                            rep = r;
-                            break;
-                        }
-                        if (order.getPlayer() != null) {
-                            Long orderGpId = order.getPlayer().getId();
-                            Long orderUserId = order.getPlayer().getUser() != null ? order.getPlayer().getUser().getId() : null;
-                            Long repGpId = r.getReportedPlayer() != null ? r.getReportedPlayer().getId() : null;
-                            Long repUserId = (r.getReportedPlayer() != null && r.getReportedPlayer().getUser() != null) 
-                                    ? r.getReportedPlayer().getUser().getId() : null;
-
-                            if ((orderGpId != null && repGpId != null && orderGpId.equals(repGpId)) ||
-                                (orderUserId != null && repUserId != null && orderUserId.equals(repUserId)) ||
-                                (orderGpId != null && repUserId != null && orderGpId.equals(repUserId)) ||
-                                (orderUserId != null && repGpId != null && orderUserId.equals(repGpId))) {
-                                rep = r;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+        if (reportRepository != null && order.getId() != null) {
+            rep = reportRepository.findByOrderId(order.getId());
         }
 
         if (rep != null) {
