@@ -55,6 +55,156 @@ const formatTransactionDate = (dateVal) => {
   return `${hours}:${minutes} ${day}/${month}/${year}`;
 };
 
+const renderStatusBadge = (tx) => {
+  // 1. Giao dịch Rút Tiền
+  if (tx.type === 'WITHDRAW') {
+    if (tx.status === 'COMPLETED') {
+      return <span className="badge badge-online">Thành Công</span>;
+    }
+    if (tx.status === 'REJECTED' || tx.status === 'REFUNDED') {
+      return (
+        <span
+          className="badge"
+          style={{
+            background: 'rgba(239, 68, 68, 0.15)',
+            color: '#ef4444',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            fontWeight: 700
+          }}
+        >
+          Từ Chối
+        </span>
+      );
+    }
+    return (
+      <span
+        className="badge"
+        style={{
+          background: 'rgba(245, 158, 11, 0.15)',
+          color: '#f59e0b',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          fontWeight: 700
+        }}
+      >
+        ⏳ Đang Chờ Duyệt
+      </span>
+    );
+  }
+
+  // 2. Giao dịch Nhận Tiền Hoàn (cộng lại tiền vào ví)
+  if (tx.type === 'REFUND') {
+    return <span className="badge badge-online">Thành Công</span>;
+  }
+
+  // 3. Giao dịch Nạp Tiền
+  if (tx.type === 'DEPOSIT') {
+    if (tx.status === 'COMPLETED') {
+      return <span className="badge badge-online">Thành Công</span>;
+    }
+    if (tx.status === 'FAILED') {
+      return <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>Thất Bại</span>;
+    }
+    return <span className="badge badge-warning">Đang Xử Lý</span>;
+  }
+
+  // 4. Giao dịch Thuê Duo (- Thuê Duo) hoặc Nhận tiền thuê (+ Nhận Tiền Thuê)
+  // 4.1 Đơn tố cáo CHƯA ĐƯỢC DUYỆT -> Hiện "↺ Khiếu Nại & Xử Lý"
+  if (tx.status === 'DISPUTED_PENDING' || tx.status === 'DISPUTED') {
+    return (
+      <span
+        className="badge"
+        style={{
+          background: 'rgba(245, 158, 11, 0.15)',
+          color: '#f59e0b',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
+          fontWeight: 700
+        }}
+      >
+        ↺ Khiếu Nại & Xử Lý
+      </span>
+    );
+  }
+
+  // 4.2 Đơn tố cáo ĐÃ ĐƯỢC DUYỆT RỒI -> Hiện rõ ràng trạng thái "Đã Hoàn Tiền" (kèm % nếu có)
+  if (tx.status === 'REFUNDED') {
+    const percentText = tx.refundPercent ? ` ${tx.refundPercent}%` : '';
+    return (
+      <span
+        className="badge"
+        style={{
+          background: 'rgba(168, 85, 247, 0.15)',
+          color: '#a855f7',
+          border: '1px solid rgba(168, 85, 247, 0.35)',
+          fontWeight: 700
+        }}
+      >
+        {tx.type === 'PAYMENT' ? `Đã Hoàn Tiền${percentText}` : 'Khấu Trừ Khiếu Nại'}
+      </span>
+    );
+  }
+
+  // 4.3 Đơn tố cáo BỊ TỪ CHỐI / BÁC BỎ
+  if (tx.status === 'REPORT_REJECTED') {
+    return (
+      <span
+        className="badge"
+        style={{
+          background: 'rgba(239, 68, 68, 0.15)',
+          color: '#ef4444',
+          border: '1px solid rgba(239, 68, 68, 0.35)',
+          fontWeight: 700
+        }}
+      >
+        Từ Chối Khiếu Nại
+      </span>
+    );
+  }
+
+  // 4.4 Các trạng thái đơn thuê thông thường
+  if (tx.status === 'COMPLETED') {
+    return <span className="badge badge-online">Thành Công</span>;
+  }
+  if (tx.status === 'FROZEN') {
+    return (
+      <span
+        className="badge"
+        style={{
+          background: 'rgba(245, 158, 11, 0.15)',
+          color: '#f59e0b',
+          border: '1px solid rgba(245, 158, 11, 0.3)'
+        }}
+      >
+        ⏳ Đang Đóng Băng
+      </span>
+    );
+  }
+  if (tx.status === 'CONFIRMED') {
+    return <span className="badge badge-primary">Đang Diễn Ra</span>;
+  }
+  if (tx.status === 'PENDING') {
+    return (
+      <span
+        className="badge badge-warning"
+        style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}
+      >
+        Chờ Xác Nhận
+      </span>
+    );
+  }
+  if (tx.status === 'CANCELED' || tx.status === 'CANCELLED' || tx.status === 'REJECTED') {
+    return (
+      <span
+        className="badge"
+        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}
+      >
+        Đã Hủy
+      </span>
+    );
+  }
+
+  return <span className="badge badge-online">{tx.status}</span>;
+};
+
 export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
   const { user, refreshUser } = useAuth();
   const [filterType, setFilterType] = useState('ALL');
@@ -119,6 +269,30 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
               ? Number(o.refundAmount)
               : (refundPercent ? Math.round(origPrice * (refundPercent / 100)) : 0);
 
+            // Kiểm tra trạng thái khiếu nại của đơn hàng
+            const isResolvedRefund = Boolean(
+              o.status === 'REFUNDED' || o.reportStatus === 'RESOLVED' || refundPercent > 0
+            );
+            const isDisputedPending = Boolean(
+              !isResolvedRefund && (
+                o.status === 'DISPUTED' ||
+                (o.isReported && (o.reportStatus === 'PENDING' || o.reportStatus === 'INVESTIGATING' || !o.reportStatus))
+              )
+            );
+            const isReportRejected = Boolean(
+              !isResolvedRefund && o.isReported && o.reportStatus === 'REJECTED'
+            );
+
+            // Trạng thái cho khoản tiền của người thuê (- Thuê Duo)
+            let renterTxStatus = o.status || 'COMPLETED';
+            if (isResolvedRefund) {
+              renterTxStatus = 'REFUNDED'; // Đã duyệt khiếu nại & hoàn tiền -> "Đã Hoàn Tiền"
+            } else if (isDisputedPending) {
+              renterTxStatus = 'DISPUTED_PENDING'; // Chưa duyệt -> "↺ Khiếu Nại & Xử Lý"
+            } else if (isReportRejected) {
+              renterTxStatus = 'REPORT_REJECTED'; // Bác bỏ khiếu nại -> "Bác Bỏ Khiếu Nại"
+            }
+
             // ─── Trường hợp 1: Là Người thuê (Renter) ───
             if (isRenter && !isPlayer) {
               // 1. Khoản trừ tiền thuê ban đầu
@@ -128,12 +302,13 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 amount: -origPrice,
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
                 date: formatTransactionDate(orderDateStr),
-                status: o.status || 'COMPLETED',
+                status: renterTxStatus,
+                refundPercent: refundPercent,
                 rawDate: orderRawDate
               });
 
               // 2. Nếu đơn hàng có hoàn tiền (REFUNDED hoặc có % hoàn)
-              if ((o.status === 'REFUNDED' || refundPercent > 0) && refundAmount > 0) {
+              if (isResolvedRefund && refundAmount > 0) {
                 list.push({
                   id: `ORD-${o.id}-REFUND`,
                   type: 'REFUND',
@@ -159,18 +334,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
               let stageText = '';
               let feeDetail = `Giá gốc: ${origPrice.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${feeAmount.toLocaleString('vi-VN')} đ`;
 
-              if (o.status === 'CONFIRMED') {
-                txStatus = 'CONFIRMED';
-                stageText = ' (Đang diễn ra - Tạm giữ)';
-                feeDetail = 'Đang diễn ra | Tiền sẽ tự động vào số dư khả dụng sau 24h từ khi kết thúc hoặc khi khách đánh giá ≥4★';
-              } else if (isFrozen) {
-                txStatus = 'FROZEN';
-                stageText = ' (Đang đóng băng)';
-                feeDetail = `Tạm giữ 85%: ${playerFinal.toLocaleString('vi-VN')} đ (Tự động vào số dư khả dụng sau 24h hoặc khi khách đánh giá ≥4★)`;
-              } else if (o.status === 'CANCELED' || o.status === 'REJECTED') {
-                earnedAmount = 0;
-                txStatus = 'CANCELED';
-              } else if (o.status === 'REFUNDED') {
+              if (isResolvedRefund) {
                 const actualRemaining = o.playerReceived != null ? Number(o.playerReceived) : 0;
                 earnedAmount = actualRemaining;
                 txStatus = 'REFUNDED';
@@ -181,6 +345,21 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                   stageText = ' (Khấu trừ 100% do khiếu nại được chấp thuận)';
                   feeDetail = `Bị hoàn tiền 100% cho người thuê do khiếu nại`;
                 }
+              } else if (isDisputedPending) {
+                txStatus = 'DISPUTED_PENDING';
+                stageText = ' (Đang bị khiếu nại - Tạm giữ)';
+                feeDetail = 'Đơn thuê đang có khiếu nại chờ Admin giải quyết';
+              } else if (o.status === 'CONFIRMED') {
+                txStatus = 'CONFIRMED';
+                stageText = ' (Đang diễn ra - Tạm giữ)';
+                feeDetail = 'Đang diễn ra | Tiền sẽ tự động vào số dư khả dụng sau 24h từ khi kết thúc hoặc khi khách đánh giá ≥4★';
+              } else if (isFrozen) {
+                txStatus = 'FROZEN';
+                stageText = ' (Đang đóng băng)';
+                feeDetail = `Tạm giữ 85%: ${playerFinal.toLocaleString('vi-VN')} đ (Tự động vào số dư khả dụng sau 24h hoặc khi khách đánh giá ≥4★)`;
+              } else if (o.status === 'CANCELED' || o.status === 'REJECTED') {
+                earnedAmount = 0;
+                txStatus = 'CANCELED';
               } else if (isReleased) {
                 txStatus = 'COMPLETED';
                 stageText = ' (Đã vào số dư khả dụng)';
@@ -197,6 +376,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)${stageText}`,
                 date: formatTransactionDate(orderDateStr),
                 status: txStatus,
+                refundPercent: refundPercent,
                 isFrozen: isFrozen,
                 rawDate: orderRawDate
               });
@@ -213,12 +393,13 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 amount: -origPrice,
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
                 date: formatTransactionDate(orderDateStr),
-                status: o.status || 'COMPLETED',
+                status: renterTxStatus,
+                refundPercent: refundPercent,
                 rawDate: orderRawDate
               });
 
               // Khoản nhận hoàn tiền nếu có
-              if ((o.status === 'REFUNDED' || refundPercent > 0) && refundAmount > 0) {
+              if (isResolvedRefund && refundAmount > 0) {
                 list.push({
                   id: `ORD-${o.id}-REFUND`,
                   type: 'REFUND',
@@ -241,7 +422,8 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 feeDetail: `Giá gốc: ${origPrice.toLocaleString('vi-VN')} đ | Chiết khấu sàn (15%): -${feeAmount.toLocaleString('vi-VN')} đ`,
                 description: `Nhận tiền thuê từ ${o.renterName || 'Khách'} (${o.hours || 1}h)${refundPercent ? ` (Sau khi trừ ${refundPercent}% hoàn tiền)` : ''}`,
                 date: formatTransactionDate(orderDateStr),
-                status: o.status || 'COMPLETED',
+                status: isResolvedRefund ? 'REFUNDED' : o.status || 'COMPLETED',
+                refundPercent: refundPercent,
                 rawDate: orderRawDate
               });
             }
@@ -253,10 +435,11 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 amount: -origPrice,
                 description: `Thuê ${o.playerName || 'Player'} (${o.hours || 1}h)`,
                 date: formatTransactionDate(orderDateStr),
-                status: o.status || 'COMPLETED',
+                status: renterTxStatus,
+                refundPercent: refundPercent,
                 rawDate: orderRawDate
               });
-              if ((o.status === 'REFUNDED' || refundPercent > 0) && refundAmount > 0) {
+              if (isResolvedRefund && refundAmount > 0) {
                 list.push({
                   id: `ORD-${o.id}-REFUND`,
                   type: 'REFUND',
@@ -346,17 +529,40 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
           withdrawsData.value.forEach(w => {
             const withdrawDateStr = w.createdAt || w.dateTime;
             const withdrawRawDate = parseToTimestamp(withdrawDateStr);
-            const statusText = w.status === 'COMPLETED' ? 'COMPLETED' : w.status === 'REFUNDED' ? 'REFUNDED' : 'PENDING';
+            const isRefunded = w.status === 'REFUNDED' || w.status === 'REJECTED';
+            const isCompleted = w.status === 'COMPLETED';
+            const statusText = isCompleted ? 'COMPLETED' : isRefunded ? 'REJECTED' : 'PENDING';
+            const coinAmount = Number(w.coin || 0);
+
+            // Giao dịch yêu cầu rút tiền ban đầu (- tiền)
             list.push({
               id: `RUT-${w.id}`,
               type: 'WITHDRAW',
-              amount: -Number(w.coin || 0),
+              amount: -coinAmount,
               description: `Rút tiền về ${w.bankName || 'Ngân hàng'}`,
-              feeDetail: `Số TK: ${w.bankAccountNumber || '—'} | Chủ TK: ${w.bankAccountName || '—'}${statusText === 'PENDING' ? ' (Đang chờ duyệt)' : statusText === 'REFUNDED' ? ' (Đã bị từ chối & hoàn tiền)' : ' (Đã chuyển khoản)'}`,
+              feeDetail: `Số TK: ${w.bankAccountNumber || '—'} | Chủ TK: ${w.bankAccountName || '—'}${isCompleted ? ' (Đã chuyển khoản thành công)' : isRefunded ? ' (Đã bị từ chối & hoàn tiền về ví)' : ' (Đang chờ Admin duyệt)'}`,
               date: formatTransactionDate(withdrawDateStr),
-              status: statusText,
+              status: isRefunded ? 'REJECTED' : statusText,
               rawDate: withdrawRawDate
             });
+
+            // Nếu bị từ chối & hoàn tiền -> Thêm bản ghi hoàn trả tiền cộng lại vào ví (+ tiền)
+            if (isRefunded) {
+              const refundDateStr = w.completedAt || withdrawDateStr;
+              const refundRawDate = (w.completedAt ? parseToTimestamp(w.completedAt) : withdrawRawDate) + 1000;
+              const reasonText = w.description ? ` | Lý do từ chối: ${w.description}` : '';
+              list.push({
+                id: `RUT-${w.id}-REFUND`,
+                type: 'REFUND',
+                subType: 'WITHDRAW_REFUND',
+                amount: +coinAmount,
+                description: `Hoàn tiền rút về ví (Yêu cầu rút #${w.id} bị từ chối)`,
+                feeDetail: `Cộng lại ${coinAmount.toLocaleString('vi-VN')} đ vào số dư khả dụng do lệnh rút về ${w.bankName || 'ngân hàng'} bị từ chối${reasonText}`,
+                date: formatTransactionDate(refundDateStr),
+                status: 'COMPLETED',
+                rawDate: refundRawDate
+              });
+            }
           });
         }
 
@@ -374,6 +580,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
 
   const filteredTransactions = transactions.filter(t => {
     if (filterType === 'ALL') return true;
+    if (filterType === 'WITHDRAW') return t.type === 'WITHDRAW' || t.subType === 'WITHDRAW_REFUND';
     return t.type === filterType;
   });
 
@@ -678,21 +885,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{tx.date}</td>
                       <td>
-                        {tx.status === 'COMPLETED' ? (
-                          <span className="badge badge-online">Thành Công</span>
-                        ) : tx.status === 'FROZEN' ? (
-                          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' }}>⏳ Đang Đóng Băng</span>
-                        ) : tx.status === 'REFUNDED' ? (
-                          <span className="badge" style={{ background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)' }}>↺ Khiếu Nại & Xử Lý</span>
-                        ) : tx.status === 'CONFIRMED' ? (
-                          <span className="badge badge-primary">Đang Diễn Ra</span>
-                        ) : tx.status === 'PENDING' ? (
-                          <span className="badge badge-warning" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>Chờ Xử Lý</span>
-                        ) : tx.status === 'CANCELED' || tx.status === 'REJECTED' ? (
-                          <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>Đã Hủy</span>
-                        ) : (
-                          <span className="badge badge-online">{tx.status}</span>
-                        )}
+                        {renderStatusBadge(tx)}
                       </td>
                     </tr>
                   ))

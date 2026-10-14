@@ -19,4 +19,8 @@ public class TopupUserDTO {
     private String bankAccountNumber; // số tài khoản
     private String bankAccountName; // tên chủ tài khoản
     private String bankName; // tên ngân hàng
+
+    // Thông tin hoàn tất / lý do từ chối
+    private String completedAt;
+    private String description;
 }

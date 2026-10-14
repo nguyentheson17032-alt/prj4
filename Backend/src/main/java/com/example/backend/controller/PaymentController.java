@@ -562,6 +562,8 @@ public class PaymentController {
             dto.setBankAccountNumber(payment.getBankAccountNumber());
             dto.setBankAccountName(payment.getBankAccountName());
             dto.setBankName(payment.getBankName());
+            dto.setCompletedAt(payment.getCompletedAt() != null ? payment.getCompletedAt().toString() : null);
+            dto.setDescription(payment.getDescription());
             return dto;
         }).collect(Collectors.toList());
         return ResponseEntity.ok(result);
@@ -609,6 +611,8 @@ public class PaymentController {
             dto.setBankAccountNumber(payment.getBankAccountNumber());
             dto.setBankAccountName(payment.getBankAccountName());
             dto.setBankName(payment.getBankName());
+            dto.setCompletedAt(payment.getCompletedAt() != null ? payment.getCompletedAt().toString() : null);
+            dto.setDescription(payment.getDescription());
             return dto;
         }).collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(result);

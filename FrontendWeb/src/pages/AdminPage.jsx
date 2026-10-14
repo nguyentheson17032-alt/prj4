@@ -25,14 +25,14 @@ import { PlayerDetailModal, getPrimaryGame } from '../components/modals/PlayerDe
 // Sidebar nav items
 // ─────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: 'overview',   label: 'Tổng Quan',             icon: LayoutDashboard },
-  { id: 'commission', label: 'Chiết Khấu (15%)',      icon: Percent },
-  { id: 'users',      label: 'Người Dùng',             icon: Users },
-  { id: 'players',    label: 'Game Thủ',               icon: Gamepad2 },
-  { id: 'orders',     label: 'Đơn Hàng',               icon: ShoppingBag },
-  { id: 'games',      label: 'Danh Mục Game',          icon: Gamepad2 },
-  { id: 'payments',   label: 'Nạp / Rút Tiền',        icon: CreditCard },
-  { id: 'reports',    label: 'Khiếu Nại',              icon: AlertTriangle },
+  { id: 'overview', label: 'Tổng Quan', icon: LayoutDashboard },
+  { id: 'commission', label: 'Chiết Khấu (15%)', icon: Percent },
+  { id: 'users', label: 'Người Dùng', icon: Users },
+  { id: 'players', label: 'Game Thủ', icon: Gamepad2 },
+  { id: 'orders', label: 'Đơn Hàng', icon: ShoppingBag },
+  { id: 'games', label: 'Danh Mục Game', icon: Gamepad2 },
+  { id: 'payments', label: 'Nạp / Rút Tiền', icon: CreditCard },
+  { id: 'reports', label: 'Khiếu Nại', icon: AlertTriangle },
 ];
 
 // ─────────────────────────────────────────────
@@ -80,19 +80,19 @@ const formatOrderDateTime = (dateVal) => {
 // ─────────────────────────────────────────────
 const StatusBadge = ({ status, order }) => {
   const map = {
-    PENDING:   { label: 'Chờ duyệt',    bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
-    COMPLETED: { label: 'Hoàn thành',   bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
-    AVAILABLE: { label: 'Sẵn sàng',     bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
-    BANNED:    { label: 'Đã khóa',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    REJECTED:  { label: 'Từ chối',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    PLAYING:   { label: 'Đang chơi',    bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
-    CONFIRMED: { label: 'Đã xác nhận',  bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
-    CANCELLED: { label: 'Đã hủy',       bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    CANCELED:  { label: 'Đã hủy',       bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    REFUNDED:  { label: 'Đã hoàn tiền', bg: 'rgba(168,85,247,0.15)',  color: '#a855f7' },
-    processed: { label: 'Đã xử lý',     bg: 'rgba(16,185,129,0.15)',  color: '#10b981' },
-    pending:   { label: 'Chờ xử lý',    bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
-    rejected:  { label: 'Từ chối',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
+    PENDING: { label: 'Chờ duyệt', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+    COMPLETED: { label: 'Hoàn thành', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    AVAILABLE: { label: 'Sẵn sàng', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    BANNED: { label: 'Đã khóa', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    REJECTED: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    PLAYING: { label: 'Đang chơi', bg: 'rgba(6,182,212,0.15)', color: '#06b6d4' },
+    CONFIRMED: { label: 'Đã xác nhận', bg: 'rgba(6,182,212,0.15)', color: '#06b6d4' },
+    CANCELLED: { label: 'Đã hủy', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    CANCELED: { label: 'Đã hủy', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    REFUNDED: { label: 'Đã hoàn tiền', bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
+    processed: { label: 'Đã xử lý', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    pending: { label: 'Chờ xử lý', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+    rejected: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
   };
 
   const refundPct = (status === 'REFUNDED' || order?.status === 'REFUNDED') ? getRefundPercentage(order) : null;
@@ -140,7 +140,7 @@ const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissi
 
   // Sơ đồ doanh thu sàn 7 ngày gần nhất (số tiền sàn ăn được 15% từng ngày từ thuê và donate)
   const weeklyData = useMemo(() => {
-    const days = ['CN','T2','T3','T4','T5','T6','T7'];
+    const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
     const now = new Date();
     const result = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now);
@@ -194,7 +194,7 @@ const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissi
     });
 
     const maxVal = Math.max(...result.map(r => r.val), 1);
-    return result.map(r => ({ ...r, height: r.val > 0 ? `${Math.max(15, Math.round((r.val/maxVal)*90))}%` : '8px' }));
+    return result.map(r => ({ ...r, height: r.val > 0 ? `${Math.max(15, Math.round((r.val / maxVal) * 90))}%` : '8px' }));
   }, [commissionTransactions, ordersList]);
 
   const weeklyTotalCommission = useMemo(() => {
@@ -213,8 +213,8 @@ const OverviewTab = ({ ordersList, usersList, playersList, reportsList, commissi
           color="#10b981"
         />
         <MetricCard label="Tổng Đơn Thuê" value={`${ordersList.length} đơn`} sub={`Tỷ lệ hoàn thành: ${completionRate}`} icon={ShoppingBag} color="#6366f1" />
-        <MetricCard label="Tổng Tài Khoản" value={usersList.length.toLocaleString()} sub={`${playersList.filter(p=>p.status!=='PENDING').length} Game thủ hoạt động`} icon={Users} color="#06b6d4" />
-        <MetricCard label="Game Thủ Chờ Duyệt" value={`${pendingCount} hồ sơ`} sub={`${reportsList.filter(r=>r.status==='PENDING').length} khiếu nại chưa xử lý`} icon={Award} color="#f59e0b" />
+        <MetricCard label="Tổng Tài Khoản" value={usersList.length.toLocaleString()} sub={`${playersList.filter(p => p.status !== 'PENDING').length} Game thủ hoạt động`} icon={Users} color="#06b6d4" />
+        <MetricCard label="Game Thủ Chờ Duyệt" value={`${pendingCount} hồ sơ`} sub={`${reportsList.filter(r => r.status === 'PENDING').length} khiếu nại chưa xử lý`} icon={Award} color="#f59e0b" />
       </div>
 
       {/* Revenue Chart */}
@@ -379,7 +379,7 @@ const CommissionTab = () => {
             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Chính Sách Chiết Khấu Sàn: 15% Cố Định</h3>
           </div>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5 }}>
-            Áp dụng tự động cho <strong>toàn bộ giao dịch Thuê Player và Donate quà tặng</strong>. 
+            Áp dụng tự động cho <strong>toàn bộ giao dịch Thuê Player và Donate quà tặng</strong>.
             Người dùng chi trả 100%, <strong>Game thủ (Idol) thực nhận 85%</strong> và <strong>Nền tảng thu 15%</strong> làm phí vận hành và dịch vụ.
           </p>
         </div>
@@ -806,6 +806,17 @@ const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers }) => {
     setCurrentPage(1);
   }, [search, roleFilter, statusFilter, sortBy]);
 
+  const hasActiveFilters = Boolean(
+    search || roleFilter !== 'ALL' || statusFilter !== 'ALL' || sortBy !== 'NEWEST'
+  );
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setRoleFilter('ALL');
+    setStatusFilter('ALL');
+    setSortBy('NEWEST');
+  };
+
   const handleBanSuccess = (userId, banData) => {
     setUsersList?.(prev => prev.map(u => {
       if (u.id === userId) {
@@ -891,15 +902,79 @@ const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers }) => {
 
       {/* ── Main User Table Panel ── */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-        {/* Header Title */}
-        <div style={{ marginBottom: '18px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Quản Lý Người Dùng & Phân Quyền</h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            Kiểm soát tài khoản, áp dụng chế tài kỷ luật khóa/mở khóa tức thì
-          </p>
+        {/* Header Title & Top Right Search / Refresh */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+              Quản Lý Người Dùng & Phân Quyền ({filteredUsers.length})
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+              Kiểm soát tài khoản, áp dụng chế tài kỷ luật khóa/mở khóa tức thì
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '250px' }}>
+              <Search
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)',
+                  pointerEvents: 'none'
+                }}
+              />
+              <input
+                className="form-control"
+                style={{
+                  paddingLeft: '34px',
+                  paddingRight: search ? '30px' : '12px',
+                  height: '38px',
+                  fontSize: '0.85rem',
+                  width: '100%',
+                  borderRadius: '10px'
+                }}
+                placeholder="Tìm tên, username, email, SĐT..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '2px'
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {reloadUsers && (
+              <button
+                className="btn btn-outline"
+                style={{ height: '38px', width: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px' }}
+                onClick={reloadUsers}
+                title="Làm mới danh sách"
+              >
+                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Controls Toolbar: Responsive Search & Filters */}
+        {/* Filter Toolbar: Responsive Dropdowns */}
         <div
           style={{
             display: 'flex',
@@ -907,37 +982,9 @@ const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers }) => {
             gap: '10px',
             flexWrap: 'wrap',
             width: '100%',
-            marginBottom: '20px'
+            marginBottom: '16px'
           }}
         >
-          {/* Search Box */}
-          <div style={{ position: 'relative', flex: '2 1 240px', minWidth: '180px' }}>
-            <Search
-              size={15}
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
-                pointerEvents: 'none'
-              }}
-            />
-            <input
-              className="form-control"
-              style={{
-                paddingLeft: '36px',
-                height: '40px',
-                fontSize: '0.85rem',
-                width: '100%',
-                borderRadius: '10px'
-              }}
-              placeholder="Tìm tên, username, email, sđt..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
           {/* Role Filter */}
           <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
             <select
@@ -993,11 +1040,31 @@ const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers }) => {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
-              <option value="NEWEST">Mới nhất</option>
-              <option value="BALANCE_DESC">Số dư ví cao nhất</option>
+              <option value="NEWEST">Mới nhất trước</option>
+              <option value="BALANCE_DESC">Số dư ví: Cao → Thấp</option>
               <option value="USERNAME_ASC">Tên đăng nhập (A-Z)</option>
             </select>
           </div>
+
+          {/* Nút reset nếu có filter hoạt động */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ height: '40px', padding: '0 12px', fontSize: '0.82rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={13} />
+              <span>Xóa bộ lọc</span>
+            </button>
+          )}
+        </div>
+
+        {/* Thanh tóm tắt kết quả theo bộ lọc */}
+        <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
+          Đang hiển thị <strong>{filteredUsers.length}</strong> / {totalUsers} người dùng
+          <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
+          Hoạt động: <strong style={{ color: '#10b981' }}>{activeCount}</strong> • Bị khóa: <strong style={{ color: '#ef4444' }}>{bannedCount}</strong> • Game thủ: <strong style={{ color: '#06b6d4' }}>{playerCount}</strong>
         </div>
 
         {/* User Table */}
@@ -1431,6 +1498,17 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
       });
   }, [groupedPlayers, search, gameFilter, statusFilter, sortBy]);
 
+  const hasActiveFilters = Boolean(
+    search || gameFilter !== 'ALL' || statusFilter !== 'ALL' || sortBy !== 'REVENUE_DESC'
+  );
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setGameFilter('ALL');
+    setStatusFilter('ALL');
+    setSortBy('REVENUE_DESC');
+  };
+
   const handleApprove = async (pid) => {
     try {
       await api.approvePlayer(pid);
@@ -1484,8 +1562,8 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
 
       {/* Full player list with summary data */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-        {/* Header Title */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '18px' }}>
+        {/* Header Title & Top Right Search */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px' }}>
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
               Danh Sách Game Thủ ({filteredGrouped.length})
@@ -1494,9 +1572,58 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
               Đã tối ưu gộp {summaryData.length} hồ sơ theo {groupedPlayers.length} Game thủ
             </p>
           </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '250px' }}>
+              <Search
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)',
+                  pointerEvents: 'none'
+                }}
+              />
+              <input
+                className="form-control"
+                style={{
+                  paddingLeft: '34px',
+                  paddingRight: search ? '30px' : '12px',
+                  height: '38px',
+                  fontSize: '0.85rem',
+                  width: '100%',
+                  borderRadius: '10px'
+                }}
+                placeholder="Tìm game thủ, username, game..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '2px'
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Controls Toolbar: Responsive Search & Filters */}
+        {/* Controls Toolbar: Responsive Filters */}
         <div
           style={{
             display: 'flex',
@@ -1504,37 +1631,9 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
             gap: '10px',
             flexWrap: 'wrap',
             width: '100%',
-            marginBottom: '20px'
+            marginBottom: '16px'
           }}
         >
-          {/* Search Box */}
-          <div style={{ position: 'relative', flex: '2 1 240px', minWidth: '180px' }}>
-            <Search
-              size={15}
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
-                pointerEvents: 'none'
-              }}
-            />
-            <input
-              className="form-control"
-              style={{
-                paddingLeft: '36px',
-                height: '40px',
-                fontSize: '0.85rem',
-                width: '100%',
-                borderRadius: '10px'
-              }}
-              placeholder="Tìm game thủ, username, game..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
           {/* Game Filter */}
           <div style={{ flex: '1 1 150px', minWidth: '135px' }}>
             <select
@@ -1597,6 +1696,24 @@ const PlayersTab = ({ playersList, setPlayersList, loading }) => {
               <option value="NAME_ASC">Tên game thủ (A-Z)</option>
             </select>
           </div>
+
+          {/* Reset button if active */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ height: '40px', padding: '0 12px', fontSize: '0.82rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={13} />
+              <span>Xóa bộ lọc</span>
+            </button>
+          )}
+        </div>
+
+        {/* Thanh tóm tắt kết quả theo bộ lọc */}
+        <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
+          Đang hiển thị <strong>{filteredGrouped.length}</strong> / {groupedPlayers.length} game thủ
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -1832,16 +1949,79 @@ const OrdersTab = ({ ordersList, loading }) => {
       .reduce((sum, o) => sum + Number(o.totalPrice || o.price || 0), 0);
   }, [filtered]);
 
+  const hasActiveFilters = Boolean(
+    search || gameFilter !== 'ALL' || statusFilter !== 'ALL' || dateFilter !== 'ALL' || sortBy !== 'NEWEST'
+  );
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setGameFilter('ALL');
+    setStatusFilter('ALL');
+    setDateFilter('ALL');
+    setSortBy('NEWEST');
+  };
+
   return (
     <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-      {/* Title Header */}
-      <div style={{ marginBottom: '18px' }}>
-        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
-          Lịch Sử Đơn Hàng ({filtered.length})
-        </h3>
-        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-          Tổng {ordersList.length} đơn | Doanh thu hoàn thành (đã lọc): <strong style={{ color: '#10b981' }}>{totalFilteredRevenue.toLocaleString('vi-VN')} đ</strong>
-        </p>
+      {/* Title Header & Top Right Search */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px' }}>
+        <div>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+            Lịch Sử Đơn Hàng ({filtered.length})
+          </h3>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            Kiểm tra toàn bộ đơn đặt thuê Idol, trạng thái thanh toán và giải ngân
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: '250px' }}>
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)',
+                pointerEvents: 'none'
+              }}
+            />
+            <input
+              className="form-control"
+              style={{
+                paddingLeft: '34px',
+                paddingRight: search ? '30px' : '12px',
+                height: '38px',
+                fontSize: '0.85rem',
+                width: '100%',
+                borderRadius: '10px'
+              }}
+              placeholder="Tìm mã đơn, người thuê, idol, game..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '2px'
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Responsive Filter Toolbar */}
@@ -1852,31 +2032,9 @@ const OrdersTab = ({ ordersList, loading }) => {
           gap: '10px',
           flexWrap: 'wrap',
           width: '100%',
-          marginBottom: '20px'
+          marginBottom: '16px'
         }}
       >
-        {/* Search Box */}
-        <div style={{ position: 'relative', flex: '2 1 220px', minWidth: '180px' }}>
-          <Search
-            size={15}
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-              pointerEvents: 'none'
-            }}
-          />
-          <input
-            className="form-control"
-            style={{ paddingLeft: '36px', height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px' }}
-            placeholder="Tìm mã đơn, người thuê, game thủ, game..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
         {/* Game Filter */}
         <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
           <select
@@ -1938,6 +2096,26 @@ const OrdersTab = ({ ordersList, loading }) => {
             <option value="PRICE_ASC">Tổng tiền thấp nhất</option>
           </select>
         </div>
+
+        {/* Reset button if active */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ height: '40px', padding: '0 12px', fontSize: '0.82rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            onClick={handleResetFilters}
+          >
+            <RotateCcw size={13} />
+            <span>Xóa bộ lọc</span>
+          </button>
+        )}
+      </div>
+
+      {/* Thanh tóm tắt kết quả theo bộ lọc */}
+      <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
+        Đang hiển thị <strong>{filtered.length}</strong> / {ordersList.length} đơn hàng
+        <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
+        Doanh thu hoàn thành (đã lọc): <strong style={{ color: '#10b981' }}>{totalFilteredRevenue.toLocaleString('vi-VN')} đ</strong>
       </div>
 
       {/* Orders Table */}
@@ -2201,7 +2379,7 @@ const GamesTab = ({ gamesList, setGamesList, loading }) => {
       {selectedGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedGame(null)}>
           <div style={{ background: 'var(--card-bg)', borderRadius: '16px', maxWidth: '520px', width: '100%', maxHeight: '80vh', overflowY: 'auto', border: '1px solid var(--border-color)' }} onClick={e => e.stopPropagation()}>
-            {(selectedGame.imageUrl || selectedGame.image) && <img src={selectedGame.imageUrl || selectedGame.image} alt={selectedGame.name} style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '16px 16px 0 0' }} onError={e => { e.target.style.display='none'; }} />}
+            {(selectedGame.imageUrl || selectedGame.image) && <img src={selectedGame.imageUrl || selectedGame.image} alt={selectedGame.name} style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '16px 16px 0 0' }} onError={e => { e.target.style.display = 'none'; }} />}
             <div style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
@@ -2248,7 +2426,7 @@ const GamesTab = ({ gamesList, setGamesList, loading }) => {
               onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
             >
               {(g.imageUrl || g.image)
-                ? <img src={g.imageUrl || g.image} alt={g.name} style={{ width: '100%', height: '100px', objectFit: 'cover' }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                ? <img src={g.imageUrl || g.image} alt={g.name} style={{ width: '100%', height: '100px', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
                 : null}
               <div style={{ width: '100%', height: '100px', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', display: (g.imageUrl || g.image) ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center' }}><Gamepad2 size={32} style={{ color: '#fff', opacity: 0.7 }} /></div>
               <div style={{ padding: '10px 12px' }}>
@@ -2577,7 +2755,7 @@ const PaymentsTab = () => {
       {/* Main Container */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
         {/* Header Tabs: Nạp Tiền & Rút Tiền */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
             {[
               { id: 'deposit', label: '⬇ Quản Lý Nạp Tiền', count: depositList.length, pendingCount: pendingDepositCount },
@@ -2616,11 +2794,31 @@ const PaymentsTab = () => {
             ))}
           </div>
 
-          {/* Nút Xuất CSV và Nút Tải Lại */}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {/* Góc phải trên cùng: Ô tìm kiếm + Nút Xuất CSV & Nút Làm Mới */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '250px' }}>
+              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+              <input
+                className="form-control"
+                style={{ paddingLeft: '34px', paddingRight: search ? '30px' : '12px', height: '38px', fontSize: '0.85rem', width: '100%', borderRadius: '10px' }}
+                placeholder={tab === 'withdraw' ? "Tìm theo tên, SĐT, STK, mã #ID..." : "Tìm theo tên, SĐT, mã #ID..."}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
             <button
               className="btn btn-outline"
-              style={{ height: '36px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ height: '38px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px' }}
               onClick={handleExportCSV}
               title="Xuất danh sách đang lọc ra file CSV Excel"
             >
@@ -2629,7 +2827,7 @@ const PaymentsTab = () => {
             </button>
             <button
               className="btn btn-outline"
-              style={{ height: '36px', fontSize: '0.82rem', padding: '0 10px' }}
+              style={{ height: '38px', width: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px' }}
               onClick={fetchData}
               title="Làm mới dữ liệu"
             >
@@ -2638,162 +2836,139 @@ const PaymentsTab = () => {
           </div>
         </div>
 
-        {/* Hệ Thống Bộ Lọc Nâng Cao */}
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '16px',
-          marginBottom: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}>
-          {/* Hàng 1: Ô tìm kiếm & Các select */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
-            {/* 1. Tìm kiếm */}
-            <div style={{ position: 'relative', minWidth: '200px' }}>
-              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                className="form-control"
-                style={{ paddingLeft: '34px', height: '38px', fontSize: '0.85rem' }}
-                placeholder={tab === 'withdraw' ? "Tìm theo tên, SĐT, STK, mã #ID..." : "Tìm theo tên, SĐT, mã #ID..."}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* 2. Trạng thái */}
-            <div>
-              <select
-                className="form-control"
-                style={{ height: '38px', fontSize: '0.85rem' }}
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="pending">⏳ Chờ duyệt (Pending)</option>
-                <option value="processed">✅ Đã xử lý (Completed)</option>
-                <option value="rejected">❌ Từ chối / Hoàn tiền</option>
-              </select>
-            </div>
-
-            {/* 3. Khoảng thời gian */}
-            <div>
-              <select
-                className="form-control"
-                style={{ height: '38px', fontSize: '0.85rem' }}
-                value={dateFilter}
-                onChange={e => setDateFilter(e.target.value)}
-              >
-                <option value="all">Tất cả thời gian</option>
-                <option value="today">Hôm nay</option>
-                <option value="yesterday">Hôm qua</option>
-                <option value="last7days">7 ngày qua</option>
-                <option value="last30days">30 ngày qua</option>
-                <option value="thisMonth">Tháng này</option>
-                <option value="custom">Tùy chọn khoảng ngày...</option>
-              </select>
-            </div>
-
-            {/* 4. Khoảng số tiền */}
-            <div>
-              <select
-                className="form-control"
-                style={{ height: '38px', fontSize: '0.85rem' }}
-                value={amountFilter}
-                onChange={e => setAmountFilter(e.target.value)}
-              >
-                <option value="all">Tất cả mệnh giá</option>
-                <option value="<100k">Dưới 100.000 đ</option>
-                <option value="100k-500k">100.000 đ - 500.000 đ</option>
-                <option value="500k-2m">500.000 đ - 2.000.000 đ</option>
-                <option value=">2m">Trên 2.000.000 đ</option>
-              </select>
-            </div>
-
-            {/* 5. Ngân hàng / Phương thức */}
-            {uniqueMethods.length > 0 && (
-              <div>
-                <select
-                  className="form-control"
-                  style={{ height: '38px', fontSize: '0.85rem' }}
-                  value={methodFilter}
-                  onChange={e => setMethodFilter(e.target.value)}
-                >
-                  <option value="all">{tab === 'withdraw' ? 'Tất cả ngân hàng' : 'Tất cả phương thức'}</option>
-                  {uniqueMethods.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* 6. Sắp xếp */}
-            <div>
-              <select
-                className="form-control"
-                style={{ height: '38px', fontSize: '0.85rem' }}
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-              >
-                <option value="newest">Mới nhất trước</option>
-                <option value="oldest">Cũ nhất trước</option>
-                <option value="amount-desc">Số tiền: Cao → Thấp</option>
-                <option value="amount-asc">Số tiền: Thấp → Cao</option>
-              </select>
-            </div>
+        {/* Hệ Thống Bộ Lọc Responsive - Giống Đơn Hàng */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap',
+            width: '100%',
+            marginBottom: '16px'
+          }}
+        >
+          {/* 1. Trạng thái */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="pending">⏳ Chờ duyệt (Pending)</option>
+              <option value="processed">✅ Đã xử lý (Completed)</option>
+              <option value="rejected">❌ Từ chối / Hoàn tiền</option>
+            </select>
           </div>
 
-          {/* Hàng 2: Tùy chọn ngày tùy chỉnh (Nếu chọn custom) */}
-          {dateFilter === 'custom' && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', paddingTop: '4px' }}>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Từ ngày:</span>
-              <input
-                type="date"
+          {/* 2. Khoảng thời gian */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={dateFilter}
+              onChange={e => setDateFilter(e.target.value)}
+            >
+              <option value="all">📅 Tất cả thời gian</option>
+              <option value="today">Hôm nay</option>
+              <option value="yesterday">Hôm qua</option>
+              <option value="last7days">7 ngày qua</option>
+              <option value="last30days">30 ngày qua</option>
+              <option value="thisMonth">Tháng này</option>
+              <option value="custom">Tùy chọn khoảng ngày...</option>
+            </select>
+          </div>
+
+          {/* 3. Mệnh giá */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={amountFilter}
+              onChange={e => setAmountFilter(e.target.value)}
+            >
+              <option value="all">💰 Tất cả mệnh giá</option>
+              <option value="<100k">Dưới 100.000 đ</option>
+              <option value="100k-500k">100.000 đ - 500.000 đ</option>
+              <option value="500k-2m">500.000 đ - 2.000.000 đ</option>
+              <option value=">2m">Trên 2.000.000 đ</option>
+            </select>
+          </div>
+
+          {/* 4. Phương thức / Ngân hàng */}
+          {uniqueMethods.length > 0 && (
+            <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+              <select
                 className="form-control"
-                style={{ height: '34px', fontSize: '0.82rem', width: 'auto' }}
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-              />
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Đến ngày:</span>
-              <input
-                type="date"
-                className="form-control"
-                style={{ height: '34px', fontSize: '0.82rem', width: 'auto' }}
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-              />
+                style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+                value={methodFilter}
+                onChange={e => setMethodFilter(e.target.value)}
+              >
+                <option value="all">{tab === 'withdraw' ? '🏦 Tất cả ngân hàng' : '💳 Tất cả phương thức'}</option>
+                {uniqueMethods.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
           )}
 
-          {/* Hàng 3: Thanh tóm tắt kết quả theo bộ lọc */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
-              Đang hiển thị <strong>{filtered.length}</strong> / {currentList.length} giao dịch
-              <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
-              Tổng tiền lọc được: <strong style={{ color: tab === 'withdraw' ? '#f59e0b' : '#10b981' }}>{filteredTotalAmount.toLocaleString('vi-VN')} đ</strong>
-            </div>
-
-            {hasActiveFilters && (
-              <button
-                className="btn btn-outline"
-                style={{ height: '30px', padding: '0 10px', fontSize: '0.78rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
-                onClick={handleResetFilters}
-              >
-                <RotateCcw size={12} style={{ marginRight: '4px' }} />
-                <span>Xóa bộ lọc</span>
-              </button>
-            )}
+          {/* 5. Sắp xếp */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+            >
+              <option value="newest">Mới nhất trước</option>
+              <option value="oldest">Cũ nhất trước</option>
+              <option value="amount-desc">Số tiền: Cao → Thấp</option>
+              <option value="amount-asc">Số tiền: Thấp → Cao</option>
+            </select>
           </div>
+
+          {/* Nút reset nếu có filter hoạt động */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ height: '40px', padding: '0 12px', fontSize: '0.82rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={13} />
+              <span>Xóa bộ lọc</span>
+            </button>
+          )}
+        </div>
+
+        {/* Ngày tùy chỉnh nếu chọn custom */}
+        {dateFilter === 'custom' && (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Từ ngày:</span>
+            <input
+              type="date"
+              className="form-control"
+              style={{ height: '36px', fontSize: '0.82rem', width: 'auto', borderRadius: '8px' }}
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+            />
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Đến ngày:</span>
+            <input
+              type="date"
+              className="form-control"
+              style={{ height: '36px', fontSize: '0.82rem', width: 'auto', borderRadius: '8px' }}
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Thanh tóm tắt kết quả theo bộ lọc */}
+        <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
+          Đang hiển thị <strong>{filtered.length}</strong> / {currentList.length} giao dịch
+          <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
+          Tổng tiền lọc được: <strong style={{ color: tab === 'withdraw' ? '#f59e0b' : '#10b981' }}>{filteredTotalAmount.toLocaleString('vi-VN')} đ</strong>
         </div>
 
         {/* Bảng Dữ Liệu Giao Dịch */}
@@ -2837,9 +3012,9 @@ const PaymentsTab = () => {
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <img
-                          src={item.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=user'}
+                          src={item.avatarUrl || getUserAvatar({ username: item.fullName || item.phoneNumber || `user_${item.id}` })}
                           alt=""
-                          style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+                          style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                         />
                         <div>
                           <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{item.fullName || '—'}</div>
@@ -3147,17 +3322,236 @@ const PaymentsTab = () => {
 // ─────────────────────────────────────────────
 // REPORTS TAB
 // ─────────────────────────────────────────────
-const ReportsTab = ({ reportsList, setReportsList, loading, onStatsRefresh }) => {
+const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadReports, onStatsRefresh }) => {
   const { addToast } = useToast();
   const [expandedId, setExpandedId] = useState(null);
+  const [selectedReport, setSelectedReport] = useState(null);
   const [resolutionTexts, setResolutionTexts] = useState({});
   const [refundPercentages, setRefundPercentages] = useState({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Filter & Search states
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all, PENDING, INVESTIGATING, RESOLVED, REJECTED
+  const [reasonFilter, setReasonFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all'); // all, with_order, without_order
+  const [dateFilter, setDateFilter] = useState('all'); // all, today, yesterday, last7days, last30days, thisMonth, custom
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [sortBy, setSortBy] = useState('newest'); // newest, oldest, order-price-desc, order-price-asc
+
+  // Thống kê tổng quan
+  const totalReports = reportsList.length;
+  const pendingList = reportsList.filter(r => r.status === 'PENDING' || r.status === 'INVESTIGATING');
+  const resolvedList = reportsList.filter(r => r.status === 'RESOLVED');
+  const rejectedList = reportsList.filter(r => r.status === 'REJECTED');
+  const withOrderList = reportsList.filter(r => r.order?.id);
+
+  const pendingCount = pendingList.length;
+  const resolvedCount = resolvedList.length;
+  const rejectedCount = rejectedList.length;
+  const withOrderCount = withOrderList.length;
+  const withoutOrderCount = totalReports - withOrderCount;
+
+  const totalRefundAmount = useMemo(() => {
+    return resolvedList.reduce((sum, r) => sum + (Number(r.refundAmount) || 0), 0);
+  }, [resolvedList]);
+
+  const resolutionRate = totalReports > 0
+    ? Math.round(((resolvedCount + rejectedCount) / totalReports) * 100)
+    : 100;
+
+  // Trích xuất danh sách lý do khiếu nại duy nhất để lọc
+  const uniqueReasons = useMemo(() => {
+    const set = new Set();
+    reportsList.forEach(r => {
+      if (r.reason && r.reason.trim()) set.add(r.reason.trim());
+    });
+    return Array.from(set);
+  }, [reportsList]);
+
+  const getReporterName = (r) => r.reporter?.username || r.reporter?.fullName || r.reportedBy || 'Khách hàng';
+  const getTargetName = (r) => r.reportedPlayer?.username || r.reportedPlayer?.user?.username || r.targetUser || 'Game thủ';
+
+  // Lọc dữ liệu khiếu nại
+  const filtered = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+    const sevenDaysAgo = todayStart - 7 * 24 * 60 * 60 * 1000;
+    const thirtyDaysAgo = todayStart - 30 * 24 * 60 * 60 * 1000;
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    return reportsList.filter(r => {
+      // 1. Trạng thái
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'PENDING') {
+          if (r.status !== 'PENDING' && r.status !== 'INVESTIGATING') return false;
+        } else if (r.status !== statusFilter) {
+          return false;
+        }
+      }
+
+      // 2. Lý do khiếu nại
+      if (reasonFilter !== 'all' && (r.reason || '').trim() !== reasonFilter) {
+        return false;
+      }
+
+      // 3. Phân loại có đơn thuê / không có đơn thuê
+      if (typeFilter === 'with_order' && !r.order?.id) return false;
+      if (typeFilter === 'without_order' && r.order?.id) return false;
+
+      // 4. Tìm kiếm từ khóa (Search)
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const cleanQ = q.startsWith('#') ? q.slice(1) : q;
+        const idMatch = String(r.id || '').toLowerCase().includes(cleanQ);
+        const orderIdMatch = r.order?.id ? String(r.order.id).toLowerCase().includes(cleanQ) : false;
+        const reporterName = getReporterName(r).toLowerCase();
+        const targetName = getTargetName(r).toLowerCase();
+        const reporterMatch = reporterName.includes(q);
+        const targetMatch = targetName.includes(q);
+        const reasonMatch = (r.reason || '').toLowerCase().includes(q);
+        const descMatch = (r.description || '').toLowerCase().includes(q);
+        const resMatch = (r.resolution || '').toLowerCase().includes(q);
+
+        if (!idMatch && !orderIdMatch && !reporterMatch && !targetMatch && !reasonMatch && !descMatch && !resMatch) {
+          return false;
+        }
+      }
+
+      // 5. Thời gian
+      if (dateFilter !== 'all') {
+        const itemDateObj = parseDateToDateObj(r.createdAt);
+        const itemTime = itemDateObj ? itemDateObj.getTime() : 0;
+        if (!itemTime) return false;
+
+        if (dateFilter === 'today' && itemTime < todayStart) return false;
+        if (dateFilter === 'yesterday' && (itemTime < yesterdayStart || itemTime >= todayStart)) return false;
+        if (dateFilter === 'last7days' && itemTime < sevenDaysAgo) return false;
+        if (dateFilter === 'last30days' && itemTime < thirtyDaysAgo) return false;
+        if (dateFilter === 'thisMonth' && itemTime < thisMonthStart) return false;
+        if (dateFilter === 'custom') {
+          if (startDate) {
+            const startLimit = new Date(startDate).getTime();
+            if (itemTime < startLimit) return false;
+          }
+          if (endDate) {
+            const endLimit = new Date(endDate).getTime() + 24 * 60 * 60 * 1000;
+            if (itemTime >= endLimit) return false;
+          }
+        }
+      }
+
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === 'order-price-desc') {
+        return (Number(b.order?.price) || 0) - (Number(a.order?.price) || 0);
+      }
+      if (sortBy === 'order-price-asc') {
+        return (Number(a.order?.price) || 0) - (Number(b.order?.price) || 0);
+      }
+
+      const timeA = parseDateToDateObj(a.createdAt)?.getTime() || 0;
+      const timeB = parseDateToDateObj(b.createdAt)?.getTime() || 0;
+      if (sortBy === 'oldest') return timeA - timeB;
+      return timeB - timeA; // newest default
+    });
+  }, [reportsList, search, statusFilter, reasonFilter, typeFilter, dateFilter, startDate, endDate, sortBy]);
+
+  const hasActiveFilters = Boolean(
+    search || statusFilter !== 'all' || reasonFilter !== 'all' || typeFilter !== 'all' || dateFilter !== 'all' || sortBy !== 'newest'
+  );
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setReasonFilter('all');
+    setTypeFilter('all');
+    setDateFilter('all');
+    setStartDate('');
+    setEndDate('');
+    setSortBy('newest');
+  };
+
+  // Làm mới dữ liệu
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (typeof reloadReports === 'function') {
+        await reloadReports();
+      } else if (onStatsRefresh) {
+        await onStatsRefresh();
+      }
+      addToast('Đã làm mới danh sách khiếu nại', 'info');
+    } catch (e) {
+      console.error(e);
+      addToast('Lỗi khi tải lại dữ liệu khiếu nại', 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Xuất file CSV
+  const handleExportCSV = () => {
+    if (filtered.length === 0) {
+      addToast('Không có dữ liệu khiếu nại để xuất file', 'warning');
+      return;
+    }
+    const headers = [
+      'Mã Khiếu Nại',
+      'Người Khiếu Nại',
+      'Game Thủ Bị Tố Cáo',
+      'Mã Đơn Thuê',
+      'Giá Đơn (VNĐ)',
+      'Lý Do',
+      'Mô Tả',
+      'Trạng Thái',
+      'Tỷ Lệ Hoàn (%)',
+      'Số Tiền Hoàn (VNĐ)',
+      'Kết Quả Xử Lý',
+      'Ngày Tạo'
+    ];
+
+    const rows = filtered.map(r => {
+      const reporter = getReporterName(r);
+      const target = getTargetName(r);
+      const statusText = r.status === 'RESOLVED' ? 'Đã hoàn tiền' : r.status === 'REJECTED' ? 'Đã từ chối' : r.status === 'INVESTIGATING' ? 'Đang điều tra' : 'Chờ xử lý';
+      const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : '—';
+      return [
+        r.id,
+        '"' + String(reporter).replace(/"/g, '""') + '"',
+        '"' + String(target).replace(/"/g, '""') + '"',
+        r.order?.id || '—',
+        Number(r.order?.price || 0),
+        '"' + String(r.reason || '—').replace(/"/g, '""') + '"',
+        '"' + String(r.description || '—').replace(/"/g, '""') + '"',
+        '"' + statusText + '"',
+        r.refundPercentage != null ? `${r.refundPercentage}%` : '—',
+        Number(r.refundAmount || 0),
+        '"' + String(r.resolution || '—').replace(/"/g, '""') + '"',
+        '"' + dateStr + '"'
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `danh_sach_khieu_nai_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    addToast(`Đã xuất file CSV cho ${filtered.length} khiếu nại!`, 'success');
+  };
 
   const handleResolve = async (id) => {
     const report = reportsList.find(r => r.id === id);
     const percent = refundPercentages[id] !== undefined ? Number(refundPercentages[id]) : 100;
     const finalPercent = (percent > 0 && percent <= 100) ? percent : 100;
-    const defaultResolution = report?.order 
+    const defaultResolution = report?.order
       ? `Admin chấp thuận khiếu nại (Hoàn tiền ${finalPercent}%)`
       : 'Admin đã chấp thuận khiếu nại';
     const resolution = resolutionTexts[id]?.trim() || defaultResolution;
@@ -3172,6 +3566,7 @@ const ReportsTab = ({ reportsList, setReportsList, loading, onStatsRefresh }) =>
         order: r.order ? { ...r.order, status: 'REFUNDED' } : r.order
       } : r));
       setExpandedId(null);
+      setSelectedReport(null);
       if (onStatsRefresh) onStatsRefresh();
       addToast(`Đã chấp thuận khiếu nại & hoàn tiền ${finalPercent}% thành công (Số tiền còn lại đã chuyển vào số dư khả dụng của idol)!`, 'success');
     } catch (e) {
@@ -3185,6 +3580,7 @@ const ReportsTab = ({ reportsList, setReportsList, loading, onStatsRefresh }) =>
       await api.updateReportStatus(id, 'REJECTED', resolution);
       setReportsList(prev => prev.map(r => r.id === id ? { ...r, status: 'REJECTED', resolution } : r));
       setExpandedId(null);
+      setSelectedReport(null);
       if (onStatsRefresh) onStatsRefresh();
       addToast('Đã từ chối khiếu nại (Toàn bộ số tiền đóng băng đã chuyển vào số dư khả dụng của idol)!', 'success');
     } catch (e) {
@@ -3192,262 +3588,806 @@ const ReportsTab = ({ reportsList, setReportsList, loading, onStatsRefresh }) =>
     }
   };
 
-  const pending = reportsList.filter(r => r.status === 'PENDING');
-  const processed = reportsList.filter(r => r.status === 'RESOLVED' || r.status === 'REJECTED');
-
-  const getReporterName = (r) => r.reporter?.username || r.reporter?.fullName || r.reportedBy || 'Khách hàng';
-  const getTargetName = (r) => r.reportedPlayer?.username || r.reportedPlayer?.user?.username || r.targetUser || 'Game thủ';
-
   const ReportStatusBadge = ({ status }) => {
     const map = {
-      PENDING: { label: 'Chờ xử lý', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-      INVESTIGATING: { label: 'Đang điều tra', bg: 'rgba(99,102,241,0.15)', color: '#6366f1' },
-      RESOLVED: { label: 'Đã xử lý', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
-      REJECTED: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+      PENDING: { label: 'Chờ xử lý', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+      INVESTIGATING: { label: 'Đang điều tra', bg: 'rgba(99,102,241,0.15)', color: '#6366f1', border: 'rgba(99,102,241,0.3)' },
+      RESOLVED: { label: 'Đã hoàn tiền', bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
+      REJECTED: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
     };
     const s = map[status?.toUpperCase()] || map.PENDING;
     return (
-      <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '20px', background: s.bg, color: s.color, fontWeight: 700 }}>
+      <span style={{
+        fontSize: '0.75rem',
+        padding: '3px 10px',
+        borderRadius: '20px',
+        background: s.bg,
+        color: s.color,
+        fontWeight: 700,
+        border: `1px solid ${s.border}`
+      }}>
         {s.label}
       </span>
     );
   };
 
   return (
-    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Khiếu Nại & Vi Phạm ({reportsList.length})</h3>
-        <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem' }}>
-          <span style={{ color: '#f59e0b', fontWeight: 700 }}>{pending.length} chờ xử lý</span>
-          <span style={{ color: '#10b981', fontWeight: 700 }}>{processed.length} đã xử lý</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* ─── CÁC Ô THỐNG KÊ (STATISTICS CARDS) ─── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '14px'
+      }}>
+        <MetricCard
+          label="Tổng Khiếu Nại"
+          value={totalReports}
+          sub={`${withOrderCount} gắn đơn • ${withoutOrderCount} tự do`}
+          icon={AlertTriangle}
+          color="#6366f1"
+        />
+        <MetricCard
+          label="Chờ Xử Lý"
+          value={pendingCount}
+          sub={pendingCount > 0 ? "Cần admin xem xét ngay" : "Không có tồn đọng"}
+          icon={Clock}
+          color="#f59e0b"
+        />
+        <MetricCard
+          label="Đã Hoàn Tiền"
+          value={resolvedCount}
+          sub={`Chiếm ${totalReports > 0 ? Math.round((resolvedCount / totalReports) * 100) : 0}% tổng đơn`}
+          icon={CheckCircle2}
+          color="#10b981"
+        />
+        <MetricCard
+          label="Đã Từ Chối"
+          value={rejectedCount}
+          sub="Tiền trả lại ví khả dụng idol"
+          icon={XCircle}
+          color="#ef4444"
+        />
+        <MetricCard
+          label="Tổng Tiền Đã Hoàn"
+          value={`${totalRefundAmount.toLocaleString('vi-VN')} đ`}
+          sub="Tổng tiền đã hoàn trả khách"
+          icon={RotateCcw}
+          color="#0ea5e9"
+        />
+        {/* <MetricCard
+          label="Tỷ Lệ Xử Lý"
+          value={`${resolutionRate}%`}
+          sub={`${resolvedCount + rejectedCount} / ${totalReports} khiếu nại`}
+          icon={TrendingUp}
+          color="#a855f7"
+        /> */}
+      </div>
+
+      {/* ─── MAIN CONTAINER: BỘ LỌC, TÌM KIẾM VÀ DANH SÁCH ─── */}
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+        {/* Header hàng 1: Tiêu đề + Góc phải trên cùng: Ô tìm kiếm + Nút thao tác nhanh (Làm mới, Xuất CSV) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={20} color="#f59e0b" />
+              <span>Quản Lý Khiếu Nại & Vi Phạm</span>
+              <span style={{ fontSize: '0.82rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                {filtered.length} / {totalReports}
+              </span>
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Theo dõi, điều tra tranh chấp đơn thuê và phân xử tỷ lệ hoàn tiền giữa khách hàng và idol
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Ô tìm kiếm đưa lên góc phải trên cùng */}
+            <div style={{ position: 'relative', width: '250px' }}>
+              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Tìm mã khiếu nại, đơn, idol..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: '34px', paddingRight: search ? '30px' : '12px', height: '38px', fontSize: '0.85rem', width: '100%', borderRadius: '10px' }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '2px'
+                  }}
+                  title="Xóa tìm kiếm"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ height: '38px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px' }}
+              onClick={handleExportCSV}
+              disabled={filtered.length === 0}
+              title="Xuất file CSV báo cáo"
+            >
+              <Download size={15} />
+              <span>Xuất CSV</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ height: '38px', width: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px' }}
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading}
+              title="Làm mới dữ liệu"
+            >
+              <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+
+        {/* Responsive Filter Toolbar - Giống Đơn Hàng */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap',
+            width: '100%',
+            marginBottom: '16px'
+          }}
+        >
+          {/* 1. Trạng thái */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="PENDING">⏳ Chờ xử lý / Đang điều tra</option>
+              <option value="RESOLVED">✅ Đã hoàn tiền</option>
+              <option value="REJECTED">❌ Đã từ chối</option>
+            </select>
+          </div>
+
+          {/* 2. Lý do vi phạm */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={reasonFilter}
+              onChange={e => setReasonFilter(e.target.value)}
+            >
+              <option value="all">⚡ Tất cả lý do ({uniqueReasons.length})</option>
+              {uniqueReasons.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Phân loại đơn */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+            >
+              <option value="all">📦 Tất cả ({totalReports})</option>
+              <option value="with_order">📦 Có đơn thuê ({withOrderCount})</option>
+              <option value="without_order">👤 Tố cáo tự do ({withoutOrderCount})</option>
+            </select>
+          </div>
+
+          {/* 4. Thời gian */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={dateFilter}
+              onChange={e => setDateFilter(e.target.value)}
+            >
+              <option value="all">📅 Tất cả thời gian</option>
+              <option value="today">Hôm nay</option>
+              <option value="yesterday">Hôm qua</option>
+              <option value="last7days">7 ngày qua</option>
+              <option value="last30days">30 ngày qua</option>
+              <option value="thisMonth">Tháng này</option>
+              <option value="custom">Tùy chọn ngày...</option>
+            </select>
+          </div>
+
+          {/* 5. Sắp xếp */}
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+            <select
+              className="form-control"
+              style={{ height: '40px', fontSize: '0.85rem', width: '100%', borderRadius: '10px', cursor: 'pointer' }}
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+            >
+              <option value="newest">Mới nhất trước</option>
+              <option value="oldest">Cũ nhất trước</option>
+              <option value="order-price-desc">Giá đơn cao nhất</option>
+              <option value="order-price-asc">Giá đơn thấp nhất</option>
+            </select>
+          </div>
+
+          {/* Nút reset nếu có filter hoạt động */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ height: '40px', padding: '0 12px', fontSize: '0.82rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={13} />
+              <span>Xóa bộ lọc</span>
+            </button>
+          )}
+        </div>
+
+        {/* Ngày tùy chỉnh nếu chọn custom */}
+        {dateFilter === 'custom' && (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Từ ngày:</span>
+            <input
+              type="date"
+              className="form-control"
+              style={{ height: '36px', fontSize: '0.82rem', width: 'auto', borderRadius: '8px' }}
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+            />
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Đến ngày:</span>
+            <input
+              type="date"
+              className="form-control"
+              style={{ height: '36px', fontSize: '0.82rem', width: 'auto', borderRadius: '8px' }}
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Dòng tóm tắt kết quả */}
+        <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
+          Đang hiển thị <strong>{filtered.length}</strong> / {totalReports} khiếu nại
+          <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
+          {pendingCount} chờ xử lý • {resolvedCount} đã hoàn tiền (<strong style={{ color: '#10b981' }}>{totalRefundAmount.toLocaleString('vi-VN')} đ</strong>) • {rejectedCount} đã từ chối
+        </div>
+
+        {/* ─── BẢNG DANH SÁCH KHIẾU NẠI (Giống Đơn Hàng) ─── */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Mã KN</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Người tố cáo</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Bị tố cáo</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Lý do & Đơn thuê</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Tổng tiền</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Thời gian</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Trạng thái</th>
+                <th style={{ padding: '12px 14px', textAlign: 'center' }}>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    Đang tải danh sách khiếu nại...
+                  </td>
+                </tr>
+              ) : reportsList.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    Hiện không có khiếu nại hoặc báo cáo vi phạm nào trong hệ thống!
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    Không tìm thấy khiếu nại nào phù hợp
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(r => {
+                  const reporterName = getReporterName(r);
+                  const targetName = getTargetName(r);
+
+                  return (
+                    <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
+                      {/* Mã KN */}
+                      <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.92rem' }}>#{r.id}</span>
+                      </td>
+
+                      {/* Người tố cáo */}
+                      <td style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <img
+                            src={r.reporter?.avatarUrl || getUserAvatar({ username: reporterName })}
+                            alt=""
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                          />
+                          <div style={{ lineHeight: 1.25 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{reporterName}</div>
+                            {r.reporter?.id && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>ID: #{r.reporter.id}</div>}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Bị tố cáo */}
+                      <td style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <img
+                            src={r.reportedPlayer?.avatarUrl || r.reportedPlayer?.user?.avatarUrl || getUserAvatar({ username: targetName })}
+                            alt=""
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                          />
+                          <div style={{ lineHeight: 1.25 }}>
+                            <div style={{ fontWeight: 600, color: '#f43f5e' }}>{targetName}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>
+                              {r.order?.game || 'Game thủ'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Lý do & Đơn thuê */}
+                      <td style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            background: 'rgba(244,63,94,0.12)',
+                            color: '#f43f5e',
+                            fontWeight: 700,
+                            border: '1px solid rgba(244,63,94,0.25)'
+                          }}>
+                            {r.reason || 'Khiếu nại dịch vụ'}
+                          </span>
+                          {r.order?.id ? (
+                            <span style={{
+                              fontSize: '0.72rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              color: '#0284c7',
+                              fontWeight: 600
+                            }}>
+                              📦 Đơn #{r.order.id}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              👤 Tố cáo tự do
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Số tiền */}
+                      <td style={{ padding: '14px', fontWeight: 700, color: r.order ? '#10b981' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {r.order?.price ? `${Number(r.order.price).toLocaleString('vi-VN')} đ` : '—'}
+                      </td>
+
+                      {/* Thời gian */}
+                      <td style={{ padding: '14px', fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : '—'}
+                      </td>
+
+                      {/* Trạng thái */}
+                      <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
+                        <ReportStatusBadge status={r.status || 'PENDING'} />
+                      </td>
+
+                      {/* Thao tác */}
+                      <td style={{ padding: '14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedReport(r)}
+                          className="btn btn-outline"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '0.78rem',
+                            gap: '6px',
+                            borderRadius: '8px',
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}
+                          title="Xem chi tiết & xử lý khiếu nại"
+                        >
+                          <Eye size={13} />
+                          <span>Chi tiết</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-      {loading ? (
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>Đang tải...</p>
-      ) : reportsList.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-          <CheckCircle2 size={36} style={{ color: '#10b981', margin: '0 auto 10px', display: 'block' }} />
-          <div>Không có khiếu nại nào!</div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {reportsList.map(r => {
-            const isExpanded = expandedId === r.id;
-            const imageList = r.imageUrls ? r.imageUrls.split(',').map(s => s.trim()).filter(Boolean) : [];
-            return (
-              <div key={r.id} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', cursor: 'pointer' }}
-                onClick={() => setExpandedId(isExpanded ? null : r.id)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--primary)' }}>#{r.id}</span>
-                    <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(244,63,94,0.15)', color: '#f43f5e', fontWeight: 700 }}>
-                      {r.reason || 'Khiếu nại'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}
-                    </span>
-                    <ReportStatusBadge status={r.status || 'PENDING'} />
-                  </div>
+
+      {/* Modal Chi Tiết & Xử Lý Khiếu Nại */}
+      {selectedReport && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setSelectedReport(null)}
+        >
+          <div
+            style={{
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+              maxWidth: '680px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              position: 'relative'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary)' }}>
+                  Khiếu Nại #{selectedReport.id}
+                </span>
+                <span style={{
+                  fontSize: '0.78rem',
+                  padding: '2px 9px',
+                  borderRadius: '6px',
+                  background: 'rgba(244,63,94,0.15)',
+                  color: '#f43f5e',
+                  fontWeight: 700,
+                  border: '1px solid rgba(244,63,94,0.3)'
+                }}>
+                  {selectedReport.reason || 'Khiếu nại dịch vụ'}
+                </span>
+                <ReportStatusBadge status={selectedReport.status || 'PENDING'} />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedReport(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '6px'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Thông tin 2 bên liên quan */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '18px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '6px' }}>
+                  👤 Người tố cáo (Khách)
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: isExpanded ? '12px' : 0, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span><strong>{getReporterName(r)}</strong> tố cáo <strong>{getTargetName(r)}</strong></span>
-                  {r.order?.id && (
-                    <span style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.12)', color: '#0284c7', fontSize: '0.78rem', fontWeight: 600 }}>
-                      Đơn #{r.order.id} ({Number(r.order.price || 0).toLocaleString('vi-VN')} đ)
-                    </span>
-                  )}
-                </div>
-
-                {isExpanded && (
-                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}
-                    onClick={e => e.stopPropagation()}>
-                    {r.order && (
-                      <div style={{ marginBottom: '12px', fontSize: '0.85rem', padding: '12px 14px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                          <span>
-                            💰 <strong>Đơn thuê #{r.order.id}</strong> • Giá đơn: <strong style={{ color: '#059669' }}>{Number(r.order.price || 0).toLocaleString('vi-VN')} đ</strong>
-                          </span>
-                          <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, background: r.order.status === 'REFUNDED' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: r.order.status === 'REFUNDED' ? '#ef4444' : '#10b981' }}>
-                            {r.order.status === 'REFUNDED' ? 'Đã Hoàn Tiền' : r.order.status}
-                          </span>
-                        </div>
-
-                        {/* Nếu đơn PENDING: Cho phép nhập % hoàn tiền */}
-                        {r.status === 'PENDING' && (() => {
-                          const orderPrice = Number(r.order.price || 0);
-                          const curPercent = refundPercentages[r.id] !== undefined ? refundPercentages[r.id] : 100;
-                          const numPercent = Number(curPercent) || 0;
-                          const playerRecv = Number(r.order.playerReceived || Math.round(orderPrice * 0.85));
-                          const renterRefundVal = Math.round(orderPrice * (numPercent / 100));
-                          const playerDeductVal = Math.round(playerRecv * (numPercent / 100));
-
-                          return (
-                            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0284c7' }}>
-                                  🎯 Tỷ lệ hoàn tiền: <span style={{ color: '#10b981' }}>{numPercent}%</span>
-                                </label>
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  {[20, 40, 50, 70, 100].map(p => (
-                                    <button
-                                      key={p}
-                                      type="button"
-                                      className="btn btn-sm"
-                                      style={{
-                                        padding: '2px 7px',
-                                        fontSize: '0.75rem',
-                                        height: 'auto',
-                                        borderRadius: '6px',
-                                        background: numPercent === p ? '#0284c7' : 'rgba(255,255,255,0.06)',
-                                        color: numPercent === p ? '#fff' : 'var(--text-secondary)',
-                                        border: '1px solid ' + (numPercent === p ? '#0284c7' : 'var(--border-color)')
-                                      }}
-                                      onClick={() => setRefundPercentages(prev => ({ ...prev, [r.id]: p }))}
-                                    >
-                                      {p}%
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <input
-                                  type="range"
-                                  min="1"
-                                  max="100"
-                                  value={numPercent}
-                                  onChange={e => setRefundPercentages(prev => ({ ...prev, [r.id]: Math.min(100, Math.max(1, Number(e.target.value))) }))}
-                                  style={{ flex: 1, accentColor: '#0284c7', cursor: 'pointer' }}
-                                />
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    max="100"
-                                    value={curPercent}
-                                    onChange={e => {
-                                      const val = e.target.value === '' ? '' : Math.min(100, Math.max(1, Number(e.target.value)));
-                                      setRefundPercentages(prev => ({ ...prev, [r.id]: val }));
-                                    }}
-                                    style={{
-                                      width: '56px',
-                                      padding: '3px 6px',
-                                      borderRadius: '6px',
-                                      border: '1px solid var(--border-color)',
-                                      background: 'var(--bg-primary)',
-                                      color: 'var(--text-primary)',
-                                      fontSize: '0.84rem',
-                                      fontWeight: 700,
-                                      textAlign: 'center'
-                                    }}
-                                  />
-                                  <span style={{ fontSize: '0.84rem', fontWeight: 700 }}>%</span>
-                                </div>
-                              </div>
-
-                              {/* Hộp xem trước số tiền hoàn & phạt */}
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '8px',
-                                padding: '8px 10px',
-                                borderRadius: '8px',
-                                background: 'rgba(0,0,0,0.18)',
-                                fontSize: '0.8rem'
-                              }}>
-                                <div>
-                                  <div style={{ color: 'var(--text-muted)' }}>Khách nhận lại ({numPercent}%):</div>
-                                  <div style={{ color: '#10b981', fontWeight: 800, fontSize: '0.92rem' }}>
-                                    +{renterRefundVal.toLocaleString('vi-VN')} Coin
-                                  </div>
-                                </div>
-                                <div>
-                                  <div style={{ color: 'var(--text-muted)' }}>Idol bị thu hồi ({numPercent}%):</div>
-                                  <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.92rem' }}>
-                                    -{playerDeductVal.toLocaleString('vi-VN')} Coin
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    <div style={{ fontSize: '0.85rem', marginBottom: '10px' }}>
-                      <strong>Mô tả:</strong> {r.description || '—'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img
+                    src={selectedReport.reporter?.avatarUrl || getUserAvatar({ username: getReporterName(selectedReport) })}
+                    alt=""
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                      {getReporterName(selectedReport)}
                     </div>
-                    {/* Link bằng chứng (Google Drive / Link đính kèm) */}
-                    {(r.videoUrl || r.imageUrls) && (
-                      <div style={{ marginBottom: '12px', fontSize: '0.85rem' }}>
-                        <strong>Link bằng chứng:</strong>{' '}
-                        <a
-                          href={r.videoUrl || r.imageUrls}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            color: '#0284c7',
-                            fontWeight: 600,
-                            textDecoration: 'underline',
-                            wordBreak: 'break-all',
-                            marginLeft: '4px'
-                          }}
-                        >
-                          🔗 {r.videoUrl || r.imageUrls}
-                        </a>
-                      </div>
+                    {selectedReport.reporter?.phoneNumber && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{selectedReport.reporter.phoneNumber}</div>
                     )}
-                    {imageList.length > 1 && (
-                      <div style={{ marginBottom: '12px' }}>
-                        <strong style={{ fontSize: '0.85rem' }}>Ảnh bằng chứng:</strong>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
-                          {imageList.map((url, idx) => (
-                            <a key={idx} href={url} target="_blank" rel="noreferrer">
-                              <img src={url} alt={`Bằng chứng ${idx + 1}`}
-                                style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)' }}
-                                onError={e => { e.target.style.display = 'none'; }} />
-                            </a>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '6px' }}>
+                  🎮 Bị tố cáo (Idol)
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img
+                    src={selectedReport.reportedPlayer?.avatarUrl || selectedReport.reportedPlayer?.user?.avatarUrl || getUserAvatar({ username: getTargetName(selectedReport) })}
+                    alt=""
+                    style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#f43f5e' }}>
+                      {getTargetName(selectedReport)}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {selectedReport.order?.game || 'Game thủ'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Thông tin đơn thuê & Slider hoàn tiền nếu có đơn */}
+            {selectedReport.order && (
+              <div style={{
+                marginBottom: '18px',
+                padding: '14px 16px',
+                borderRadius: '12px',
+                background: 'rgba(16, 185, 129, 0.05)',
+                border: '1px solid rgba(16, 185, 129, 0.2)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      📦 Đơn thuê #{selectedReport.order.id}
+                    </span>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      Giá đơn: <strong style={{ color: '#10b981' }}>{Number(selectedReport.order.price || 0).toLocaleString('vi-VN')} đ</strong>
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: '0.76rem',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    background: selectedReport.order.status === 'REFUNDED' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
+                    color: selectedReport.order.status === 'REFUNDED' ? '#ef4444' : '#10b981'
+                  }}>
+                    Đơn: {selectedReport.order.status === 'REFUNDED' ? 'Đã Hoàn Tiền' : selectedReport.order.status}
+                  </span>
+                </div>
+
+                {/* Bộ điều chỉnh tỷ lệ hoàn tiền khi đang PENDING */}
+                {selectedReport.status === 'PENDING' && (() => {
+                  const orderPrice = Number(selectedReport.order.price || 0);
+                  const curPercent = refundPercentages[selectedReport.id] !== undefined ? refundPercentages[selectedReport.id] : 100;
+                  const numPercent = Number(curPercent) || 0;
+                  const playerRecv = Number(selectedReport.order.playerReceived || Math.round(orderPrice * 0.85));
+                  const renterRefundVal = Math.round(orderPrice * (numPercent / 100));
+                  const playerDeductVal = Math.round(playerRecv * (numPercent / 100));
+
+                  return (
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
+                          🎯 Tỷ lệ hoàn tiền cho khách: <span style={{ color: '#10b981' }}>{numPercent}%</span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[20, 40, 50, 70, 100].map(p => (
+                            <button
+                              key={p}
+                              type="button"
+                              className="btn btn-sm"
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: '0.75rem',
+                                height: 'auto',
+                                borderRadius: '6px',
+                                background: numPercent === p ? '#0284c7' : 'rgba(255,255,255,0.06)',
+                                color: numPercent === p ? '#fff' : 'var(--text-secondary)',
+                                border: '1px solid ' + (numPercent === p ? '#0284c7' : 'var(--border-color)')
+                              }}
+                              onClick={() => setRefundPercentages(prev => ({ ...prev, [selectedReport.id]: p }))}
+                            >
+                              {p}%
+                            </button>
                           ))}
                         </div>
                       </div>
-                    )}
-                    {r.resolution && (
-                      <div style={{ fontSize: '0.85rem', marginBottom: '10px', color: r.status === 'REJECTED' ? '#ef4444' : '#10b981', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <strong>Kết quả xử lý:</strong> <span>{r.resolution}</span>
-                        {r.refundPercentage && (
-                          <span style={{ fontSize: '0.76rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 700 }}>
-                            Hoàn {r.refundPercentage}% ({Number(r.refundAmount || 0).toLocaleString('vi-VN')} Coin)
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {r.status === 'PENDING' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <textarea
-                          placeholder="Ghi chú kết quả xử lý (tuỳ chọn)..."
-                          value={resolutionTexts[r.id] || ''}
-                          onChange={e => setResolutionTexts(prev => ({ ...prev, [r.id]: e.target.value }))}
-                          rows={2}
-                          style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', resize: 'vertical', fontSize: '0.85rem', boxSizing: 'border-box' }}
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <input
+                          type="range"
+                          min="1"
+                          max="100"
+                          value={numPercent}
+                          onChange={e => setRefundPercentages(prev => ({ ...prev, [selectedReport.id]: Math.min(100, Math.max(1, Number(e.target.value))) }))}
+                          style={{ flex: 1, accentColor: '#0284c7', cursor: 'pointer' }}
                         />
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem', height: 'auto' }}
-                            onClick={() => handleResolve(r.id)}>
-                            <CheckCircle2 size={14} /> <span>Chấp thuận & Hoàn tiền</span>
-                          </button>
-                          <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.8rem', height: 'auto', borderColor: '#ef4444', color: '#ef4444' }}
-                            onClick={() => handleReject(r.id)}>
-                            <X size={14} /> <span>Từ chối</span>
-                          </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={curPercent}
+                            onChange={e => {
+                              const val = e.target.value === '' ? '' : Math.min(100, Math.max(1, Number(e.target.value)));
+                              setRefundPercentages(prev => ({ ...prev, [selectedReport.id]: val }));
+                            }}
+                            style={{
+                              width: '56px',
+                              padding: '3px 6px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              textAlign: 'center'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.84rem', fontWeight: 700 }}>%</span>
                         </div>
                       </div>
-                    )}
+
+                      {/* Hộp xem trước số tiền hoàn & phạt */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '8px',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        background: 'rgba(0,0,0,0.22)',
+                        fontSize: '0.82rem'
+                      }}>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)' }}>Khách nhận lại ({numPercent}%):</div>
+                          <div style={{ color: '#10b981', fontWeight: 800, fontSize: '0.95rem' }}>
+                            +{renterRefundVal.toLocaleString('vi-VN')} đ
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)' }}>Idol bị thu hồi ({numPercent}%):</div>
+                          <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.95rem' }}>
+                            -{playerDeductVal.toLocaleString('vi-VN')} đ
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Chi tiết nội dung mô tả khiếu nại */}
+            <div style={{ fontSize: '0.85rem', marginBottom: '16px', background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>📝 Nội dung chi tiết:</div>
+              <div style={{ color: 'var(--text-secondary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                {selectedReport.description || 'Không có mô tả chi tiết'}
+              </div>
+            </div>
+
+            {/* Link bằng chứng */}
+            {(selectedReport.videoUrl || selectedReport.imageUrls) && (
+              <div style={{ marginBottom: '14px', fontSize: '0.85rem' }}>
+                <strong>🔗 Link bằng chứng:</strong>{' '}
+                <a
+                  href={selectedReport.videoUrl || selectedReport.imageUrls}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: '#0284c7', fontWeight: 600, textDecoration: 'underline', wordBreak: 'break-all', marginLeft: '4px' }}
+                >
+                  {selectedReport.videoUrl || selectedReport.imageUrls}
+                </a>
+              </div>
+            )}
+
+            {/* Ảnh bằng chứng */}
+            {(() => {
+              const imageList = selectedReport.imageUrls ? selectedReport.imageUrls.split(',').map(s => s.trim()).filter(Boolean) : [];
+              if (imageList.length <= 1) return null;
+              return (
+                <div style={{ marginBottom: '16px' }}>
+                  <strong style={{ fontSize: '0.85rem' }}>🖼 Ảnh bằng chứng ({imageList.length}):</strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {imageList.map((url, idx) => (
+                      <a key={idx} href={url} target="_blank" rel="noreferrer" title="Bấm để mở ảnh gốc">
+                        <img
+                          src={url}
+                          alt={`Bằng chứng ${idx + 1}`}
+                          style={{ width: '90px', height: '65px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                          onError={e => { e.target.style.display = 'none'; }}
+                        />
+                      </a>
+                    ))}
                   </div>
+                </div>
+              );
+            })()}
+
+            {/* Kết quả giải quyết nếu đã xong */}
+            {selectedReport.resolution && (
+              <div style={{
+                fontSize: '0.85rem',
+                marginBottom: '16px',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                background: selectedReport.status === 'REJECTED' ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
+                border: `1px solid ${selectedReport.status === 'REJECTED' ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`,
+                color: selectedReport.status === 'REJECTED' ? '#ef4444' : '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap'
+              }}>
+                <strong>Kết quả giải quyết:</strong>
+                <span>{selectedReport.resolution}</span>
+                {selectedReport.refundPercentage != null && (
+                  <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 700 }}>
+                    Đã hoàn {selectedReport.refundPercentage}% ({Number(selectedReport.refundAmount || 0).toLocaleString('vi-VN')} đ)
+                  </span>
                 )}
               </div>
-            );
-          })}
+            )}
+
+            {/* Form hành động cho Admin khi khiếu nại đang PENDING */}
+            {selectedReport.status === 'PENDING' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
+                <textarea
+                  placeholder="Ghi chú kết quả xử lý gửi cho người dùng (ví dụ: Chấp thuận hoàn tiền do idol vắng mặt không lý do)..."
+                  value={resolutionTexts[selectedReport.id] || ''}
+                  onChange={e => setResolutionTexts(prev => ({ ...prev, [selectedReport.id]: e.target.value }))}
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    resize: 'vertical',
+                    fontSize: '0.85rem',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-outline"
+                    style={{ padding: '8px 18px', fontSize: '0.85rem', borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={async () => {
+                      await handleReject(selectedReport.id);
+                      setSelectedReport(null);
+                    }}
+                  >
+                    <X size={16} />
+                    <span>Từ Chối Khiếu Nại</span>
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    style={{ padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={async () => {
+                      await handleResolve(selectedReport.id);
+                      setSelectedReport(null);
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>Chấp Thuận & Hoàn Tiền</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -3656,13 +4596,14 @@ export const AdminPage = () => {
               reportsList={reportsList}
               setReportsList={setReportsList}
               loading={loading}
+              reloadReports={loadData}
               onStatsRefresh={async () => {
                 try {
                   const comm = await api.getAdminCommissionStats();
                   if (comm) setCommissionStats(comm);
                   const allOrd = await api.getAllOrdersAdmin();
                   if (allOrd) setOrdersList(allOrd);
-                } catch (ignored) {}
+                } catch (ignored) { }
               }}
             />
           )}

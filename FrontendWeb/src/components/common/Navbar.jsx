@@ -17,8 +17,7 @@ import {
   Sparkles,
   ShieldCheck,
   ChevronDown,
-  Landmark,
-  ArrowUpRight
+  Landmark
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -243,77 +242,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
                     <div style={{ padding: '8px 12px' }}>
                       <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user.fullName}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>@{user.username}</div>
-                      <div style={{
-                        marginTop: '8px',
-                        padding: '8px 10px',
-                        background: 'rgba(255,255,255,0.05)',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        fontSize: '0.8rem'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: '#10b981', fontWeight: 600 }}>Số dư khả dụng:</span>
-                          <span style={{ color: '#10b981', fontWeight: 800 }}>{(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ</span>
-                        </div>
-                        {user?.frozenBalance > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', color: '#f59e0b', fontSize: '0.75rem' }}>
-                            <span>Đang đóng băng:</span>
-                            <span style={{ fontWeight: 700 }}>{user.frozenBalance.toLocaleString('vi-VN')} đ</span>
-                          </div>
-                        )}
-                        {/* Quick Action Buttons: Deposit & Withdraw */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowDropdown(false);
-                              if (onOpenDeposit) onOpenDeposit();
-                            }}
-                            style={{
-                              padding: '5px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(16, 185, 129, 0.4)',
-                              background: 'rgba(16, 185, 129, 0.12)',
-                              color: '#10b981',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <span>+ Nạp tiền</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowDropdown(false);
-                              if (onOpenWithdraw) onOpenWithdraw();
-                            }}
-                            style={{
-                              padding: '5px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(245, 158, 11, 0.4)',
-                              background: 'rgba(245, 158, 11, 0.12)',
-                              color: '#f59e0b',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <ArrowUpRight size={13} />
-                            <span>Rút tiền</span>
-                          </button>
-                        </div>
-                      </div>
+
                     </div>
                     <div className="dropdown-divider" />
                     {isAdmin && (
