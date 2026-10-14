@@ -35,8 +35,8 @@ export const normalizeGamePlayer = (gp) => {
   const rating = reviewCount > 0 ? rawRating : 0;
   const totalGames = Number(gp.totalGames || 0);
   const orderCount = Number(gp.orderCount || gp.totalOrders || totalGames || 0);
-  const isVip = Boolean(gp.isVip === true || (orderCount >= 50 && rating >= 4.8));
-  const isHot = Boolean(gp.isHot === true || (orderCount >= 20 && rating >= 4.5));
+  const isVip = Boolean(gp.isVip === true || (rating >= 4.8 && reviewCount > 0) || (orderCount >= 10 && rating >= 4.5));
+  const isHot = Boolean(gp.isHot === true || (rating >= 4.5 && reviewCount > 0) || orderCount >= 5);
 
   return {
     id: gp.id,

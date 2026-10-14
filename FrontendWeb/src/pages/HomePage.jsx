@@ -61,7 +61,27 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
     : activePlayers.filter(p => p.primaryGame?.toLowerCase().includes(selectedCategory.toLowerCase()) ||
                           p.games?.some(g => g.name.toLowerCase().includes(selectedCategory.toLowerCase())));
 
-  const vipPlayers = activePlayers.filter(p => p.isVip);
+  const vipList = activePlayers.filter(p => p.isVip);
+
+  // Sắp xếp Idol & Duo nổi bật: Ưu tiên VIP, rating cao nhất (5 sao trước), nhiều lượt thuê nhất
+  const sortedFeaturedPlayers = [...activePlayers].sort((a, b) => {
+    if (b.isVip !== a.isVip) return (b.isVip ? 1 : 0) - (a.isVip ? 1 : 0);
+    const ratingDiff = (b.rating || 0) - (a.rating || 0);
+    if (ratingDiff !== 0) return ratingDiff;
+    const ordersB = b.orderCount || b.totalGames || 0;
+    const ordersA = a.orderCount || a.totalGames || 0;
+    if (ordersB !== ordersA) return ordersB - ordersA;
+    return (b.reviewCount || 0) - (a.reviewCount || 0);
+  });
+
+  const categoryFeatured = selectedCategory === 'ALL'
+    ? sortedFeaturedPlayers
+    : sortedFeaturedPlayers.filter(p =>
+        p.primaryGame?.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+        p.games?.some(g => g.name.toLowerCase().includes(selectedCategory.toLowerCase()))
+      );
+
+  const vipPlayers = (categoryFeatured.length > 0 ? categoryFeatured : sortedFeaturedPlayers).slice(0, 4);
   const hotPlayers = activePlayers.filter(p => p.isHot);
 
   return (
@@ -156,13 +176,27 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
         </div>
 
         <div className="grid-cards">
-          {vipPlayers.map((player) => (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              onHire={onHirePlayer}
-            />
-          ))}
+          {vipPlayers.length > 0 ? (
+            vipPlayers.map((player) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                onHire={onHirePlayer}
+              />
+            ))
+          ) : (
+            <div style={{
+              gridColumn: '1 / -1',
+              padding: '36px 20px',
+              textAlign: 'center',
+              background: 'var(--bg-card)',
+              borderRadius: 'var(--radius-lg, 16px)',
+              border: '1px dashed var(--border-color)',
+              color: 'var(--text-muted)'
+            }}>
+              Chưa có Idol / Duo nổi bật nào
+            </div>
+          )}
         </div>
       </section>
 
@@ -179,13 +213,27 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
         </div>
 
         <div className="grid-cards">
-          {filteredPlayers.map((player) => (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              onHire={onHirePlayer}
-            />
-          ))}
+          {filteredPlayers.length > 0 ? (
+            filteredPlayers.map((player) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                onHire={onHirePlayer}
+              />
+            ))
+          ) : (
+            <div style={{
+              gridColumn: '1 / -1',
+              padding: '36px 20px',
+              textAlign: 'center',
+              background: 'var(--bg-card)',
+              borderRadius: 'var(--radius-lg, 16px)',
+              border: '1px dashed var(--border-color)',
+              color: 'var(--text-muted)'
+            }}>
+              Không tìm thấy người chơi nào trong danh mục này
+            </div>
+          )}
         </div>
       </section>
 
