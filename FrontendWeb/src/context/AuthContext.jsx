@@ -151,6 +151,39 @@ export const AuthProvider = ({ children }) => {
     return { success: true, newBalance };
   };
 
+  const withdrawMoney = async ({ amount, bankAccountNumber, bankAccountName, bankName }) => {
+    if (!user) throw new Error('Vui lòng đăng nhập để rút tiền');
+    const numericAmount = Number(amount);
+    const currentBalance = Number(user.balance || user.walletBalance || user.coin || 0);
+
+    if (!numericAmount || numericAmount <= 0) throw new Error('Số tiền rút không hợp lệ');
+    if (numericAmount > currentBalance) {
+      throw new Error(`Số tiền rút không được vượt quá số dư khả dụng (${currentBalance.toLocaleString('vi-VN')} đ)`);
+    }
+    if (!bankAccountNumber?.trim()) throw new Error('Vui lòng nhập số tài khoản ngân hàng');
+    if (!bankAccountName?.trim()) throw new Error('Vui lòng nhập tên chủ tài khoản');
+    if (!bankName?.trim()) throw new Error('Vui lòng chọn hoặc nhập tên ngân hàng');
+
+    const res = await api.withdraw({
+      coin: numericAmount,
+      bankAccountNumber,
+      bankAccountName,
+      bankName
+    });
+
+    const newBalance = Math.max(0, currentBalance - numericAmount);
+    const updated = {
+      ...user,
+      balance: newBalance,
+      walletBalance: newBalance,
+      coin: newBalance
+    };
+    setUser(updated);
+    localStorage.setItem('current_user', JSON.stringify(updated));
+
+    return { success: true, newBalance, data: res };
+  };
+
   const deductBalance = (amount) => {
     const current = Number(user?.balance || 0);
     const cost = Number(amount);
@@ -223,6 +256,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         deposit,
+        withdrawMoney,
         deductBalance,
         refreshUser,
         updateProfile

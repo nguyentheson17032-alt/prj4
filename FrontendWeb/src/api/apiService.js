@@ -655,6 +655,28 @@ export const api = {
     }
   },
 
+  // Withdraw
+  async withdraw({ coin, bankAccountNumber, bankAccountName, bankName }) {
+    const res = await client.post('/api/payments/withdraw', {
+      coin: Number(coin),
+      bankAccountNumber: String(bankAccountNumber || '').trim(),
+      bankAccountName: String(bankAccountName || '').trim(),
+      bankName: String(bankName || '').trim()
+    });
+    return res.data;
+  },
+
+  async getWithdrawHistory() {
+    try {
+      const res = await client.get('/api/payments/withdraw-history');
+      if (Array.isArray(res.data)) return res.data;
+      if (res.data && Array.isArray(res.data.data)) return res.data.data;
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
   // Donate / Gift
   async donateToPlayer(playerId, coin, message = '') {
     const res = await client.post('/api/payments/donate', {

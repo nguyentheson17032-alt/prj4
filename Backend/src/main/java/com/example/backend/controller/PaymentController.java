@@ -124,6 +124,18 @@ public class PaymentController {
             @Valid @RequestBody ProcessPaymentRequest request) {
         try {
             Payment payment = paymentService.processPayment(id, request.getTransactionId());
+            if (Payment.PaymentType.WITHDRAW.equals(payment.getType()) && payment.getUser() != null) {
+                try {
+                    notificationService.createNotification(
+                        payment.getUser().getId(),
+                        "✅ Rút tiền thành công",
+                        "Yêu cầu rút " + (payment.getCoin() != null ? payment.getCoin() : 0) + " đ về tài khoản " + (payment.getBankAccountNumber() != null ? payment.getBankAccountNumber() : "") + " (" + (payment.getBankName() != null ? payment.getBankName() : "") + ") đã được Admin xử lý thành công.",
+                        "withdraw_success",
+                        "/wallet",
+                        payment.getId().toString()
+                    );
+                } catch (Exception ignored) {}
+            }
             return ResponseEntity.ok(payment);
         } catch (PaymentException e) {
             return ResponseEntity.badRequest().build();
@@ -138,6 +150,18 @@ public class PaymentController {
             @Valid @RequestBody RefundRequest request) {
         try {
             Payment payment = paymentService.refundPayment(id, request.getReason());
+            if (Payment.PaymentType.WITHDRAW.equals(payment.getType()) && payment.getUser() != null) {
+                try {
+                    notificationService.createNotification(
+                        payment.getUser().getId(),
+                        "❌ Yêu cầu rút tiền bị từ chối",
+                        "Yêu cầu rút " + (payment.getCoin() != null ? payment.getCoin() : 0) + " đ đã bị từ chối. Lý do: " + (request.getReason() != null ? request.getReason() : "Thông tin không hợp lệ") + ". Số tiền đã được hoàn lại vào ví.",
+                        "withdraw_rejected",
+                        "/wallet",
+                        payment.getId().toString()
+                    );
+                } catch (Exception ignored) {}
+            }
             return ResponseEntity.ok(payment);
         } catch (PaymentException e) {
             return ResponseEntity.badRequest().build();
@@ -306,34 +330,37 @@ public class PaymentController {
     }
 
     @PostMapping("/withdraw")
-    @PreAuthorize("hasRole('PLAYER')")
+    @PreAuthorize("isAuthenticated()")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public ResponseEntity<?> withdraw(@RequestBody WithdrawRequest request, Authentication authentication) {
         try {
             User player = userService.findByUsername(authentication.getName());
+            if (player == null) {
+                return ResponseEntity.badRequest().body("Không tìm thấy người dùng");
+            }
             Long coin = request.getCoin();
 
             if (coin == null || coin <= 0) {
-                return ResponseEntity.badRequest().body("Số coin không hợp lệ");
+                return ResponseEntity.badRequest().body("Số tiền rút không hợp lệ");
             }
 
-            if (player.getCoin() < coin) {
+            long currentCoin = player.getCoin() != null ? player.getCoin() : 0L;
+            if (currentCoin < coin) {
                 // Gửi thông báo lỗi cho người rút tiền
                 try {
                     notificationService.createNotification(
                         player.getId(),
-                        "❌ Rút coin thất bại",
-                        "Số dư không đủ để rút " + coin + " coin. Số dư hiện tại: " + player.getCoin() + " coin.",
+                        "❌ Rút tiền thất bại",
+                        "Số dư khả dụng không đủ để rút " + coin + " đ. Số dư hiện tại: " + currentCoin + " đ.",
                         "withdraw_failed",
                         null,
                         null
                     );
                 } catch (Exception e) {
                     System.err.println("[PaymentController] Error sending insufficient balance notification: " + e.getMessage());
-                    e.printStackTrace();
                 }
                 
-                return ResponseEntity.badRequest().body("Số coin không đủ");
+                return ResponseEntity.badRequest().body("Số dư khả dụng không đủ để rút số tiền này");
             }
 
             // Validate thông tin ngân hàng
@@ -349,14 +376,15 @@ public class PaymentController {
                 return ResponseEntity.badRequest().body("Tên ngân hàng không được để trống");
             }
 
-            player.setCoin(player.getCoin() - coin);
+            // Khấu trừ coin ngay lập tức để tránh double-spending
+            player.setCoin(currentCoin - coin);
             userService.save(player);
 
             Payment payment = new Payment();
             payment.setUser(player);
             payment.setCoin(coin);
             payment.setCurrency("COIN");
-            payment.setStatus(Payment.PaymentStatus.COMPLETED);
+            payment.setStatus(Payment.PaymentStatus.PENDING);
             payment.setPaymentMethod(Payment.PaymentMethod.WITHDRAW);
             payment.setType(Payment.PaymentType.WITHDRAW);
             payment.setCreatedAt(java.time.LocalDateTime.now());
@@ -366,37 +394,46 @@ public class PaymentController {
             payment.setBankAccountName(request.getBankAccountName().trim());
             payment.setBankName(request.getBankName().trim());
             
-            paymentRepository.save(payment);
+            Payment savedPayment = paymentRepository.save(payment);
 
-            // Gửi notification khi rút tiền thành công
-            notificationService.createNotification(
-                    player.getId(),
-                    "💰 Rút coin thành công",
-                    "Bạn đã rút thành công " + coin + " coin vào tài khoản " + request.getBankAccountNumber() + " - " + request.getBankAccountName() + " (" + request.getBankName() + "). Số dư còn lại: " + player.getCoin() + " coin.",
-                    "withdraw",
-                    "/balance-history", // URL để xem lịch sử giao dịch
-                    payment.getId().toString());
+            // Gửi notification khi tạo yêu cầu rút tiền
+            try {
+                notificationService.createNotification(
+                        player.getId(),
+                        "⏳ Đã gửi yêu cầu rút tiền",
+                        "Bạn đã gửi yêu cầu rút " + coin + " đ về tài khoản " + request.getBankAccountNumber() + " - " + request.getBankAccountName() + " (" + request.getBankName() + "). Hệ thống đang chờ Admin xử lý chuyển khoản.",
+                        "withdraw",
+                        "/wallet",
+                        savedPayment.getId().toString());
+            } catch (Exception e) {
+                System.err.println("[PaymentController] Error creating notification: " + e.getMessage());
+            }
             
             // Gửi push notification đặc biệt cho rút tiền
-            sendWithdrawPushNotification(player, coin, request.getBankAccountNumber(), request.getBankAccountName(), request.getBankName());
+            try {
+                sendWithdrawPushNotification(player, coin, request.getBankAccountNumber(), request.getBankAccountName(), request.getBankName());
+            } catch (Exception e) {
+                System.err.println("[PaymentController] Error sending push notification: " + e.getMessage());
+            }
 
             // Gửi thông báo cho admin
             try {
                 adminNotificationService.notifyAdminsAboutWithdraw(player, coin, request.getBankAccountNumber(), request.getBankAccountName(), request.getBankName());
             } catch (Exception e) {
                 System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutWithdraw: " + e.getMessage());
-                e.printStackTrace();
             }
 
             return ResponseEntity.ok(Map.of(
-                    "message", "Rút coin thành công",
+                    "message", "Yêu cầu rút tiền thành công, đang chờ xử lý",
                     "coin", coin,
                     "bankAccountNumber", request.getBankAccountNumber(),
                     "bankAccountName", request.getBankAccountName(),
-                    "bankName", request.getBankName()));
+                    "bankName", request.getBankName(),
+                    "newBalance", player.getCoin(),
+                    "paymentId", savedPayment.getId()));
         } catch (Exception e) {
-            logger.error("Lỗi khi rút coin: {}", e.getMessage());
-            return ResponseEntity.badRequest().body("Lỗi khi rút coin: " + e.getMessage());
+            logger.error("Lỗi khi rút tiền: {}", e.getMessage());
+            return ResponseEntity.badRequest().body("Lỗi khi rút tiền: " + e.getMessage());
         }
     }
 
@@ -500,6 +537,36 @@ public class PaymentController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/withdraw-history")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<TopupUserDTO>> getWithdrawHistory(Authentication authentication) {
+        User user = userService.findByUsername(authentication.getName());
+        if (user == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<Payment> withdraws = paymentRepository.findByUserIdAndTypeOrderByCreatedAtDesc(user.getId(),
+                Payment.PaymentType.WITHDRAW);
+        List<TopupUserDTO> result = withdraws.stream().map(payment -> {
+            TopupUserDTO dto = new TopupUserDTO();
+            dto.setId(payment.getId());
+            if (payment.getUser() != null) {
+                String name = payment.getUser().getFullName();
+                dto.setFullName(name != null && !name.trim().isEmpty() ? name : payment.getUser().getUsername());
+                dto.setAvatarUrl(payment.getUser().getAvatarUrl());
+                dto.setPhoneNumber(payment.getUser().getPhoneNumber());
+            }
+            dto.setCreatedAt(payment.getCreatedAt() != null ? payment.getCreatedAt().toString() : null);
+            dto.setCoin(payment.getCoin());
+            dto.setStatus(payment.getStatus());
+            dto.setMethod(payment.getPaymentMethod());
+            dto.setBankAccountNumber(payment.getBankAccountNumber());
+            dto.setBankAccountName(payment.getBankAccountName());
+            dto.setBankName(payment.getBankName());
+            return dto;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/topup-users")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TopupUserDTO>> getAllTopupUsers() {
@@ -508,7 +575,8 @@ public class PaymentController {
             TopupUserDTO dto = new TopupUserDTO();
             dto.setId(payment.getId());
             if (payment.getUser() != null) {
-                dto.setFullName(payment.getUser().getFullName());
+                String name = payment.getUser().getFullName();
+                dto.setFullName(name != null && !name.trim().isEmpty() ? name : payment.getUser().getUsername());
                 dto.setAvatarUrl(payment.getUser().getAvatarUrl());
                 dto.setPhoneNumber(payment.getUser().getPhoneNumber());
             }
@@ -529,7 +597,8 @@ public class PaymentController {
             TopupUserDTO dto = new TopupUserDTO();
             dto.setId(payment.getId());
             if (payment.getUser() != null) {
-                dto.setFullName(payment.getUser().getFullName());
+                String name = payment.getUser().getFullName();
+                dto.setFullName(name != null && !name.trim().isEmpty() ? name : payment.getUser().getUsername());
                 dto.setAvatarUrl(payment.getUser().getAvatarUrl());
                 dto.setPhoneNumber(payment.getUser().getPhoneNumber());
             }

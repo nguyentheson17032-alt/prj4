@@ -55,7 +55,7 @@ const formatTransactionDate = (dateVal) => {
   return `${hours}:${minutes} ${day}/${month}/${year}`;
 };
 
-export const WalletPage = ({ onOpenDeposit }) => {
+export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
   const { user, refreshUser } = useAuth();
   const [filterType, setFilterType] = useState('ALL');
   const [transactions, setTransactions] = useState([]);
@@ -72,10 +72,11 @@ export const WalletPage = ({ onOpenDeposit }) => {
     const fetchTransactions = async () => {
       setLoading(true);
       try {
-        const [ordersData, topupsData, donatesData] = await Promise.allSettled([
+        const [ordersData, topupsData, donatesData, withdrawsData] = await Promise.allSettled([
           api.getOrders(),
           api.getTopupHistory(),
-          api.getDonateHistory()
+          api.getDonateHistory(),
+          api.getWithdrawHistory()
         ]);
 
         const list = [];
@@ -340,6 +341,25 @@ export const WalletPage = ({ onOpenDeposit }) => {
           });
         }
 
+        // 4. Giao dịch Rút tiền (Withdraws)
+        if (withdrawsData.status === 'fulfilled' && Array.isArray(withdrawsData.value)) {
+          withdrawsData.value.forEach(w => {
+            const withdrawDateStr = w.createdAt || w.dateTime;
+            const withdrawRawDate = parseToTimestamp(withdrawDateStr);
+            const statusText = w.status === 'COMPLETED' ? 'COMPLETED' : w.status === 'REFUNDED' ? 'REFUNDED' : 'PENDING';
+            list.push({
+              id: `RUT-${w.id}`,
+              type: 'WITHDRAW',
+              amount: -Number(w.coin || 0),
+              description: `Rút tiền về ${w.bankName || 'Ngân hàng'}`,
+              feeDetail: `Số TK: ${w.bankAccountNumber || '—'} | Chủ TK: ${w.bankAccountName || '—'}${statusText === 'PENDING' ? ' (Đang chờ duyệt)' : statusText === 'REFUNDED' ? ' (Đã bị từ chối & hoàn tiền)' : ' (Đã chuyển khoản)'}`,
+              date: formatTransactionDate(withdrawDateStr),
+              status: statusText,
+              rawDate: withdrawRawDate
+            });
+          });
+        }
+
         list.sort((a, b) => b.rawDate - a.rawDate);
         setTransactions(list);
         setFrozenAmount(totalFrozen);
@@ -438,14 +458,30 @@ export const WalletPage = ({ onOpenDeposit }) => {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button
                 className="btn btn-primary"
-                style={{ flex: 1 }}
                 onClick={onOpenDeposit}
               >
                 <PlusCircle size={18} />
-                <span>Nạp Tiền Ngay</span>
+                <span>Nạp Tiền</span>
+              </button>
+              <button
+                className="btn btn-outline"
+                style={{
+                  borderColor: 'rgba(245, 158, 11, 0.5)',
+                  color: '#f59e0b',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontWeight: 700
+                }}
+                onClick={onOpenWithdraw}
+              >
+                <ArrowUpRight size={18} />
+                <span>Rút Tiền</span>
               </button>
             </div>
           </div>
@@ -483,6 +519,13 @@ export const WalletPage = ({ onOpenDeposit }) => {
                 onClick={() => setFilterType('DEPOSIT')}
               >
                 Nạp Tiền
+              </button>
+              <button
+                className={`order-tab-btn ${filterType === 'WITHDRAW' ? 'active' : ''}`}
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                onClick={() => setFilterType('WITHDRAW')}
+              >
+                Rút Tiền
               </button>
               <button
                 className={`order-tab-btn ${filterType === 'PAYMENT' ? 'active' : ''}`}
@@ -534,6 +577,19 @@ export const WalletPage = ({ onOpenDeposit }) => {
                       <td style={{ fontWeight: 700, color: 'var(--text-muted)' }}>#{tx.id}</td>
                       <td>
                         {tx.type === 'DEPOSIT' && <span className="badge badge-online">+ Nạp Tiền</span>}
+                        {tx.type === 'WITHDRAW' && (
+                          <span
+                            className="badge"
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#f59e0b',
+                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                              fontWeight: 700
+                            }}
+                          >
+                            ⬆ Rút Tiền
+                          </span>
+                        )}
                         {tx.type === 'PAYMENT' && <span className="badge badge-primary">- Thuê Duo</span>}
                         {tx.type === 'RECEIVE' && (
                           tx.status === 'FROZEN' ? (

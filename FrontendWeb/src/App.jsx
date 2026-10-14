@@ -24,6 +24,7 @@ import AdminPage from './pages/AdminPage';
 // Modals
 import BookingModal from './components/modals/BookingModal';
 import DepositModal from './components/modals/DepositModal';
+import WithdrawModal from './components/modals/WithdrawModal';
 import DonateModal from './components/modals/DonateModal';
 import AuthModal from './components/modals/AuthModal';
 
@@ -31,6 +32,7 @@ const AppContent = ({
   selectedPlayerForHire, setSelectedPlayerForHire,
   selectedPlayerForDonate, setSelectedPlayerForDonate,
   isDepositOpen, setIsDepositOpen,
+  isWithdrawOpen, setIsWithdrawOpen,
   isAuthOpen, setIsAuthOpen
 }) => {
   const location = useLocation();
@@ -41,6 +43,7 @@ const AppContent = ({
       {!isAdminRoute && (
         <Navbar
           onOpenDeposit={() => setIsDepositOpen(true)}
+          onOpenWithdraw={() => setIsWithdrawOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
         />
       )}
@@ -80,6 +83,7 @@ const AppContent = ({
             element={
               <WalletPage
                 onOpenDeposit={() => setIsDepositOpen(true)}
+                onOpenWithdraw={() => setIsWithdrawOpen(true)}
               />
             }
           />
@@ -108,6 +112,10 @@ const AppContent = ({
             isOpen={isDepositOpen}
             onClose={() => setIsDepositOpen(false)}
           />
+          <WithdrawModal
+            isOpen={isWithdrawOpen}
+            onClose={() => setIsWithdrawOpen(false)}
+          />
           <DonateModal
             player={selectedPlayerForDonate}
             isOpen={!!selectedPlayerForDonate}
@@ -128,6 +136,7 @@ export const App = () => {
   const [selectedPlayerForHire, setSelectedPlayerForHire] = useState(null);
   const [selectedPlayerForDonate, setSelectedPlayerForDonate] = useState(null);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   return (
@@ -143,6 +152,8 @@ export const App = () => {
                 setSelectedPlayerForDonate={setSelectedPlayerForDonate}
                 isDepositOpen={isDepositOpen}
                 setIsDepositOpen={setIsDepositOpen}
+                isWithdrawOpen={isWithdrawOpen}
+                setIsWithdrawOpen={setIsWithdrawOpen}
                 isAuthOpen={isAuthOpen}
                 setIsAuthOpen={setIsAuthOpen}
               />

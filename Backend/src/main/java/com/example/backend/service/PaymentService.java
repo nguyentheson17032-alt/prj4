@@ -103,15 +103,15 @@ public class PaymentService {
             Payment payment = paymentRepository.findById(paymentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
 
-            if (!Payment.PaymentStatus.COMPLETED.equals(payment.getStatus())) {
-                logger.warn("Payment {} is not completed", paymentId);
-                throw new PaymentException("Payment is not completed");
+            if (!Payment.PaymentStatus.COMPLETED.equals(payment.getStatus()) && !Payment.PaymentStatus.PENDING.equals(payment.getStatus())) {
+                logger.warn("Payment {} is neither completed nor pending, current status: {}", paymentId, payment.getStatus());
+                throw new PaymentException("Payment cannot be refunded or rejected in current status");
             }
 
             // Hoàn xu cho người dùng
             User user = payment.getUser();
-            if (payment.getCoin() != null) {
-                user.setCoin(user.getCoin() + payment.getCoin());
+            if (payment.getCoin() != null && user != null) {
+                user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + payment.getCoin());
                 userRepository.save(user);
                 logger.info("Refunded {} coins to user {}", payment.getCoin(), user.getId());
             }

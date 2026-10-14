@@ -16,7 +16,9 @@ import {
   Bell,
   Sparkles,
   ShieldCheck,
-  ChevronDown
+  ChevronDown,
+  Landmark,
+  ArrowUpRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -24,7 +26,7 @@ import { getUserAvatar } from '../../utils/avatarUtils';
 import api from '../../api/apiService';
 import '../../styles/navbar.css';
 
-export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
+export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -259,6 +261,58 @@ export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
                             <span style={{ fontWeight: 700 }}>{user.frozenBalance.toLocaleString('vi-VN')} đ</span>
                           </div>
                         )}
+                        {/* Quick Action Buttons: Deposit & Withdraw */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowDropdown(false);
+                              if (onOpenDeposit) onOpenDeposit();
+                            }}
+                            style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(16, 185, 129, 0.4)',
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              color: '#10b981',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <span>+ Nạp tiền</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowDropdown(false);
+                              if (onOpenWithdraw) onOpenWithdraw();
+                            }}
+                            style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              background: 'rgba(245, 158, 11, 0.12)',
+                              color: '#f59e0b',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <ArrowUpRight size={13} />
+                            <span>Rút tiền</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="dropdown-divider" />
@@ -285,6 +339,18 @@ export const Navbar = ({ onOpenDeposit, onOpenAuth }) => {
                       <Wallet size={16} />
                       <span>Ví & Lịch Sử Giao Dịch</span>
                     </Link>
+                    <button
+                      type="button"
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowDropdown(false);
+                        if (onOpenWithdraw) onOpenWithdraw();
+                      }}
+                      style={{ color: '#f59e0b', width: '100%', textAlign: 'left', background: 'transparent', border: 'none' }}
+                    >
+                      <Landmark size={16} />
+                      <span>Rút Tiền Về Ngân Hàng</span>
+                    </button>
                     <Link to="/register-player" className="dropdown-item" onClick={() => setShowDropdown(false)} style={{ color: 'var(--secondary)' }}>
                       <PlusCircle size={16} />
                       <span>Đăng Ký Làm Player</span>
