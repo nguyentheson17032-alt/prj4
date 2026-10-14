@@ -16,6 +16,13 @@ public class MomentDTO {
     private LocalDateTime updatedAt;
     private String status;
     private Long followerCount;
-    private Boolean isFollowing;
     private Long playerUserId;
+    private String authorName;
+    private String authorAvatar;
+    private Boolean isVip;
+    private Long likeCount;
+    private Long commentCount;
+    private Boolean isLiked;
+    private List<String> likedByUsers;
+    private List<Long> likedByUserIds;
 } 

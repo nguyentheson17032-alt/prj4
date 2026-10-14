@@ -7,4 +7,6 @@ import java.util.List;
 public class CreateMomentRequest {
     private String content;
     private List<String> imageUrls;
+    private String gameName;
+    private Long gameId;
 } 

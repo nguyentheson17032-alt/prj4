@@ -51,6 +51,8 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/cover-images/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/moments/moment-images/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/moments/all").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/moments/player/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/moments/user/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/files/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

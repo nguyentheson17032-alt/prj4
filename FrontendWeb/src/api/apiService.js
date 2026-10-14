@@ -134,6 +134,91 @@ export const normalizeOrder = (o) => {
   };
 };
 
+export const normalizeMoment = (m) => {
+  if (!m) return null;
+  const authorName = m.author?.name || m.authorName || m.gamePlayerUsername || m.author?.fullName || 'Idol PlayZone';
+  const authorAvatar = m.author?.avatar || m.authorAvatar || getUserAvatar({ username: authorName });
+  const rawImages = m.images || m.imageUrls || [];
+  const images = (Array.isArray(rawImages) ? rawImages : []).map(img => {
+    if (!img || typeof img !== 'string') return img;
+    if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:') || img.startsWith('blob:')) return img;
+    if (img.startsWith('/api/moments/moment-images/')) return `${BASE_URL}${img}`;
+    if (img.startsWith('moment-images/')) {
+      return `${BASE_URL}/api/moments/moment-images/${img.replace('moment-images/', '')}`;
+    }
+    return `${BASE_URL}/api/moments/moment-images/${img}`;
+  }).filter(Boolean);
+
+  let formattedDate = 'Vừa xong';
+  if (m.createdAt) {
+    try {
+      const d = new Date(m.createdAt);
+      if (!isNaN(d.getTime())) {
+        const diffMs = Date.now() - d.getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMin / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffMin < 1) formattedDate = 'Vừa xong';
+        else if (diffMin < 60) formattedDate = `${diffMin} phút trước`;
+        else if (diffHours < 24) formattedDate = `${diffHours} giờ trước`;
+        else if (diffDays < 7) formattedDate = `${diffDays} ngày trước`;
+        else formattedDate = d.toLocaleDateString('vi-VN');
+      } else {
+        formattedDate = m.createdAt;
+      }
+    } catch (_) {
+      formattedDate = m.createdAt;
+    }
+  }
+
+  const likedByUserIds = Array.isArray(m.likedByUserIds) ? m.likedByUserIds.map(Number) : [];
+  const likedByUsers = Array.isArray(m.likedByUsers) ? m.likedByUsers : [];
+
+  // Determine isLiked based on current logged-in user in localStorage
+  let isLiked = false;
+  try {
+    const rawUser = localStorage.getItem('current_user') || localStorage.getItem('user');
+    if (rawUser) {
+      const cur = JSON.parse(rawUser);
+      const myId = cur?.id ? Number(cur.id) : null;
+      const myName = (cur?.fullName || cur?.username || '').toLowerCase();
+      if (myId && likedByUserIds.length > 0) {
+        isLiked = likedByUserIds.includes(myId);
+      } else if (myName && likedByUsers.length > 0) {
+        isLiked = likedByUsers.some(u => (u || '').toLowerCase() === myName);
+      } else if (m.isLiked !== undefined) {
+        isLiked = Boolean(m.isLiked);
+      }
+    }
+  } catch (_) {
+    isLiked = Boolean(m.isLiked);
+  }
+
+  return {
+    id: m.id || Date.now(),
+    gamePlayerId: m.gamePlayerId,
+    playerUserId: m.playerUserId || m.author?.userId,
+    author: {
+      id: m.author?.id || m.gamePlayerId || m.playerUserId || 1,
+      userId: m.playerUserId || m.author?.userId,
+      name: authorName,
+      avatar: authorAvatar,
+      isVip: m.isVip ?? m.author?.isVip ?? true,
+    },
+    gameName: m.gameName || 'Gaming',
+    content: m.content || '',
+    images: images,
+    likeCount: Number(m.likeCount || 0),
+    commentCount: Number(m.commentCount || 0),
+    isLiked: isLiked,
+    likedByUsers: likedByUsers,
+    likedByUserIds: likedByUserIds,
+    status: (m.status || 'ACTIVE').toUpperCase(),
+    createdAt: formattedDate,
+    rawCreatedAt: m.createdAt || new Date().toISOString()
+  };
+};
+
 export const api = {
   // Auth
   async login(username, password) {
@@ -378,19 +463,352 @@ export const api = {
 
   // Moments
   async getMoments() {
+    let backendMoments = [];
     try {
-      const res = await client.get('/api/moments/all');
-      if (res.data && Array.isArray(res.data.content)) return res.data.content;
-      if (Array.isArray(res.data)) return res.data;
-      return [];
+      const res = await client.get('/api/moments/all', { params: { size: 100 } });
+      if (res.data && Array.isArray(res.data.content)) {
+        backendMoments = res.data.content;
+      } else if (Array.isArray(res.data)) {
+        backendMoments = res.data;
+      }
     } catch (e) {
-      return [];
+      console.warn('Backend getMoments error:', e.message);
     }
+
+    // Load local stored moments
+    let localMoments = [];
+    try {
+      const stored = localStorage.getItem('playzone_moments');
+      if (stored) {
+        localMoments = JSON.parse(stored);
+      }
+    } catch (_) {}
+
+    // Combine by ID, keeping local likes and comments
+    const map = new Map();
+    localMoments.forEach(m => {
+      if (m && m.id) {
+        const norm = normalizeMoment(m);
+        if (norm) map.set(m.id, norm);
+      }
+    });
+
+    backendMoments.forEach(m => {
+      if (m && m.id) {
+        const norm = normalizeMoment(m);
+        if (norm) {
+          if (map.has(m.id)) {
+            const existing = map.get(m.id);
+            const mergedLikedByUsers = norm.likedByUsers && norm.likedByUsers.length > 0
+              ? norm.likedByUsers
+              : (existing.likedByUsers || []);
+            const mergedLikedByUserIds = norm.likedByUserIds && norm.likedByUserIds.length > 0
+              ? norm.likedByUserIds
+              : (existing.likedByUserIds || []);
+
+            let isLiked = norm.isLiked;
+            try {
+              const rawUser = localStorage.getItem('current_user') || localStorage.getItem('user');
+              if (rawUser) {
+                const cur = JSON.parse(rawUser);
+                const myId = cur?.id ? Number(cur.id) : null;
+                const myName = (cur?.fullName || cur?.username || '').toLowerCase();
+                if (myId && mergedLikedByUserIds.length > 0) {
+                  isLiked = mergedLikedByUserIds.includes(myId);
+                } else if (myName && mergedLikedByUsers.length > 0) {
+                  isLiked = mergedLikedByUsers.some(u => (u || '').toLowerCase() === myName);
+                }
+              }
+            } catch (_) {}
+
+            map.set(m.id, {
+              ...norm,
+              isLiked,
+              likedByUsers: mergedLikedByUsers,
+              likedByUserIds: mergedLikedByUserIds,
+              likeCount: Math.max(norm.likeCount, mergedLikedByUsers.length, existing.likeCount || 0)
+            });
+          } else {
+            map.set(m.id, norm);
+          }
+        }
+      }
+    });
+
+    const list = Array.from(map.values()).sort((a, b) => {
+      const timeA = new Date(a.rawCreatedAt).getTime() || 0;
+      const timeB = new Date(b.rawCreatedAt).getTime() || 0;
+      return timeB - timeA;
+    });
+
+    return list;
   },
 
-  async createMoment(gamePlayerId, data) {
-    const res = await client.post(`/api/moments/${gamePlayerId}`, data);
-    return res.data;
+  async getMomentsByUser(userId) {
+    if (!userId) return [];
+    try {
+      const res = await client.get(`/api/moments/user/${userId}`);
+      if (res.data && Array.isArray(res.data.content)) {
+        return res.data.content.map(normalizeMoment).filter(Boolean);
+      }
+    } catch (_) {}
+
+    const all = await this.getMoments();
+    return all.filter(m =>
+      String(m.playerUserId) === String(userId) ||
+      String(m.author?.userId) === String(userId) ||
+      String(m.author?.id) === String(userId)
+    );
+  },
+
+  async getMomentsByPlayer(playerId) {
+    if (!playerId) return [];
+    try {
+      const res = await client.get(`/api/moments/player/${playerId}`);
+      if (res.data && Array.isArray(res.data.content)) {
+        return res.data.content.map(normalizeMoment).filter(Boolean);
+      }
+    } catch (_) {}
+
+    const all = await this.getMoments();
+    return all.filter(m =>
+      String(m.gamePlayerId) === String(playerId) ||
+      String(m.author?.id) === String(playerId)
+    );
+  },
+
+  async uploadMomentFiles(files) {
+    if (!files || files.length === 0) return [];
+    try {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append('files', file);
+      }
+      const res = await client.post('/api/moments/upload-files', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        return res.data.map(p => p.startsWith('http') ? p : `${BASE_URL}${p}`);
+      }
+    } catch (err) {
+      console.warn('Backend uploadMomentFiles error, falling back to data URLs:', err.message);
+    }
+
+    // Fallback: convert files to Base64 data URLs
+    const dataUrls = await Promise.all(
+      Array.from(files).map(file => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+      }))
+    );
+    return dataUrls.filter(Boolean);
+  },
+
+  async createMoment(payload) {
+    let result = null;
+    try {
+      const res = await client.post('/api/moments/create', {
+        content: payload.content,
+        gameName: payload.gameName,
+        imageUrls: payload.images || payload.imageUrls || []
+      });
+      if (res.data) {
+        result = normalizeMoment(res.data);
+      }
+    } catch (e) {
+      console.warn('Backend createMoment/create error, using normalized local moment:', e.message);
+    }
+
+    if (!result) {
+      result = normalizeMoment({
+        id: Date.now(),
+        authorName: payload.author?.name || 'Idol PlayZone',
+        authorAvatar: payload.author?.avatar,
+        isVip: true,
+        gameName: payload.gameName || 'Gaming',
+        content: payload.content,
+        images: payload.images || payload.imageUrls || [],
+        createdAt: new Date().toISOString(),
+        playerUserId: payload.author?.userId || payload.author?.id
+      });
+    }
+
+    // Save to localStorage for instant real-time feed update
+    try {
+      const stored = localStorage.getItem('playzone_moments');
+      const list = stored ? JSON.parse(stored) : [];
+      list.unshift(result);
+      localStorage.setItem('playzone_moments', JSON.stringify(list));
+    } catch (_) {}
+
+    return result;
+  },
+
+  async deleteMoment(momentId) {
+    try {
+      await client.delete(`/api/moments/${momentId}`);
+    } catch (e) {
+      console.warn('Backend deleteMoment error:', e.message);
+    }
+    try {
+      const stored = localStorage.getItem('playzone_moments');
+      if (stored) {
+        const list = JSON.parse(stored).filter(m => m.id !== momentId);
+        localStorage.setItem('playzone_moments', JSON.stringify(list));
+      }
+    } catch (_) {}
+    return { success: true };
+  },
+
+  async toggleLikeMoment(momentId, currentUserId, currentUserName) {
+    let result = null;
+    try {
+      const res = await client.post(`/api/moments/${momentId}/like`);
+      if (res.data) {
+        result = res.data;
+      }
+    } catch (e) {
+      console.warn('Backend toggleLikeMoment error, falling back to local toggle:', e.message);
+    }
+
+    // Local state fallback / synchronization
+    try {
+      const stored = localStorage.getItem('playzone_moments');
+      const list = stored ? JSON.parse(stored) : [];
+      let found = false;
+      const updatedList = list.map(m => {
+        if (m.id === momentId) {
+          found = true;
+          let likedUsers = Array.isArray(m.likedByUsers) ? [...m.likedByUsers] : [];
+          let likedIds = Array.isArray(m.likedByUserIds) ? [...m.likedByUserIds].map(Number) : [];
+
+          const userKey = currentUserName || `User_${currentUserId || 'guest'}`;
+          const userIdNum = currentUserId ? Number(currentUserId) : null;
+
+          if (result && Array.isArray(result.likedByUsers)) {
+            likedUsers = result.likedByUsers;
+          }
+          if (result && Array.isArray(result.likedByUserIds)) {
+            likedIds = result.likedByUserIds.map(Number);
+          }
+
+          if (!result) {
+            const hasLiked = likedUsers.some(u => u.toLowerCase() === userKey.toLowerCase()) || (userIdNum && likedIds.includes(userIdNum));
+            if (!hasLiked) {
+              likedUsers.unshift(userKey);
+              if (userIdNum) likedIds.unshift(userIdNum);
+            } else {
+              likedUsers = likedUsers.filter(u => u.toLowerCase() !== userKey.toLowerCase());
+              if (userIdNum) likedIds = likedIds.filter(id => id !== userIdNum);
+            }
+          }
+
+          const likeCount = result ? Number(result.likeCount) : likedUsers.length;
+          return {
+            ...m,
+            likeCount,
+            likedByUsers: likedUsers,
+            likedByUserIds: likedIds
+          };
+        }
+        return m;
+      });
+      if (found) {
+        localStorage.setItem('playzone_moments', JSON.stringify(updatedList));
+      }
+    } catch (_) {}
+
+    return result;
+  },
+
+  async getAllMomentsAdmin() {
+    let backendMoments = [];
+    try {
+      const res = await client.get('/api/moments/admin/all', { params: { size: 200 } });
+      if (res.data && Array.isArray(res.data.content)) {
+        backendMoments = res.data.content;
+      } else if (Array.isArray(res.data)) {
+        backendMoments = res.data;
+      }
+    } catch (e) {
+      console.warn('Backend getAllMomentsAdmin error:', e.message);
+    }
+
+    // Combine with local moments
+    let localMoments = [];
+    try {
+      const stored = localStorage.getItem('playzone_moments');
+      if (stored) {
+        localMoments = JSON.parse(stored);
+      }
+    } catch (_) {}
+
+    const map = new Map();
+    localMoments.forEach(m => {
+      if (m && m.id) {
+        const norm = normalizeMoment(m);
+        if (norm) map.set(m.id, norm);
+      }
+    });
+
+    backendMoments.forEach(m => {
+      if (m && m.id) {
+        const norm = normalizeMoment(m);
+        if (norm) {
+          if (map.has(m.id)) {
+            const existing = map.get(m.id);
+            map.set(m.id, {
+              ...norm,
+              isLiked: existing.isLiked,
+              likeCount: Math.max(norm.likeCount, existing.likeCount || 0),
+              status: existing.status || norm.status
+            });
+          } else {
+            map.set(m.id, norm);
+          }
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      const timeA = new Date(a.rawCreatedAt).getTime() || 0;
+      const timeB = new Date(b.rawCreatedAt).getTime() || 0;
+      return timeB - timeA;
+    });
+  },
+
+  async updateMomentStatusAdmin(momentId, status) {
+    try {
+      await client.patch(`/api/moments/admin/${momentId}/status`, { status });
+    } catch (e) {
+      console.warn('Backend updateMomentStatusAdmin error:', e.message);
+    }
+    try {
+      const stored = localStorage.getItem('playzone_moments');
+      if (stored) {
+        const list = JSON.parse(stored).map(m => m.id === momentId ? { ...m, status } : m);
+        localStorage.setItem('playzone_moments', JSON.stringify(list));
+      }
+    } catch (_) {}
+    return { success: true, status };
+  },
+
+  async deleteMomentAdmin(momentId) {
+    try {
+      await client.delete(`/api/moments/admin/${momentId}`);
+    } catch (e) {
+      console.warn('Backend deleteMomentAdmin error:', e.message);
+    }
+    try {
+      const stored = localStorage.getItem('playzone_moments');
+      if (stored) {
+        const list = JSON.parse(stored).map(m => m.id === momentId ? { ...m, status: 'DELETED' } : m);
+        localStorage.setItem('playzone_moments', JSON.stringify(list));
+      }
+    } catch (_) {}
+    return { success: true };
   },
 
   // Orders

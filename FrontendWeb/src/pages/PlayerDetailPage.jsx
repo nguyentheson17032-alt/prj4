@@ -14,7 +14,8 @@ import {
   Share2,
   ChevronRight,
   ArrowLeft,
-  AlertTriangle
+  AlertTriangle,
+  Image as ImageIcon
 } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
 import AudioWave from '../components/common/AudioWave';
@@ -68,11 +69,55 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
           }
         } catch (_) {}
 
+        // Fetch moments of this player to build the full album
+        let playerMoments = [];
+        try {
+          const targetUserId = pData.userId || id;
+          playerMoments = await api.getMomentsByUser(targetUserId);
+          if (!playerMoments || playerMoments.length === 0) {
+            playerMoments = await api.getMomentsByPlayer(id);
+          }
+        } catch (_) {}
+
+        const albumList = [];
+        const seenUrls = new Set();
+
+        // 1. Photos from player's posted moments
+        if (Array.isArray(playerMoments)) {
+          playerMoments.forEach(m => {
+            if (Array.isArray(m.images)) {
+              m.images.forEach(img => {
+                if (img && !seenUrls.has(img)) {
+                  seenUrls.add(img);
+                  albumList.push({
+                    url: img,
+                    gameName: m.gameName || pData.primaryGame || 'Gaming',
+                    createdAt: m.createdAt,
+                    caption: m.content
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        // 2. Existing player album if any
+        if (Array.isArray(pData.album)) {
+          pData.album.forEach(item => {
+            const url = typeof item === 'string' ? item : item?.url;
+            if (url && !seenUrls.has(url)) {
+              seenUrls.add(url);
+              albumList.push(typeof item === 'string' ? { url, gameName: pData.primaryGame || 'PlayZone' } : item);
+            }
+          });
+        }
+
         const finalPlayer = {
           ...pData,
           rating: finalRating,
           reviewCount: finalReviewCount,
           games: allGames,
+          album: albumList
         };
         setPlayer(finalPlayer);
         setSelectedGame(allGames?.[0] || null);
@@ -395,32 +440,128 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
           {/* Tab 2: Album */}
           {activeTab === 'ALBUM' && (
             <div className="animate-fade-in">
+              {/* Header inside Tab */}
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: '16px'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+                padding: '14px 20px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '14px',
+                border: '1px solid rgba(255, 255, 255, 0.06)'
               }}>
-                {player.album?.map((imgUrl, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      height: '240px',
-                      borderRadius: 'var(--radius-md)',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      border: '1px solid var(--border-color)',
-                      transition: 'transform 0.2s'
-                    }}
-                    onClick={() => setPreviewImage(imgUrl)}
-                  >
-                    <img
-                      src={imgUrl}
-                      alt={`Album ${idx}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </div>
-                ))}
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 4px 0', color: '#fff' }}>
+                    📸 Album Khoảnh Khắc &amp; Highlight
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    Tất cả hình ảnh highlight, chiến tích leo rank Idol đã đăng tải trong "Khoảnh Khắc"
+                  </p>
+                </div>
+                <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  color: '#a5b4fc',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  border: '1px solid rgba(99, 102, 241, 0.3)'
+                }}>
+                  {player.album?.length || 0} Ảnh
+                </span>
               </div>
+
+              {(!player.album || player.album.length === 0) ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  background: 'var(--bg-card)',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--border-color)',
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)'
+                }}>
+                  <ImageIcon size={48} color="var(--text-muted)" style={{ margin: '0 auto 16px auto' }} />
+                  <h4 style={{ fontSize: '1.15rem', color: '#fff', marginBottom: '8px' }}>Chưa Có Ảnh Nào Trong Album</h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: '420px', margin: '0 auto', lineHeight: 1.6 }}>
+                    Idol chưa chia sẻ hình ảnh khoảnh khắc nào. Khi Idol đăng bài viết mới kèm ảnh từ mục "Khoảnh Khắc", tất cả ảnh sẽ tự động hiển thị trong Album này!
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '16px'
+                }}>
+                  {player.album.map((item, idx) => {
+                    const imgUrl = typeof item === 'string' ? item : item.url;
+                    const gameName = item.gameName || player.primaryGame || 'Gaming';
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          height: '240px',
+                          borderRadius: 'var(--radius-md)',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          border: '1px solid var(--border-color)',
+                          position: 'relative',
+                          background: '#090a10',
+                          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                          transition: 'all 0.25s ease'
+                        }}
+                        onClick={() => setPreviewImage(imgUrl)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-4px)';
+                          e.currentTarget.style.borderColor = 'var(--primary)';
+                          e.currentTarget.style.boxShadow = '0 10px 25px rgba(99, 102, 241, 0.25)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'none';
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                          e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+                        }}
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={`Album ${idx}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        {/* Game tag overlay */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '10px',
+                          left: '10px',
+                          background: 'rgba(0, 0, 0, 0.65)',
+                          backdropFilter: 'blur(4px)',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.72rem',
+                          color: '#e2e8f0',
+                          fontWeight: 600,
+                          border: '1px solid rgba(255, 255, 255, 0.15)'
+                        }}>
+                          🎮 {gameName}
+                        </div>
+                        {/* Hover zoom pill */}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '10px',
+                          right: '10px',
+                          background: 'rgba(99, 102, 241, 0.85)',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.72rem',
+                          color: '#fff',
+                          fontWeight: 700
+                        }}>
+                          Phóng to
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -579,9 +720,30 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
 
       {/* Lightbox image preview modal */}
       {previewImage && (
-        <div className="modal-overlay" onClick={() => setPreviewImage(null)}>
+        <div className="modal-overlay" onClick={() => setPreviewImage(null)} style={{ backdropFilter: 'blur(8px)', zIndex: 99999 }}>
+          <button
+            onClick={() => setPreviewImage(null)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255, 255, 255, 0.15)',
+              border: 'none',
+              color: '#fff',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              zIndex: 100000
+            }}
+          >
+            ✕
+          </button>
           <div style={{ maxWidth: '90vw', maxHeight: '90vh', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-            <img src={previewImage} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: '12px' }} />
+            <img src={previewImage} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }} />
           </div>
         </div>
       )}

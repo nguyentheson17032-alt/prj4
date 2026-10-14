@@ -39,6 +39,9 @@ public class MomentServiceImpl implements MomentService {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private MomentLikeRepository momentLikeRepository;
+
     @Override
     public MomentDTO createMoment(Long gamePlayerId, CreateMomentRequest request) {
         // Kiểm tra game player tồn tại
@@ -52,6 +55,15 @@ public class MomentServiceImpl implements MomentService {
         
         if (request.getContent().length() > 1000) {
             throw new IllegalArgumentException("Content cannot exceed 1000 characters");
+        }
+
+        // Kiểm tra luật: mỗi player chỉ được đăng 1 khoảnh khắc mỗi ngày
+        if (gamePlayer.getUser() != null) {
+            java.time.LocalDateTime startOfDay = java.time.LocalDate.now().atStartOfDay();
+            long countToday = momentRepository.countMomentsByUserSince(gamePlayer.getUser().getId(), startOfDay);
+            if (countToday >= 1) {
+                throw new IllegalArgumentException("Mỗi Player chỉ được đăng 1 khoảnh khắc mỗi ngày. Bạn đã đăng bài hôm nay rồi, vui lòng quay lại vào ngày mai!");
+            }
         }
 
         // Tạo moment mới
@@ -241,7 +253,7 @@ public class MomentServiceImpl implements MomentService {
         dto.setId(moment.getId());
         dto.setGamePlayerId(gamePlayer.getId());
         dto.setGamePlayerUsername(gamePlayer.getUsername());
-        dto.setGameName(gamePlayer.getGame().getName());
+        dto.setGameName(gamePlayer.getGame() != null ? gamePlayer.getGame().getName() : "Gaming");
         dto.setContent(moment.getContent());
         dto.setCreatedAt(moment.getCreatedAt());
         dto.setUpdatedAt(moment.getUpdatedAt());
@@ -258,12 +270,38 @@ public class MomentServiceImpl implements MomentService {
         Long followerCount = playerFollowRepository.countFollowersByGamePlayerId(gamePlayer.getId());
         dto.setFollowerCount(followerCount);
         
-        // Set playerUserId
+        // Set playerUserId & author info
         if (gamePlayer.getUser() != null) {
-            dto.setPlayerUserId(gamePlayer.getUser().getId());
+            User u = gamePlayer.getUser();
+            dto.setPlayerUserId(u.getId());
+            dto.setAuthorName(u.getFullName() != null && !u.getFullName().trim().isEmpty() ? u.getFullName() : gamePlayer.getUsername());
+            dto.setAuthorAvatar(u.getAvatarUrl() != null && !u.getAvatarUrl().trim().isEmpty() ? u.getAvatarUrl() : u.getProfileImageUrl());
+            dto.setIsVip(true);
         } else {
             dto.setPlayerUserId(null);
+            dto.setAuthorName(gamePlayer.getUsername());
+            dto.setAuthorAvatar(null);
+            dto.setIsVip(false);
         }
+
+        long likeCount = momentLikeRepository.countByMomentId(moment.getId());
+        dto.setLikeCount(likeCount);
+        dto.setCommentCount(0L);
+        dto.setIsLiked(false);
+        try {
+            List<com.example.backend.entity.MomentLike> likes = momentLikeRepository.findByMomentIdOrderByLikedAtDesc(moment.getId());
+            List<String> likers = likes.stream()
+                    .map(l -> l.getUser().getFullName() != null && !l.getUser().getFullName().trim().isEmpty() 
+                            ? l.getUser().getFullName() : l.getUser().getUsername())
+                    .limit(20)
+                    .collect(Collectors.toList());
+            dto.setLikedByUsers(likers);
+
+            List<Long> likerIds = likes.stream()
+                    .map(l -> l.getUser().getId())
+                    .collect(Collectors.toList());
+            dto.setLikedByUserIds(likerIds);
+        } catch (Exception ignored) {}
         
         return dto;
     }
@@ -334,5 +372,49 @@ public class MomentServiceImpl implements MomentService {
         return unviewedMoments.stream()
                 .map(moment -> convertToDTO(moment, moment.getGamePlayer()))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public boolean toggleLike(Long momentId, Long userId) {
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Moment not found with id: " + momentId));
+        User user = userService.findById(userId);
+
+        java.util.Optional<MomentLike> existing = momentLikeRepository.findByMomentAndUser(moment, user);
+        if (existing.isPresent()) {
+            momentLikeRepository.delete(existing.get());
+            return false;
+        } else {
+            MomentLike like = new MomentLike();
+            like.setMoment(moment);
+            like.setUser(user);
+            momentLikeRepository.save(like);
+            return true;
+        }
+    }
+
+    @Override
+    public Page<MomentDTO> getAllMomentsForAdmin(Pageable pageable) {
+        Page<Moment> moments = momentRepository.findAllByOrderByCreatedAtDesc(pageable);
+        return moments.map(moment -> convertToDTO(moment, moment.getGamePlayer()));
+    }
+
+    @Override
+    @Transactional
+    public void adminUpdateStatus(Long momentId, String status) {
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Moment not found with id: " + momentId));
+        moment.setStatus(status);
+        momentRepository.save(moment);
+    }
+
+    @Override
+    @Transactional
+    public void adminDeleteMoment(Long momentId) {
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Moment not found with id: " + momentId));
+        moment.setStatus("DELETED");
+        momentRepository.save(moment);
     }
 } 

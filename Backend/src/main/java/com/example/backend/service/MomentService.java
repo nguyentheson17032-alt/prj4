@@ -50,4 +50,12 @@ public interface MomentService {
     
     // Lấy danh sách moment chưa đọc
     List<MomentDTO> getUnviewedMoments(Long userId);
+
+    // Toggle like
+    boolean toggleLike(Long momentId, Long userId);
+
+    // Admin methods
+    Page<MomentDTO> getAllMomentsForAdmin(Pageable pageable);
+    void adminUpdateStatus(Long momentId, String status);
+    void adminDeleteMoment(Long momentId);
 } 

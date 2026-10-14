@@ -46,5 +46,6 @@ HELP.md
 *.iws
 *.ipr
 .DS_Store
-Thumbs.db
 *.log
+uploads/
+**/uploads/

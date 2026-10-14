@@ -36,4 +36,9 @@ public interface MomentRepository extends JpaRepository<Moment, Long> {
     Page<Moment> findByGamePlayerIdInAndStatusOrderByCreatedAtDesc(List<Long> gamePlayerIds, String status, Pageable pageable);
 
     Page<Moment> findByStatusOrderByCreatedAtDesc(String status, org.springframework.data.domain.Pageable pageable);
+
+    Page<Moment> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @Query("SELECT COUNT(m) FROM Moment m WHERE m.gamePlayer.user.id = ?1 AND m.createdAt >= ?2 AND m.status <> 'DELETED'")
+    long countMomentsByUserSince(Long userId, java.time.LocalDateTime since);
 } 
