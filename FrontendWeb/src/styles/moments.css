@@ -62,6 +62,62 @@
   box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
 }
 
+/* Game Search Box in Filter Bar */
+.moment-game-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 6px 14px;
+  flex: 1;
+  max-width: 300px;
+  min-width: 190px;
+  transition: all 0.2s ease;
+}
+
+.moment-game-search-box:focus-within {
+  border-color: var(--primary);
+  background: rgba(15, 23, 42, 0.7);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.moment-search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.moment-game-search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 0.84rem;
+  width: 100%;
+}
+
+.moment-game-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.moment-search-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.15s ease;
+}
+
+.moment-search-clear-btn:hover {
+  color: #fff;
+}
+
 /* Horizontal scrolling game pills */
 .moment-game-scroll {
   display: flex;

@@ -1,12 +1,26 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Star, Crown, MessageSquare, Gamepad2, Heart } from 'lucide-react';
+import { Star, Crown, MessageSquare, Gamepad2, Heart, UserCheck } from 'lucide-react';
 import StatusBadge from '../common/StatusBadge';
 import AudioWave from '../common/AudioWave';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/player.css';
 
 export const PlayerCard = ({ player, onHire, onDonate }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isOwner = Boolean(
+    user?.id != null &&
+    player &&
+    (
+      player.userId != null
+        ? String(player.userId) === String(user.id)
+        : (player.user?.id != null
+            ? String(player.user.id) === String(user.id)
+            : String(player.id) === String(user.id))
+    )
+  );
 
   const handleChat = (e) => {
     e.preventDefault();
@@ -97,22 +111,48 @@ export const PlayerCard = ({ player, onHire, onDonate }) => {
               <span className="player-price-unit">/ giờ</span>
             </div>
 
-            <div className="player-actions-row">
+            {isOwner ? (
               <button
-                className="btn-icon nav-icon-btn"
-                onClick={handleChat}
-                title="Nhắn tin với player"
+                className="btn btn-sm btn-outline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate('/profile');
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: 'rgba(99, 102, 241, 0.4)',
+                  color: '#818cf8',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  padding: '6px 12px',
+                  borderRadius: '8px'
+                }}
+                title="Hồ sơ Idol của bạn - Bấm để quản lý & chỉnh sửa"
               >
-                <MessageSquare size={16} />
+                <UserCheck size={14} />
+                <span>Hồ Sơ Của Bạn</span>
               </button>
+            ) : (
+              <div className="player-actions-row">
+                <button
+                  className="btn-icon nav-icon-btn"
+                  onClick={handleChat}
+                  title="Nhắn tin với player"
+                >
+                  <MessageSquare size={16} />
+                </button>
 
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={handleHireClick}
-              >
-                <span>Thuê Ngay</span>
-              </button>
-            </div>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={handleHireClick}
+                >
+                  <span>Thuê Ngay</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </Link>

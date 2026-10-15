@@ -13,9 +13,13 @@ import {
   Heart,
   Share2,
   ChevronRight,
+  ChevronLeft,
   ArrowLeft,
   AlertTriangle,
-  Image as ImageIcon
+  Image as ImageIcon,
+  X,
+  UserCheck,
+  Pencil
 } from 'lucide-react';
 import StatusBadge from '../components/common/StatusBadge';
 import AudioWave from '../components/common/AudioWave';
@@ -23,9 +27,10 @@ import api from '../api/apiService';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getUserAvatar } from '../utils/avatarUtils';
+import '../styles/player.css';
 
 export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -35,8 +40,24 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('SERVICES'); // SERVICES, ALBUM, REVIEWS
   const [isFavorited, setIsFavorited] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
+
+  const previewItem = (player?.album && previewIndex !== null) ? player.album[previewIndex] : null;
+
+  // Determine if the current authenticated user is the owner of this player profile
+  const isOwner = Boolean(
+    isAuthenticated &&
+    user?.id != null &&
+    player &&
+    (
+      player.userId != null
+        ? String(player.userId) === String(user.id)
+        : (player.user?.id != null
+            ? String(player.user.id) === String(user.id)
+            : String(player.id) === String(user.id))
+    )
+  );
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -79,6 +100,20 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
           }
         } catch (_) {}
 
+        // Helper to check like status
+        const myId = user?.id ? Number(user.id) : null;
+        const myName = (user?.fullName || user?.username || '').trim().toLowerCase();
+        const checkIsLiked = (m) => {
+          if (!myId && !myName) return Boolean(m.isLiked);
+          if (myId && Array.isArray(m.likedByUserIds) && m.likedByUserIds.length > 0) {
+            if (m.likedByUserIds.map(Number).includes(myId)) return true;
+          }
+          if (myName && Array.isArray(m.likedByUsers) && m.likedByUsers.length > 0) {
+            if (m.likedByUsers.some(u => (u || '').trim().toLowerCase() === myName)) return true;
+          }
+          return Boolean(m.isLiked);
+        };
+
         const albumList = [];
         const seenUrls = new Set();
 
@@ -92,8 +127,18 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   albumList.push({
                     url: img,
                     gameName: m.gameName || pData.primaryGame || 'Gaming',
-                    createdAt: m.createdAt,
-                    caption: m.content
+                    createdAt: m.createdAt || 'Vừa xong',
+                    caption: m.content || '',
+                    likeCount: Number(m.likeCount || 0),
+                    likedByUsers: Array.isArray(m.likedByUsers) ? m.likedByUsers : [],
+                    likedByUserIds: Array.isArray(m.likedByUserIds) ? m.likedByUserIds : [],
+                    isLiked: checkIsLiked(m),
+                    momentId: m.id,
+                    author: m.author || {
+                      name: pData.fullName || pData.name || pData.username || 'Idol PlayZone',
+                      avatar: pData.avatar || getUserAvatar({ username: pData.name }),
+                      isVip: true
+                    }
                   });
                 }
               });
@@ -107,7 +152,57 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
             const url = typeof item === 'string' ? item : item?.url;
             if (url && !seenUrls.has(url)) {
               seenUrls.add(url);
-              albumList.push(typeof item === 'string' ? { url, gameName: pData.primaryGame || 'PlayZone' } : item);
+              const matchedMoment = playerMoments.find(m => Array.isArray(m.images) && m.images.includes(url));
+              if (matchedMoment) {
+                albumList.push({
+                  url,
+                  gameName: matchedMoment.gameName || pData.primaryGame || 'Gaming',
+                  createdAt: matchedMoment.createdAt || 'Vừa xong',
+                  caption: matchedMoment.content || '',
+                  likeCount: Number(matchedMoment.likeCount || 0),
+                  likedByUsers: Array.isArray(matchedMoment.likedByUsers) ? matchedMoment.likedByUsers : [],
+                  likedByUserIds: Array.isArray(matchedMoment.likedByUserIds) ? matchedMoment.likedByUserIds : [],
+                  isLiked: checkIsLiked(matchedMoment),
+                  momentId: matchedMoment.id,
+                  author: matchedMoment.author || {
+                    name: pData.fullName || pData.name || pData.username || 'Idol PlayZone',
+                    avatar: pData.avatar || getUserAvatar({ username: pData.name }),
+                    isVip: true
+                  }
+                });
+              } else {
+                albumList.push(typeof item === 'string' ? {
+                  url,
+                  gameName: pData.primaryGame || 'PlayZone',
+                  createdAt: 'Ảnh hồ sơ',
+                  caption: '',
+                  likeCount: 0,
+                  likedByUsers: [],
+                  likedByUserIds: [],
+                  isLiked: false,
+                  momentId: null,
+                  author: {
+                    name: pData.fullName || pData.name || pData.username || 'Idol PlayZone',
+                    avatar: pData.avatar || getUserAvatar({ username: pData.name }),
+                    isVip: true
+                  }
+                } : {
+                  url: item.url,
+                  gameName: item.gameName || pData.primaryGame || 'PlayZone',
+                  createdAt: item.createdAt || 'Ảnh hồ sơ',
+                  caption: item.caption || item.content || '',
+                  likeCount: Number(item.likeCount || 0),
+                  likedByUsers: Array.isArray(item.likedByUsers) ? item.likedByUsers : [],
+                  likedByUserIds: Array.isArray(item.likedByUserIds) ? item.likedByUserIds : [],
+                  isLiked: Boolean(item.isLiked),
+                  momentId: item.momentId || item.id || null,
+                  author: item.author || {
+                    name: pData.fullName || pData.name || pData.username || 'Idol PlayZone',
+                    avatar: pData.avatar || getUserAvatar({ username: pData.name }),
+                    isVip: true
+                  }
+                });
+              }
             }
           });
         }
@@ -126,7 +221,100 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
       setLoading(false);
     };
     fetchDetail();
-  }, [id]);
+  }, [id, user?.id]);
+
+  // Keyboard navigation for album photo modal (Must be before any early returns to obey React hook rules!)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (previewIndex === null) return;
+      if (e.key === 'Escape') setPreviewIndex(null);
+      if (e.key === 'ArrowRight' && player?.album?.length > 1) {
+        setPreviewIndex(prev => (prev + 1) % player.album.length);
+      }
+      if (e.key === 'ArrowLeft' && player?.album?.length > 1) {
+        setPreviewIndex(prev => (prev - 1 + player.album.length) % player.album.length);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewIndex, player?.album]);
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    addToast('Đã sao chép liên kết trang player vào bộ nhớ tạm!', 'success');
+  };
+
+  const handleToggleFavorite = () => {
+    setIsFavorited(!isFavorited);
+    addToast(isFavorited ? 'Đã bỏ yêu thích player' : 'Đã thêm player vào danh sách yêu thích ❤️', 'success');
+  };
+
+  const handleToggleLikePhoto = async (item) => {
+    if (!isAuthenticated) {
+      addToast('Vui lòng đăng nhập để thích khoảnh khắc!', 'warning');
+      return;
+    }
+
+    const myId = user?.id ? Number(user.id) : null;
+    const myName = user?.fullName || user?.username || 'Bạn';
+    const nextLiked = !item.isLiked;
+    const newCount = nextLiked ? (item.likeCount || 0) + 1 : Math.max(0, (item.likeCount || 0) - 1);
+
+    const prevLikedUsers = Array.isArray(item.likedByUsers) ? item.likedByUsers : [];
+    const prevLikedUserIds = Array.isArray(item.likedByUserIds) ? item.likedByUserIds.map(Number) : [];
+
+    const newLikedUsers = nextLiked
+      ? [myName, ...prevLikedUsers.filter(u => (u || '').trim().toLowerCase() !== myName.trim().toLowerCase())]
+      : prevLikedUsers.filter(u => (u || '').trim().toLowerCase() !== myName.trim().toLowerCase());
+
+    const newLikedUserIds = nextLiked
+      ? (myId ? [myId, ...prevLikedUserIds.filter(uid => uid !== myId)] : prevLikedUserIds)
+      : (myId ? prevLikedUserIds.filter(uid => uid !== myId) : prevLikedUserIds);
+
+    // Optimistically update player.album so modal and grid reflect immediately
+    setPlayer(prev => {
+      if (!prev) return prev;
+      const newAlbum = prev.album.map((a, idx) => {
+        if (idx === previewIndex || a.url === item.url || (item.momentId && a.momentId === item.momentId)) {
+          return {
+            ...a,
+            isLiked: nextLiked,
+            likeCount: newCount,
+            likedByUsers: newLikedUsers,
+            likedByUserIds: newLikedUserIds
+          };
+        }
+        return a;
+      });
+      return { ...prev, album: newAlbum };
+    });
+
+    addToast(nextLiked ? 'Đã thích khoảnh khắc ❤️' : 'Đã bỏ thích khoảnh khắc', 'success');
+
+    if (item.momentId) {
+      try {
+        const res = await api.toggleLikeMoment(item.momentId, myId, myName);
+        if (res) {
+          setPlayer(prev => {
+            if (!prev) return prev;
+            const newAlbum = prev.album.map((a, idx) => {
+              if (idx === previewIndex || a.url === item.url || a.momentId === item.momentId) {
+                return {
+                  ...a,
+                  isLiked: res.isLiked ?? nextLiked,
+                  likeCount: res.likeCount != null ? Number(res.likeCount) : newCount,
+                  likedByUsers: res.likedByUsers || newLikedUsers,
+                  likedByUserIds: res.likedByUserIds || newLikedUserIds
+                };
+              }
+              return a;
+            });
+            return { ...prev, album: newAlbum };
+          });
+        }
+      } catch (_) {}
+    }
+  };
 
   if (loading) {
     return (
@@ -146,16 +334,6 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
       </div>
     );
   }
-
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    addToast('Đã sao chép liên kết trang player vào bộ nhớ tạm!', 'success');
-  };
-
-  const handleToggleFavorite = () => {
-    setIsFavorited(!isFavorited);
-    addToast(isFavorited ? 'Đã bỏ yêu thích player' : 'Đã thêm player vào danh sách yêu thích ❤️', 'success');
-  };
 
   return (
     <div className="container animate-fade-in" style={{ paddingBottom: '80px' }}>
@@ -261,42 +439,70 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               </div>
             </div>
 
-            {/* Quick Action CTAs */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  const targetPartnerId = player.userId || player.id;
-                  const query = new URLSearchParams({
-                    partnerId: targetPartnerId,
-                    player: player.id,
-                    name: player.fullName || player.name || player.username || 'Idol PlayZone',
-                    username: player.username || '',
-                    avatar: player.avatar || '',
-                    role: player.primaryGame || 'Idol Duo',
-                    isPlayer: 'true'
-                  });
-                  navigate(`/chat?${query.toString()}`);
-                }}
-              >
-                <MessageSquare size={18} />
-                <span>Nhắn Tin</span>
-              </button>
-              <button
-                className="btn btn-accent"
-                onClick={() => onDonatePlayer(player)}
-              >
-                <Gift size={18} />
-                <span>Tặng Quà</span>
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => onHirePlayer(player)}
-              >
-                <Gamepad2 size={18} />
-                <span>Thuê Ngay</span>
-              </button>
-            </div>
+            {/* Quick Action CTAs: Show Edit Profile if viewing own profile, otherwise show Chat, Gift & Hire */}
+            {isOwner ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span style={{
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  color: '#a5b4fc',
+                  padding: '9px 16px',
+                  borderRadius: '12px',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <UserCheck size={16} color="var(--primary)" />
+                  <span>Hồ Sơ Của Bạn</span>
+                </span>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => navigate('/profile')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', borderRadius: '12px', fontWeight: 700 }}
+                >
+                  <Pencil size={16} />
+                  <span>Chỉnh Sửa Hồ Sơ</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const targetPartnerId = player.userId || player.id;
+                    const query = new URLSearchParams({
+                      partnerId: targetPartnerId,
+                      player: player.id,
+                      name: player.fullName || player.name || player.username || 'Idol PlayZone',
+                      username: player.username || '',
+                      avatar: player.avatar || '',
+                      role: player.primaryGame || 'Idol Duo',
+                      isPlayer: 'true'
+                    });
+                    navigate(`/chat?${query.toString()}`);
+                  }}
+                >
+                  <MessageSquare size={18} />
+                  <span>Nhắn Tin</span>
+                </button>
+                <button
+                  className="btn btn-accent"
+                  onClick={() => onDonatePlayer(player)}
+                >
+                  <Gift size={18} />
+                  <span>Tặng Quà</span>
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => onHirePlayer(player)}
+                >
+                  <Gamepad2 size={18} />
+                  <span>Thuê Ngay</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Voice Preview Bar if available */}
@@ -422,12 +628,23 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 1 giờ</div>
                           </div>
-                          <button
-                            className="btn btn-sm btn-primary"
-                            onClick={(e) => { e.stopPropagation(); setSelectedGame(game); onHirePlayer({ ...player, pricePerHour: game.price, primaryGame: game.name }); }}
-                          >
-                            Thuê Game Này
-                          </button>
+                          {isOwner ? (
+                            <button
+                              className="btn btn-sm btn-outline"
+                              onClick={(e) => { e.stopPropagation(); navigate('/profile'); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              <Pencil size={13} />
+                              <span>Chỉnh sửa game</span>
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={(e) => { e.stopPropagation(); setSelectedGame(game); onHirePlayer({ ...player, pricePerHour: game.price, primaryGame: game.name }); }}
+                            >
+                              Thuê Game Này
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -496,6 +713,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   {player.album.map((item, idx) => {
                     const imgUrl = typeof item === 'string' ? item : item.url;
                     const gameName = item.gameName || player.primaryGame || 'Gaming';
+                    const likeCount = item.likeCount || 0;
                     return (
                       <div
                         key={idx}
@@ -510,7 +728,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                           boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
                           transition: 'all 0.25s ease'
                         }}
-                        onClick={() => setPreviewImage(imgUrl)}
+                        onClick={() => setPreviewIndex(idx)}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'translateY(-4px)';
                           e.currentTarget.style.borderColor = 'var(--primary)';
@@ -543,19 +761,46 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                         }}>
                           🎮 {gameName}
                         </div>
-                        {/* Hover zoom pill */}
+
+                        {/* Bottom overlay with Like count and Phóng to */}
                         <div style={{
                           position: 'absolute',
-                          bottom: '10px',
-                          right: '10px',
-                          background: 'rgba(99, 102, 241, 0.85)',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.72rem',
-                          color: '#fff',
-                          fontWeight: 700
+                          bottom: '0',
+                          left: '0',
+                          right: '0',
+                          padding: '10px',
+                          background: 'linear-gradient(transparent, rgba(0, 0, 0, 0.85))',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '6px'
                         }}>
-                          Phóng to
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'rgba(0, 0, 0, 0.65)',
+                            backdropFilter: 'blur(4px)',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            color: item.isLiked ? '#ef4444' : '#fff',
+                            fontWeight: 700
+                          }}>
+                            <Heart size={13} fill={item.isLiked ? '#ef4444' : 'none'} color="#ef4444" />
+                            <span>{likeCount}</span>
+                          </div>
+
+                          <div style={{
+                            background: 'rgba(99, 102, 241, 0.85)',
+                            padding: '4px 9px',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
+                            color: '#fff',
+                            fontWeight: 700
+                          }}>
+                            Phóng to
+                          </div>
                         </div>
                       </div>
                     );
@@ -683,67 +928,329 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button
-                className="btn btn-primary btn-lg"
-                style={{ width: '100%' }}
-                onClick={() => onHirePlayer(selectedGame ? { ...player, pricePerHour: selectedGame.price, primaryGame: selectedGame.name } : player)}
-              >
-                <Gamepad2 size={20} />
-                <span>Thuê Ngay Bây Giờ</span>
-              </button>
+            {/* Booking Actions: If viewing own profile, show notice and manage button, otherwise show Hire & Chat */}
+            {isOwner ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  textAlign: 'center',
+                  fontSize: '0.85rem',
+                  color: '#a5b4fc',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}>
+                  <UserCheck size={18} />
+                  <span>Bạn đang xem hồ sơ Idol của chính mình</span>
+                </div>
+                <button
+                  className="btn btn-primary btn-lg"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  onClick={() => navigate('/profile')}
+                >
+                  <Pencil size={18} />
+                  <span>Quản Lý & Chỉnh Sửa Hồ Sơ</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  className="btn btn-primary btn-lg"
+                  style={{ width: '100%' }}
+                  onClick={() => onHirePlayer(selectedGame ? { ...player, pricePerHour: selectedGame.price, primaryGame: selectedGame.name } : player)}
+                >
+                  <Gamepad2 size={20} />
+                  <span>Thuê Ngay Bây Giờ</span>
+                </button>
 
-              <button
-                className="btn btn-secondary"
-                style={{ width: '100%' }}
-                onClick={() => {
-                  const targetPartnerId = player.userId || player.id;
-                  const query = new URLSearchParams({
-                    partnerId: targetPartnerId,
-                    player: player.id,
-                    name: player.fullName || player.name || player.username || 'Idol PlayZone',
-                    username: player.username || '',
-                    avatar: player.avatar || '',
-                    role: player.primaryGame || 'Idol Duo',
-                    isPlayer: 'true'
-                  });
-                  navigate(`/chat?${query.toString()}`);
-                }}
-              >
-                <MessageSquare size={18} />
-                <span>Trò Chuyện Trước Khi Thuê</span>
-              </button>
-            </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: '100%' }}
+                  onClick={() => {
+                    const targetPartnerId = player.userId || player.id;
+                    const query = new URLSearchParams({
+                      partnerId: targetPartnerId,
+                      player: player.id,
+                      name: player.fullName || player.name || player.username || 'Idol PlayZone',
+                      username: player.username || '',
+                      avatar: player.avatar || '',
+                      role: player.primaryGame || 'Idol Duo',
+                      isPlayer: 'true'
+                    });
+                    navigate(`/chat?${query.toString()}`);
+                  }}
+                >
+                  <MessageSquare size={18} />
+                  <span>Trò Chuyện Trước Khi Thuê</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Lightbox image preview modal */}
-      {previewImage && (
-        <div className="modal-overlay" onClick={() => setPreviewImage(null)} style={{ backdropFilter: 'blur(8px)', zIndex: 99999 }}>
+      {/* Lightbox image preview modal with caption and likes */}
+      {previewItem && (
+        <div
+          className="modal-overlay"
+          onClick={() => setPreviewIndex(null)}
+          style={{
+            backdropFilter: 'blur(12px)',
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          {/* Close button */}
           <button
-            onClick={() => setPreviewImage(null)}
+            onClick={() => setPreviewIndex(null)}
             style={{
-              position: 'absolute',
+              position: 'fixed',
               top: '20px',
-              right: '20px',
+              right: '24px',
               background: 'rgba(255, 255, 255, 0.15)',
               border: 'none',
               color: '#fff',
-              width: '40px',
-              height: '40px',
+              width: '42px',
+              height: '42px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              zIndex: 100000
+              zIndex: 100001,
+              transition: 'all 0.2s ease'
             }}
+            title="Đóng (Esc)"
           >
-            ✕
+            <X size={22} />
           </button>
-          <div style={{ maxWidth: '90vw', maxHeight: '90vh', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-            <img src={previewImage} alt="Preview" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }} />
+
+          {/* Navigation buttons */}
+          {player?.album?.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPreviewIndex((previewIndex - 1 + player.album.length) % player.album.length);
+                }}
+                style={{
+                  position: 'fixed',
+                  left: '20px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#fff',
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  zIndex: 100001,
+                  backdropFilter: 'blur(8px)',
+                  transition: 'all 0.2s'
+                }}
+                title="Ảnh trước (←)"
+              >
+                <ChevronLeft size={24} />
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPreviewIndex((previewIndex + 1) % player.album.length);
+                }}
+                style={{
+                  position: 'fixed',
+                  right: '20px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#fff',
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  zIndex: 100001,
+                  backdropFilter: 'blur(8px)',
+                  transition: 'all 0.2s'
+                }}
+                title="Ảnh tiếp theo (→)"
+              >
+                <ChevronRight size={24} />
+              </button>
+            </>
+          )}
+
+          {/* Modal Card */}
+          <div
+            className="player-photo-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Left: Image */}
+            <div className="player-photo-modal-img-wrap">
+              <img
+                src={previewItem.url}
+                alt="Highlight preview"
+                className="player-photo-modal-img"
+              />
+            </div>
+
+            {/* Right: Caption, Details & Likes */}
+            <div className="player-photo-modal-side">
+              <div>
+                {/* Author Info & Game */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img
+                      src={previewItem.author?.avatar || player.avatar}
+                      alt="Avatar"
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '50%',
+                        border: '2px solid var(--primary)',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>{previewItem.author?.name || player.fullName || player.name}</span>
+                        <Crown size={14} color="#f59e0b" fill="#f59e0b" />
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                        {previewItem.createdAt || 'Khoảnh khắc gaming'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.15)',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      color: '#a5b4fc',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    🎮 {previewItem.gameName || 'Gaming'}
+                  </span>
+                </div>
+
+                <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '14px 0' }} />
+
+                {/* Content / Caption (Nội dung ảnh) */}
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '8px' }}>
+                    Nội dung ảnh / Khoảnh khắc
+                  </div>
+                  {previewItem.caption ? (
+                    <div
+                      style={{
+                        fontSize: '0.96rem',
+                        color: '#f8fafc',
+                        lineHeight: 1.6,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        padding: '14px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255, 255, 255, 0.06)'
+                      }}
+                    >
+                      {previewItem.caption}
+                    </div>
+                  ) : (
+                    <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.88rem', padding: '10px 0' }}>
+                      (Không có nội dung mô tả cho ảnh này)
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom: Likes & Actions */}
+              <div>
+                <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '14px 0' }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  {/* Like Button with like count */}
+                  <button
+                    onClick={() => handleToggleLikePhoto(previewItem)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: previewItem.isLiked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                      border: previewItem.isLiked ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
+                      color: previewItem.isLiked ? '#ef4444' : '#fff',
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '0.92rem',
+                      transition: 'all 0.2s ease',
+                      flex: 1,
+                      justifyContent: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    <Heart
+                      size={20}
+                      fill={previewItem.isLiked ? '#ef4444' : 'none'}
+                      color={previewItem.isLiked ? '#ef4444' : '#fff'}
+                    />
+                    <span>{previewItem.likeCount || 0} lượt thích</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(previewItem.url);
+                      addToast('Đã sao chép liên kết ảnh!', 'success');
+                    }}
+                    className="btn btn-outline"
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      color: 'var(--text-secondary)'
+                    }}
+                    title="Sao chép liên kết ảnh"
+                  >
+                    <Share2 size={18} />
+                  </button>
+                </div>
+
+                {/* Likers Hint */}
+                {Array.isArray(previewItem.likedByUsers) && previewItem.likedByUsers.length > 0 && (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Heart size={12} color="#ef4444" fill="#ef4444" />
+                    <span>Được thích bởi <strong>{previewItem.likedByUsers.slice(0, 2).join(', ')}</strong> {previewItem.likedByUsers.length > 2 ? `và ${previewItem.likedByUsers.length - 2} người khác` : ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -16,7 +16,8 @@ import {
   TrendingUp,
   Compass,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import api from '../api/apiService';
 import CreateMomentModal from '../components/modals/CreateMomentModal';
@@ -36,6 +37,7 @@ export const MomentsPage = () => {
   // Filters & Tabs
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL', 'MY_POSTS', 'TOP'
   const [selectedGameFilter, setSelectedGameFilter] = useState('ALL');
+  const [gameSearchQuery, setGameSearchQuery] = useState('');
 
   // Modal to view users who liked a moment
   const [viewingLikersMoment, setViewingLikersMoment] = useState(null);
@@ -99,8 +101,30 @@ export const MomentsPage = () => {
     });
   }, [moments, user, isPlayer]);
 
+  // Game alias map for flexible search (e.g. LOL/LMHT <-> League of Legends / Liên Minh)
+  const GAME_ALIASES = useMemo(() => ({
+    'lol': ['league of legends', 'liên minh', 'lmht'],
+    'lmht': ['league of legends', 'liên minh', 'lol'],
+    'lien minh': ['league of legends', 'liên minh', 'lol', 'lmht'],
+    'tft': ['đấu trường chân lý', 'dtcl', 'tft'],
+    'dtcl': ['đấu trường chân lý', 'dtcl', 'tft'],
+    'lq': ['liên quân', 'lien quan', 'aov'],
+    'lien quan': ['liên quân', 'lien quan', 'aov'],
+    'cs': ['counter-strike', 'cs2', 'csgo'],
+    'cs2': ['counter-strike', 'cs2', 'csgo'],
+    'ff': ['free fire'],
+    'wr': ['wild rift', 'tốc chiến'],
+    'toc chien': ['wild rift', 'tốc chiến'],
+    'fo4': ['fifa online 4', 'fc online', 'fifa'],
+    'fifa': ['fifa online 4', 'fc online', 'fifa'],
+    'genshin': ['genshin impact'],
+    'hsr': ['honkai: star rail', 'honkai star rail']
+  }), []);
+
   // Filter moments
   const filteredMoments = useMemo(() => {
+    const q = gameSearchQuery.trim().toLowerCase();
+
     return moments.filter(m => {
       // 1. Tab filter
       if (activeTab === 'MY_POSTS') {
@@ -113,10 +137,39 @@ export const MomentsPage = () => {
         if (!isMyPost) return false;
       }
 
-      // 2. Game filter
+      const mGame = (m.gameName || '').toLowerCase();
+
+      // 2. Selected Pill filter
       if (selectedGameFilter !== 'ALL') {
-        const matchGame = (m.gameName || '').toLowerCase().includes(selectedGameFilter.toLowerCase());
-        if (!matchGame) return false;
+        const sel = selectedGameFilter.toLowerCase();
+        let matchPill = mGame.includes(sel);
+        if (!matchPill) {
+          for (const [alias, targets] of Object.entries(GAME_ALIASES)) {
+            if (sel.includes(alias) || alias.includes(sel)) {
+              if (targets.some(t => mGame.includes(t))) {
+                matchPill = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!matchPill) return false;
+      }
+
+      // 3. Search query filter
+      if (q) {
+        let matchQuery = mGame.includes(q);
+        if (!matchQuery) {
+          for (const [alias, targets] of Object.entries(GAME_ALIASES)) {
+            if (q.includes(alias) || alias.includes(q)) {
+              if (targets.some(t => mGame.includes(t))) {
+                matchQuery = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!matchQuery) return false;
       }
 
       return true;
@@ -126,7 +179,24 @@ export const MomentsPage = () => {
       }
       return 0; // already sorted newest first
     });
-  }, [moments, activeTab, selectedGameFilter, user]);
+  }, [moments, activeTab, selectedGameFilter, gameSearchQuery, user, GAME_ALIASES]);
+
+  // Visible game pills filtered by search query
+  const visibleGameTopics = useMemo(() => {
+    if (!gameSearchQuery.trim()) return GAME_TOPICS_20;
+    const q = gameSearchQuery.trim().toLowerCase();
+    return GAME_TOPICS_20.filter(game => {
+      const gName = game.name.toLowerCase();
+      if (gName.includes(q)) return true;
+      if (game.category?.toLowerCase().includes(q)) return true;
+      for (const [alias, targets] of Object.entries(GAME_ALIASES)) {
+        if (q.includes(alias) || alias.includes(q)) {
+          if (targets.some(t => gName.includes(t))) return true;
+        }
+      }
+      return false;
+    });
+  }, [gameSearchQuery, GAME_ALIASES]);
 
   const handleToggleLike = async (id) => {
     if (!isAuthenticated) {
@@ -198,6 +268,7 @@ export const MomentsPage = () => {
       setMoments(prev => [newMoment, ...prev.filter(m => m.id !== newMoment.id)]);
       setActiveTab('ALL');
       setSelectedGameFilter('ALL');
+      setGameSearchQuery('');
     }
   };
 
@@ -378,45 +449,96 @@ export const MomentsPage = () => {
               </button>
             </div>
 
-            {/* Clear game filter if active */}
-            {selectedGameFilter !== 'ALL' && (
-              <button
-                onClick={() => setSelectedGameFilter('ALL')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary)',
-                  fontSize: '0.78rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <X size={13} />
-                <span>Bỏ lọc game</span>
-              </button>
-            )}
+            {/* Game Search Bar & Clear Filter button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+              <div className="moment-game-search-box">
+                <Search size={15} className="moment-search-icon" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo game (VD: LOL, VALORANT...)"
+                  value={gameSearchQuery}
+                  onChange={(e) => {
+                    setGameSearchQuery(e.target.value);
+                    if (selectedGameFilter !== 'ALL') setSelectedGameFilter('ALL');
+                  }}
+                  className="moment-game-search-input"
+                />
+                {gameSearchQuery && (
+                  <button
+                    type="button"
+                    className="moment-search-clear-btn"
+                    onClick={() => setGameSearchQuery('')}
+                    title="Xóa tìm kiếm"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Clear game filter if active */}
+              {(selectedGameFilter !== 'ALL' || gameSearchQuery) && (
+                <button
+                  onClick={() => {
+                    setSelectedGameFilter('ALL');
+                    setGameSearchQuery('');
+                  }}
+                  style={{
+                    background: 'rgba(99, 102, 241, 0.12)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    color: '#a5b4fc',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '12px',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Xóa bộ lọc game"
+                >
+                  <X size={13} />
+                  <span>Bỏ lọc{selectedGameFilter !== 'ALL' ? `: ${selectedGameFilter}` : ''}</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Game Topics Horizontal Scroll Bar (20 games) */}
           <div className="moment-game-scroll">
             <button
-              className={`moment-game-pill ${selectedGameFilter === 'ALL' ? 'active' : ''}`}
-              onClick={() => setSelectedGameFilter('ALL')}
+              className={`moment-game-pill ${selectedGameFilter === 'ALL' && !gameSearchQuery ? 'active' : ''}`}
+              onClick={() => {
+                setSelectedGameFilter('ALL');
+                setGameSearchQuery('');
+              }}
             >
               🎮 Tất Cả Game
             </button>
-            {GAME_TOPICS_20.map((game) => (
+            {visibleGameTopics.map((game) => (
               <button
                 key={game.id}
                 className={`moment-game-pill ${selectedGameFilter === game.name ? 'active' : ''}`}
-                onClick={() => setSelectedGameFilter(game.name)}
+                onClick={() => {
+                  if (selectedGameFilter === game.name) {
+                    setSelectedGameFilter('ALL');
+                  } else {
+                    setSelectedGameFilter(game.name);
+                    setGameSearchQuery('');
+                  }
+                }}
               >
                 <span>{game.icon}</span>
                 <span>{game.name}</span>
               </button>
             ))}
+            {visibleGameTopics.length === 0 && gameSearchQuery && (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '5px 12px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>Đang lọc bài viết theo game: <strong>"{gameSearchQuery}"</strong></span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -456,14 +578,16 @@ export const MomentsPage = () => {
             <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', color: '#fff', fontWeight: 700 }}>
               {activeTab === 'MY_POSTS'
                 ? 'Bạn Chưa Đăng Khoảnh Khắc Nào'
-                : selectedGameFilter !== 'ALL'
-                ? `Chưa Có Khoảnh Khắc Cho Game ${selectedGameFilter}`
+                : (gameSearchQuery || selectedGameFilter !== 'ALL')
+                ? `Không Tìm Thấy Khoảnh Khắc Cho Game "${gameSearchQuery || selectedGameFilter}"`
                 : 'Chưa Có Khoảnh Khắc Nào'}
             </h3>
 
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px', maxWidth: '440px', margin: '0 auto 20px auto' }}>
               {activeTab === 'MY_POSTS'
                 ? 'Hãy chia sẻ chiến tích leo rank hoặc hình ảnh highlight của bạn để người hâm mộ cùng chiêm ngưỡng!'
+                : (gameSearchQuery || selectedGameFilter !== 'ALL')
+                ? 'Không có bài viết nào phù hợp với tựa game bạn tìm kiếm. Hãy thử từ khóa khác hoặc xóa bộ lọc!'
                 : 'Hãy đón chờ những khoảnh khắc tiếp theo từ các Idol PlayZone nhé!'}
             </p>
 
@@ -476,13 +600,16 @@ export const MomentsPage = () => {
                 <PlusCircle size={16} />
                 <span>Đăng Bài Đầu Tiên</span>
               </button>
-            ) : selectedGameFilter !== 'ALL' ? (
+            ) : (selectedGameFilter !== 'ALL' || gameSearchQuery) ? (
               <button
                 className="btn btn-secondary"
-                onClick={() => setSelectedGameFilter('ALL')}
+                onClick={() => {
+                  setSelectedGameFilter('ALL');
+                  setGameSearchQuery('');
+                }}
                 style={{ padding: '8px 20px', borderRadius: '10px' }}
               >
-                Xem Tất Cả Game
+                Xóa Bộ Lọc Game
               </button>
             ) : null}
           </div>

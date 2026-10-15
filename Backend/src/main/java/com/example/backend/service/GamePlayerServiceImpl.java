@@ -115,6 +115,9 @@ public class GamePlayerServiceImpl {
         }
 
         GamePlayer gamePlayer = findById(id);
+        if (gamePlayer.getUser() != null && user != null && gamePlayer.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Bạn không thể tự thuê chính mình");
+        }
         if (!"AVAILABLE".equals(gamePlayer.getStatus())) {
             throw new RuntimeException("Game player is not available for hire");
         }

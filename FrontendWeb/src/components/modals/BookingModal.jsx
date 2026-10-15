@@ -60,6 +60,23 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
       return;
     }
 
+    const isOwner = Boolean(
+      user?.id != null &&
+      player &&
+      (
+        player.userId != null
+          ? String(player.userId) === String(user.id)
+          : (player.user?.id != null
+              ? String(player.user.id) === String(user.id)
+              : String(player.id) === String(user.id))
+      )
+    );
+    if (isOwner) {
+      addToast('Bạn không thể tự thuê chính mình!', 'warning');
+      onClose();
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const now = new Date();

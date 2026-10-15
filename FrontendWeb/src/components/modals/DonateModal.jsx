@@ -222,6 +222,23 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
       return;
     }
 
+    const isOwner = Boolean(
+      user?.id != null &&
+      player &&
+      (
+        player.userId != null
+          ? String(player.userId) === String(user.id)
+          : (player.user?.id != null
+              ? String(player.user.id) === String(user.id)
+              : String(player.id) === String(user.id))
+      )
+    );
+    if (isOwner) {
+      addToast('Bạn không thể tự tặng quà cho chính mình!', 'warning');
+      onClose();
+      return;
+    }
+
     if (!isBalanceEnough) {
       addToast('Số dư ví không đủ để tặng món quà này, vui lòng nạp thêm!', 'error');
       if (onOpenDeposit) onOpenDeposit();

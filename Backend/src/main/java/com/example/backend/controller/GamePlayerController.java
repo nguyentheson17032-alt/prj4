@@ -330,6 +330,12 @@ public class GamePlayerController {
             // Check if player is available
             GamePlayer gamePlayer = gamePlayerService.findById(id);
 
+            // Check if user is attempting to hire themselves
+            if (gamePlayer.getUser() != null && gamePlayer.getUser().getId().equals(request.getUserId())) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Bạn không thể tự thuê chính mình", null));
+            }
+
             // Check if player is already hired in the requested time period
             List<Payment> activeHires = paymentRepository.findByPlayerIdAndStatusAndEndTimeAfter(
                 gamePlayer.getUser().getId(), Payment.PaymentStatus.PENDING, LocalDateTime.now());
