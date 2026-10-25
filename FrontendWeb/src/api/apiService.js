@@ -1231,6 +1231,113 @@ export const api = {
     } catch (err) {
       return 0;
     }
+  },
+
+  // Notification APIs
+  async getNotifications() {
+    try {
+      const res = await client.get('/api/notifications/user');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch (err) {
+      console.warn('getNotifications error:', err.message);
+      return [];
+    }
+  },
+
+  async getUnreadNotifications() {
+    try {
+      const res = await client.get('/api/notifications/unread');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch (err) {
+      console.warn('getUnreadNotifications error:', err.message);
+      return [];
+    }
+  },
+
+  async getUnreadNotificationCount() {
+    try {
+      const res = await client.get('/api/notifications/unread/count');
+      if (res.data && res.data.count !== undefined) {
+        return Number(res.data.count) || 0;
+      }
+    } catch (_) {}
+    // Robust fallback: fetch /api/notifications/unread and count length
+    try {
+      const res2 = await client.get('/api/notifications/unread');
+      return Array.isArray(res2.data) ? res2.data.length : 0;
+    } catch (_) {
+      return 0;
+    }
+  },
+
+  async markNotificationAsRead(id) {
+    if (!id) return false;
+    try {
+      await client.put(`/api/notifications/${id}/read`);
+      return true;
+    } catch (err) {
+      console.warn(`markNotificationAsRead(${id}) error:`, err.message);
+      return false;
+    }
+  },
+
+  async markAllNotificationsAsRead(unreadIds = []) {
+    let success = false;
+    try {
+      const res = await client.put('/api/notifications/read-all');
+      if (res.status === 200) success = true;
+    } catch (_) {
+      try {
+        const resPost = await client.post('/api/notifications/read-all');
+        if (resPost.status === 200) success = true;
+      } catch (_) {}
+    }
+
+    // Fail-safe: fallback to individual mark as read
+    if (!success && Array.isArray(unreadIds) && unreadIds.length > 0) {
+      try {
+        await Promise.all(
+          unreadIds.map((id) => client.put(`/api/notifications/${id}/read`).catch(() => {}))
+        );
+        success = true;
+      } catch (_) {}
+    }
+    return success;
+  },
+
+  async deleteNotification(id) {
+    if (!id) return false;
+    try {
+      await client.delete(`/api/notifications/${id}`);
+      return true;
+    } catch (err) {
+      console.warn(`deleteNotification(${id}) error:`, err.message);
+      return false;
+    }
+  },
+
+  async deleteAllReadNotifications(readIds = []) {
+    let success = false;
+    try {
+      const res = await client.delete('/api/notifications/clear-read');
+      if (res.status === 200) success = true;
+    } catch (_) {
+      try {
+        const resPost = await client.post('/api/notifications/clear-read');
+        if (resPost.status === 200) success = true;
+      } catch (_) {}
+    }
+
+    // Fail-safe: If bulk delete endpoints are not yet loaded, delete individually by id
+    if (!success && Array.isArray(readIds) && readIds.length > 0) {
+      try {
+        await Promise.all(
+          readIds.map((id) => client.delete(`/api/notifications/${id}`).catch(() => {}))
+        );
+        success = true;
+      } catch (_) {}
+    }
+    return success;
   }
 };
 

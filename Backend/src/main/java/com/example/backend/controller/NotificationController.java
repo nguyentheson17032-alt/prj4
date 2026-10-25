@@ -65,6 +65,16 @@ public class NotificationController {
         }
     }
 
+    @Operation(summary = "Delete all read notifications")
+    @RequestMapping(value = {"/clear-read", "/read", "/read-all"}, method = {RequestMethod.DELETE, RequestMethod.POST})
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> deleteAllReadNotifications(Authentication authentication) {
+        String username = authentication.getName();
+        User user = userService.findByUsername(username);
+        notificationService.deleteAllReadNotifications(user.getId());
+        return ResponseEntity.ok(java.util.Map.of("message", "Đã xóa tất cả thông báo đã đọc"));
+    }
+
     @Operation(summary = "Delete a notification")
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
@@ -116,6 +126,26 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.getRecentNotifications(user.getId()));
     }
 
+    @Operation(summary = "Get unread notifications count")
+    @GetMapping("/unread/count")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<java.util.Map<String, Object>> getUnreadNotificationCount(Authentication authentication) {
+        String username = authentication.getName();
+        User user = userService.findByUsername(username);
+        long count = notificationService.getUnreadCount(user.getId());
+        return ResponseEntity.ok(java.util.Map.of("count", count));
+    }
+
+    @Operation(summary = "Mark all notifications as read")
+    @RequestMapping(value = "/read-all", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> markAllAsRead(Authentication authentication) {
+        String username = authentication.getName();
+        User user = userService.findByUsername(username);
+        notificationService.markAllAsRead(user.getId());
+        return ResponseEntity.ok(java.util.Map.of("message", "Đã đánh dấu tất cả thông báo là đã đọc"));
+    }
+
     @Operation(summary = "Update device token for push notifications")
     @PostMapping("/device-token")
     @PreAuthorize("isAuthenticated()")
@@ -126,6 +156,22 @@ public class NotificationController {
             String username = authentication.getName();
             User user = userService.findByUsername(username);
             notificationService.updateDeviceToken(user.getId(), request.getDeviceToken());
+            return ResponseEntity.ok().build();
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @Operation(summary = "Remove device token for push notifications")
+    @DeleteMapping("/device-token")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> removeDeviceToken(Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            User user = userService.findByUsername(username);
+            notificationService.removeDeviceToken(user.getId());
             return ResponseEntity.ok().build();
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();

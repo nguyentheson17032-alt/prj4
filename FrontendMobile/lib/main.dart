@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
-import 'settings_screen.dart';
-import 'message_list_screen.dart';
-import 'hired_players_screen.dart' as hired_players;
-import 'hired_players_screen.dart' show NotificationScreen;
+import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/message_list_screen.dart';
+import 'screens/hired_players_screen.dart' as hired_players;
+import 'screens/hired_players_screen.dart' show NotificationScreen;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'explore_screen.dart';
+import 'screens/explore_screen.dart';
 import 'utils/firebase_helper.dart';
 import 'utils/notification_helper.dart';
 import 'utils/message_helper.dart';
@@ -97,7 +97,11 @@ class PlayerDuoApp extends StatelessWidget {
   }
 }
 
+bool _isFCMSetup = false;
+
 void setupFCM() async {
+  if (_isFCMSetup) return;
+  _isFCMSetup = true;
   try {
     // Sử dụng FirebaseHelper để thiết lập FCM an toàn
     bool success = await FirebaseHelper.setupFCM();

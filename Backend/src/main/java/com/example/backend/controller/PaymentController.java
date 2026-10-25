@@ -204,7 +204,7 @@ public class PaymentController {
     }
 
     @PostMapping("/topup")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public ResponseEntity<?> topUp(@Valid @RequestBody TopUpRequest request, Authentication authentication) {
         try {
@@ -727,6 +727,15 @@ public class PaymentController {
             return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
         }
         if ("00".equals(responseCode)) {
+            // Chống Replay Attack: Nếu giao dịch đã hoàn tất trước đó thì không cộng xu trùng lặp
+            if (Payment.PaymentStatus.COMPLETED.equals(payment.getStatus())) {
+                html = "<div style='text-align:center;margin-top:50px;'>"
+                    + "<h1 style='color:green;font-size:2.5em;'>Giao dịch đã được ghi nhận thành công!</h1>"
+                    + "<p style='font-size:1.2em;'>Số xu đã được cộng vào tài khoản của bạn trước đó.</p>"
+                    + "</div>";
+                return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+            }
+
             payment.setStatus(Payment.PaymentStatus.COMPLETED);
             paymentRepository.save(payment);
             // Cộng xu cho user

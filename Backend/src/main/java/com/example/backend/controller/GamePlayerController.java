@@ -129,13 +129,19 @@ public class GamePlayerController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new game player")
     public ResponseEntity<ApiResponse<GamePlayer>> createGamePlayer(
-            @Valid @RequestBody GamePlayerRequest request) {
+            @Valid @RequestBody GamePlayerRequest request,
+            Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        Long targetUserId = (isAdmin && request.getUserId() != null) ? request.getUserId() : currentUser.getId();
+        request.setUserId(targetUserId);
+
         // Kiểm tra user đã đăng ký game này chưa (cho phép đăng ký nhiều game khác nhau)
-        if (gamePlayerService.existsByUserAndGame(request.getUserId(), request.getGameId())) {
+        if (gamePlayerService.existsByUserAndGame(targetUserId, request.getGameId())) {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse<>(false, "Bạn đã đăng ký game này rồi!", null));
         }
-        User user = userService.findById(request.getUserId());
+        User user = userService.findById(targetUserId);
         // Tự động cập nhật thông tin cơ bản nếu còn trống để đăng ký thuận lợi
         if (user.getFullName() == null || user.getFullName().trim().isEmpty()) {
             user.setFullName(request.getUsername());
@@ -198,10 +204,19 @@ public class GamePlayerController {
     @Operation(summary = "Update a game player")
     public ResponseEntity<ApiResponse<GamePlayer>> updateGamePlayer(
             @PathVariable Long id,
-            @Valid @RequestBody GamePlayerRequest request) {
+            @Valid @RequestBody GamePlayerRequest request,
+            Authentication authentication) {
+        GamePlayer existing = gamePlayerService.findById(id);
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        if (!isAdmin && (existing.getUser() == null || !existing.getUser().getId().equals(currentUser.getId()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponse<>(false, "Bạn không có quyền chỉnh sửa hồ sơ Player này!", null));
+        }
+        Long targetUserId = existing.getUser() != null ? existing.getUser().getId() : currentUser.getId();
         GamePlayer gamePlayer = gamePlayerService.updateGamePlayer(
             id,
-            request.getUserId(),
+            targetUserId,
             request.getGameId(),
             request.getUsername(),
             request.getRank(),
@@ -319,7 +334,8 @@ public class GamePlayerController {
     @Operation(summary = "Hire a game player")
     public ResponseEntity<ApiResponse<?>> hireGamePlayer(
             @PathVariable Long id,
-            @Valid @RequestBody HireRequest request) {
+            @Valid @RequestBody HireRequest request,
+            Authentication authentication) {
         try {
             // Validate time
             if (request.getStartTime().isAfter(request.getEndTime())) {
@@ -330,10 +346,38 @@ public class GamePlayerController {
             // Check if player is available
             GamePlayer gamePlayer = gamePlayerService.findById(id);
 
+            // Chống IDOR: User thuê luôn là user đang đăng nhập qua token
+            User user = userService.findByUsername(authentication.getName());
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse<>(false, "Vui lòng đăng nhập để thuê player", null));
+            }
+
             // Check if user is attempting to hire themselves
-            if (gamePlayer.getUser() != null && gamePlayer.getUser().getId().equals(request.getUserId())) {
+            if (gamePlayer.getUser() != null && gamePlayer.getUser().getId().equals(user.getId())) {
                 return ResponseEntity.badRequest()
                     .body(new ApiResponse<>(false, "Bạn không thể tự thuê chính mình", null));
+            }
+
+            // Calculate hours from start and end time
+            long hours = java.time.Duration.between(request.getStartTime(), request.getEndTime()).toHours();
+            if (hours < 1) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Thời gian thuê phải ít nhất 1 giờ", null));
+            }
+
+            // Chống Client-side Price Tampering: Server tự tính toán số coin dựa vào pricePerHour * hours
+            long pricePerHour = gamePlayer.getPricePerHour() != null ? gamePlayer.getPricePerHour().longValue() : 0L;
+            long originalCoin = pricePerHour * hours;
+            if (originalCoin <= 0) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Giá thuê player không hợp lệ", null));
+            }
+
+            // Check user's coin balance
+            if (user.getCoin() == null || user.getCoin() < originalCoin) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Số coin trong ví không đủ. Cần " + originalCoin + " xu để thuê.", null));
             }
 
             // Check if player is already hired in the requested time period
@@ -348,22 +392,7 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Player đang được thuê trong khoảng thời gian này", null));
             }
 
-            // Check user's coin balance
-            User user = userService.findById(request.getUserId());
-            if (user.getCoin() < request.getCoin()) {
-                return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Số coin không đủ", null));
-            }
-
-            // Calculate hours from start and end time
-            long hours = java.time.Duration.between(request.getStartTime(), request.getEndTime()).toHours();
-            if (hours < 1) {
-                return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Thời gian thuê phải ít nhất 1 giờ", null));
-            }
-
             // Trừ coin ngay khi tạo đơn thuê
-            long originalCoin = request.getCoin();
             long platformFee = Math.round(originalCoin * 0.15); // 15% chiết khấu nền tảng
             long playerReceivedTotal = originalCoin - platformFee; // 85% Idol thực nhận
 
@@ -980,6 +1009,13 @@ public class GamePlayerController {
 
             User currentUser = userService.findByUsername(authentication.getName());
             boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+            boolean isRenter = order.getRenter() != null && currentUser.getId().equals(order.getRenter().getId());
+            boolean isPlayer = gamePlayer != null && gamePlayer.getUser() != null && currentUser.getId().equals(gamePlayer.getUser().getId());
+
+            if (!isAdmin && !isRenter && !isPlayer) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse<>(false, "Bạn không có quyền hoàn thành đơn này", null));
+            }
 
             // Chỉ cho phép hoàn thành khi trạng thái là CONFIRMED
             if (!"CONFIRMED".equals(order.getStatus())) {

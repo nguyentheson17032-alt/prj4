@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../api_service.dart';
+import '../services/api_service.dart';
 
 class MessageHelper {
   static int _unreadCount = 0;

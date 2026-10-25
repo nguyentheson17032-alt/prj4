@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
-import '../api_service.dart';
+import '../services/api_service.dart';
 
 class NotificationHelper {
   // Stream controller for unread count
@@ -17,7 +17,7 @@ class NotificationHelper {
     try {
       print('🔄 NotificationHelper: Đang tải số thông báo chưa đọc...');
       final notifications = await ApiService.getUserNotifications();
-      final unreadCount = notifications.where((n) => n['read'] == false).length;
+      final unreadCount = notifications.where((n) => n['read'] == false || n['isRead'] == false).length;
       
       _unreadCount = unreadCount;
       _unreadCountController.add(_unreadCount);

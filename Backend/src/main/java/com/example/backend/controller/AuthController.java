@@ -347,7 +347,11 @@ public class AuthController {
     public ResponseEntity<?> logout(Authentication authentication) {
         if (authentication == null) return ResponseEntity.ok().build();
         User user = userService.findByUsername(authentication.getName());
-        userService.setUserOffline(user.getId());
+        if (user != null) {
+            userService.setUserOffline(user.getId());
+            user.setDeviceToken(null);
+            userRepository.save(user);
+        }
         return ResponseEntity.ok().build();
     }
 

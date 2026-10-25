@@ -22,8 +22,26 @@ public class Notification {
     @Column(nullable = false)
     private String message;
 
-    @Column(nullable = false)
+    @Column(name = "is_read", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonProperty("isRead")
     private boolean isRead = false;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("read")
+    public boolean getRead() {
+        return this.isRead;
+    }
+
+    public boolean getIsRead() {
+        return this.isRead;
+    }
+
+    public void setIsRead(boolean isRead) {
+        this.isRead = isRead;
+    }
+
+    public void setRead(boolean isRead) {
+        this.isRead = isRead;
+    }
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

@@ -60,9 +60,31 @@ public class OrderController {
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<Map<String, Object>> getOrderDetails(@PathVariable Long orderId) {
-        Payment payment = paymentRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getOrderDetails(@PathVariable Long orderId, Authentication authentication) {
+        Order order = orderRepository.findById(orderId).orElse(null);
+        Payment payment = null;
+        if (order != null && order.getPayment() != null) {
+            payment = order.getPayment();
+        } else {
+            payment = paymentRepository.findById(orderId).orElse(null);
+        }
+        if (payment == null && order == null) {
+            throw new ResourceNotFoundException("Order not found");
+        }
+
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        Long renterId = order != null && order.getRenter() != null ? order.getRenter().getId() : (payment != null && payment.getUser() != null ? payment.getUser().getId() : null);
+        Long playerId = order != null && order.getPlayer() != null && order.getPlayer().getUser() != null ? order.getPlayer().getUser().getId() : (payment != null && payment.getPlayer() != null ? payment.getPlayer().getId() : null);
+
+        if (!isAdmin && (renterId == null || !renterId.equals(currentUser.getId())) && (playerId == null || !playerId.equals(currentUser.getId()))) {
+            return ResponseEntity.status(403).body("Bạn không có quyền xem chi tiết đơn hàng này");
+        }
+
+        if (payment == null) {
+            return getOrderDetailNew(orderId, authentication);
+        }
 
         Map<String, Object> data = new HashMap<>();
         data.put("id", payment.getId());
@@ -105,9 +127,19 @@ public class OrderController {
     // API MỚI: Lấy chi tiết đơn thuê dùng entity Order nhưng trả về dữ liệu y hệt
     // API cũ
     @GetMapping("/detail/{orderId}")
-    public ResponseEntity<Map<String, Object>> getOrderDetailNew(@PathVariable Long orderId) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getOrderDetailNew(@PathVariable Long orderId, Authentication authentication) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        boolean isRenter = order.getRenter() != null && currentUser.getId().equals(order.getRenter().getId());
+        boolean isPlayer = order.getPlayer() != null && order.getPlayer().getUser() != null && currentUser.getId().equals(order.getPlayer().getUser().getId());
+
+        if (!isAdmin && !isRenter && !isPlayer) {
+            return ResponseEntity.status(403).body("Bạn không có quyền xem chi tiết đơn hàng này");
+        }
 
         Map<String, Object> data = new HashMap<>();
         data.put("id", order.getId());
@@ -218,21 +250,42 @@ public class OrderController {
 
     @GetMapping("/user/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<OrderResponseDTO>> getOrdersByUser(@PathVariable Long userId) {
+    public ResponseEntity<?> getOrdersByUser(@PathVariable Long userId, Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        if (!isAdmin && !currentUser.getId().equals(userId)) {
+            return ResponseEntity.status(403).body("Bạn không có quyền xem đơn hàng của người dùng khác");
+        }
         List<Order> orders = orderRepository.findByRenter_Id(userId);
         return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
     @GetMapping("/player/{playerId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<OrderResponseDTO>> getOrdersByPlayer(@PathVariable Long playerId) {
+    public ResponseEntity<?> getOrdersByPlayer(@PathVariable Long playerId, Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        if (!isAdmin) {
+            List<Order> sampleOrders = orderRepository.findByPlayer_Id(playerId);
+            if (!sampleOrders.isEmpty()) {
+                Order first = sampleOrders.get(0);
+                if (first.getPlayer() != null && first.getPlayer().getUser() != null && !currentUser.getId().equals(first.getPlayer().getUser().getId())) {
+                    return ResponseEntity.status(403).body("Bạn không có quyền xem đơn hàng của Player khác");
+                }
+            }
+        }
         List<Order> orders = orderRepository.findByPlayer_Id(playerId);
         return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
     @GetMapping("/user-all/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<UserOrderDTO>> getAllUserOrders(@PathVariable Long userId) {
+    public ResponseEntity<?> getAllUserOrders(@PathVariable Long userId, Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        if (!isAdmin && !currentUser.getId().equals(userId)) {
+            return ResponseEntity.status(403).body("Bạn không có quyền xem đơn hàng của người dùng khác");
+        }
         List<Order> allOrders = orderRepository.findAllByUserId(userId);
 
         List<Order> hiredOrders = allOrders.stream()

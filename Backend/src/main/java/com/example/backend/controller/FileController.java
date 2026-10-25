@@ -25,6 +25,9 @@ public class FileController {
      */
     @GetMapping("/videos/{filename:.+}")
     public ResponseEntity<StreamingResponseBody> serveVideo(@PathVariable String filename) {
+        if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
         try {
             Resource resource = fileStorageService.loadFileAsResource("report-videos/" + filename);
             
@@ -64,6 +67,9 @@ public class FileController {
      */
     @GetMapping("/images/{filename:.+}")
     public ResponseEntity<Resource> serveImage(@PathVariable String filename) {
+        if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
         try {
             Resource resource = fileStorageService.loadFileAsResource("player-images/" + filename);
             
@@ -91,6 +97,10 @@ public class FileController {
     public ResponseEntity<Resource> serveFile(
             @PathVariable String folder,
             @PathVariable String filename) {
+        if (folder == null || filename == null || folder.contains("..") || filename.contains("..") ||
+            folder.contains("/") || folder.contains("\\") || filename.contains("/") || filename.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
         try {
             Resource resource = fileStorageService.loadFileAsResource(folder + "/" + filename);
             

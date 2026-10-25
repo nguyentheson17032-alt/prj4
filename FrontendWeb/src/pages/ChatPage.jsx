@@ -81,13 +81,19 @@ export const ChatPage = ({ onHirePlayer }) => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const activeConvRef = useRef(null);
+  const prevConvIdRef = useRef(null);
 
   // Keep activeConvRef always up to date for polling interval
   useEffect(() => {
     activeConvRef.current = activeConv;
   }, [activeConv]);
+
+  // Ensure window is at top when ChatPage mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
 
   // Initial loading of conversations and target partner from URL params
   useEffect(() => {
@@ -314,10 +320,48 @@ export const ChatPage = ({ onHirePlayer }) => {
     return () => clearInterval(interval);
   }, [user]);
 
-  // Scroll to bottom on new messages
+  // Scroll chat messages container to bottom without scrolling the whole window/page
+  const scrollToBottom = (behavior = 'auto') => {
+    if (!messagesContainerRef.current) return;
+    try {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior
+      });
+    } catch (_) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeConv?.messages]);
+    if (!messagesContainerRef.current) return;
+
+    const curConvId = activeConv?.id || activeConv?.partnerId;
+    const isNewConv = prevConvIdRef.current !== curConvId;
+
+    if (isNewConv) {
+      prevConvIdRef.current = curConvId;
+      // When switching conversations, scroll to bottom immediately inside the chat box
+      const timer = setTimeout(() => {
+        scrollToBottom('auto');
+      }, 30);
+      return () => clearTimeout(timer);
+    } else {
+      // Check if user is already near bottom or sent a message
+      const container = messagesContainerRef.current;
+      const isNearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight < 160;
+      const lastMsg = activeConv?.messages?.[activeConv?.messages?.length - 1];
+      const isMyMessage = lastMsg?.sender === 'me';
+
+      if (isNearBottom || isMyMessage) {
+        const timer = setTimeout(() => {
+          scrollToBottom('smooth');
+        }, 30);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeConv?.id, activeConv?.partnerId, activeConv?.messages]);
 
   // Select conversation handler
   const handleSelectConversation = async (conv) => {
@@ -567,7 +611,7 @@ export const ChatPage = ({ onHirePlayer }) => {
             </div>
 
             {/* Messages Body */}
-            <div className="chat-messages">
+            <div className="chat-messages" ref={messagesContainerRef}>
               {(!activeConv.messages || activeConv.messages.length === 0) ? (
                 <div style={{ textAlign: 'center', margin: 'auto', padding: '40px 20px', color: 'var(--text-muted)' }}>
                   <MessageSquare size={36} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
@@ -586,7 +630,6 @@ export const ChatPage = ({ onHirePlayer }) => {
                   </div>
                 ))
               )}
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Input Bar */}

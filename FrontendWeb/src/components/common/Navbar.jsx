@@ -23,6 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getUserAvatar } from '../../utils/avatarUtils';
 import api from '../../api/apiService';
+import { NotificationDropdown } from './NotificationDropdown';
 import '../../styles/navbar.css';
 
 export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
@@ -32,26 +33,69 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [bellBadgeCount, setBellBadgeCount] = useState(0);
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   const navigate = useNavigate();
 
-  // Poll unread messages count
+  // Poll unread messages and notifications count
   useEffect(() => {
     if (!user) {
       setUnreadMsgCount(0);
+      setUnreadNotifCount(0);
+      setBellBadgeCount(0);
       return;
     }
-    const fetchUnread = async () => {
+
+    const fetchCounts = async () => {
       try {
-        const count = await api.getUnreadMessageCount();
-        setUnreadMsgCount(count);
+        const msgCount = await api.getUnreadMessageCount();
+        setUnreadMsgCount(msgCount);
+      } catch (_) {}
+
+      try {
+        const notifs = await api.getNotifications();
+        const unread = notifs.filter((n) => typeof n.read === 'boolean' ? !n.read : !n.isRead);
+        setUnreadNotifCount(unread.length);
+
+        const storageKey = `playzone_notif_seen_${user.id || user.username}`;
+        const lastSeenTimeStr = localStorage.getItem(storageKey);
+
+        if (!lastSeenTimeStr) {
+          // Người dùng chưa từng bấm vào chuông -> hiện toàn bộ số chưa đọc
+          setBellBadgeCount(unread.length);
+        } else {
+          const lastSeenTime = new Date(lastSeenTimeStr).getTime();
+          // Chỉ đếm những thông báo CHƯA ĐỌC được tạo SAU thời điểm bấm chuông gần nhất
+          const newSinceSeen = unread.filter((n) => {
+            const createdTime = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+            return createdTime > lastSeenTime;
+          }).length;
+          setBellBadgeCount(newSinceSeen);
+        }
       } catch (_) {}
     };
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 5000);
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 5000);
     return () => clearInterval(interval);
   }, [user]);
+
+  const handleToggleNotifications = () => {
+    const nextState = !showNotifications;
+    setShowNotifications(nextState);
+    if (nextState) {
+      // Khi bấm mở chuông: RESET badge trên chuông về 0 và lưu lại mốc thời gian vừa xem
+      setBellBadgeCount(0);
+      if (user) {
+        localStorage.setItem(
+          `playzone_notif_seen_${user.id || user.username}`,
+          new Date().toISOString()
+        );
+      }
+    }
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -205,23 +249,42 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
               <div style={{ position: 'relative' }} ref={notifRef}>
                 <button
                   className="nav-icon-btn"
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={handleToggleNotifications}
                   title="Thông báo"
                 >
                   <Bell size={18} />
+                  {bellBadgeCount > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-4px',
+                        right: '-4px',
+                        background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                        color: '#ffffff',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        minWidth: '18px',
+                        height: '18px',
+                        padding: '0 4px',
+                        borderRadius: '9999px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        lineHeight: 1,
+                        boxShadow: '0 2px 8px rgba(236, 72, 153, 0.45)'
+                      }}
+                    >
+                      {bellBadgeCount > 99 ? '99+' : bellBadgeCount}
+                    </span>
+                  )}
                 </button>
 
-                {showNotifications && (
-                  <div className="user-dropdown animate-fade-in" style={{ width: '320px', right: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', fontWeight: 700, fontSize: '0.95rem' }}>
-                      <span>Thông Báo</span>
-                    </div>
-                    <div className="dropdown-divider" />
-                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      Không có thông báo mới nào
-                    </div>
-                  </div>
-                )}
+                <NotificationDropdown
+                  isOpen={showNotifications}
+                  onClose={() => setShowNotifications(false)}
+                  unreadCount={unreadNotifCount}
+                  onUnreadCountChange={setUnreadNotifCount}
+                />
               </div>
 
               {/* User Dropdown */}

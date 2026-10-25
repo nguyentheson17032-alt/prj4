@@ -54,12 +54,14 @@ public class OrderService {
             .filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus()))
             .filter(o -> o.getStartTime() != null && o.getStartTime().isAfter(now) && o.getStartTime().isBefore(soon))
             .toList();
+        java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("HH:mm 'ngày' dd/MM/yyyy");
         for (Order order : upcoming) {
+            String startTimeStr = order.getStartTime() != null ? order.getStartTime().format(dtf) : "";
             if (order.getRenter() != null) {
                 notificationService.createNotification(
                     order.getRenter().getId(),
                     "Sắp đến giờ thuê!",
-                    "Đơn thuê của bạn với player " + (order.getPlayer() != null ? order.getPlayer().getUsername() : "") + " sẽ bắt đầu lúc " + order.getStartTime() + ".",
+                    "Đơn thuê của bạn với player " + (order.getPlayer() != null ? order.getPlayer().getUsername() : "") + " sẽ bắt đầu lúc " + startTimeStr + ".",
                     "order_upcoming",
                     null,
                     order.getId().toString()
@@ -69,7 +71,7 @@ public class OrderService {
                 notificationService.createNotification(
                     order.getPlayer().getUser().getId(),
                     "Sắp đến giờ thuê!",
-                    "Bạn sắp có đơn thuê với người dùng " + (order.getRenter() != null ? order.getRenter().getUsername() : "") + " lúc " + order.getStartTime() + ".",
+                    "Bạn sắp có đơn thuê với người dùng " + (order.getRenter() != null ? order.getRenter().getUsername() : "") + " lúc " + startTimeStr + ".",
                     "order_upcoming",
                     null,
                     order.getId().toString()
@@ -82,11 +84,12 @@ public class OrderService {
             .filter(o -> o.getEndTime() != null && o.getEndTime().isAfter(now) && o.getEndTime().isBefore(soon))
             .toList();
         for (Order order : ending) {
+            String endTimeStr = order.getEndTime() != null ? order.getEndTime().format(dtf) : "";
             if (order.getRenter() != null) {
                 notificationService.createNotification(
                     order.getRenter().getId(),
                     "Đơn thuê sắp kết thúc!",
-                    "Đơn thuê của bạn với player " + (order.getPlayer() != null ? order.getPlayer().getUsername() : "") + " sẽ kết thúc lúc " + order.getEndTime() + ".",
+                    "Đơn thuê của bạn với player " + (order.getPlayer() != null ? order.getPlayer().getUsername() : "") + " sẽ kết thúc lúc " + endTimeStr + ".",
                     "order_ending",
                     null,
                     order.getId().toString()
@@ -96,7 +99,7 @@ public class OrderService {
                 notificationService.createNotification(
                     order.getPlayer().getUser().getId(),
                     "Đơn thuê sắp kết thúc!",
-                    "Bạn sắp kết thúc đơn thuê với người dùng " + (order.getRenter() != null ? order.getRenter().getUsername() : "") + " lúc " + order.getEndTime() + ".",
+                    "Bạn sắp kết thúc đơn thuê với người dùng " + (order.getRenter() != null ? order.getRenter().getUsername() : "") + " lúc " + endTimeStr + ".",
                     "order_ending",
                     null,
                     order.getId().toString()

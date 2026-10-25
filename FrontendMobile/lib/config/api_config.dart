@@ -18,7 +18,7 @@ class ApiConfig {
   static const String refreshToken = '/api/auth/refresh-token';
   static const String logout = '/api/auth/logout';
   static const String me = '/api/auth/me';
-  static const String userInfo = '/api/auth/user-info';
+  static const String userInfo = '/api/auth/me';
   static const String updateProfile = '/api/auth/update';
   static const String updateAvatar = '/api/auth/update/avatar';
   static const String updateProfileImage = '/api/auth/update/profile-image';
