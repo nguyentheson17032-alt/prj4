@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -344,7 +345,16 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(Authentication authentication) {
+    public ResponseEntity<?> logout(HttpServletRequest request, Authentication authentication) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String jwt = authHeader.substring(7);
+            try {
+                jwtTokenUtil.invalidateToken(jwt);
+            } catch (Exception e) {
+                logger.warn("Could not invalidate JWT on logout: {}", e.getMessage());
+            }
+        }
         if (authentication == null) return ResponseEntity.ok().build();
         User user = userService.findByUsername(authentication.getName());
         if (user != null) {
@@ -415,7 +425,7 @@ public class AuthController {
 
     @PutMapping("/update")
     public ResponseEntity<?> updateUser(
-            @RequestBody UpdateUserRequest request,
+            @Valid @RequestBody UpdateUserRequest request,
             Authentication authentication) {
         User currentUser = userService.findByUsername(authentication.getName());
         User updatedUser = userService.update(

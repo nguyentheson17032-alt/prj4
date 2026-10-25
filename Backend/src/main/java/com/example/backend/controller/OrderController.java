@@ -381,7 +381,14 @@ public class OrderController {
 
     @GetMapping("/user-stats/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Object>> getUserOrderStats(@PathVariable Long userId) {
+    public ResponseEntity<?> getUserOrderStats(@PathVariable Long userId, Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
+                (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+        if (!isAdmin && (currentUser == null || !currentUser.getId().equals(userId))) {
+            return ResponseEntity.status(403).body("Bạn không có quyền xem thống kê của người dùng khác");
+        }
+
         List<Order> allOrders = orderRepository.findAllByUserId(userId);
 
         List<Order> hiredOrders = allOrders.stream()
@@ -473,8 +480,23 @@ public class OrderController {
 
     @GetMapping("/status")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<OrderResponseDTO>> getOrdersByStatus(@RequestParam String status) {
-        List<Order> orders = orderRepository.findByStatus(status.toUpperCase());
+    public ResponseEntity<List<OrderResponseDTO>> getOrdersByStatus(
+            @RequestParam String status,
+            Authentication authentication) {
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
+                (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+
+        List<Order> orders;
+        if (isAdmin) {
+            orders = orderRepository.findByStatus(status.toUpperCase());
+        } else if (currentUser != null) {
+            orders = orderRepository.findAllByUserId(currentUser.getId()).stream()
+                    .filter(o -> status.equalsIgnoreCase(o.getStatus()))
+                    .toList();
+        } else {
+            orders = new ArrayList<>();
+        }
         return ResponseEntity.ok(mapOrdersToDTO(orders));
     }
 
@@ -650,15 +672,30 @@ public class OrderController {
     }
 
     @DeleteMapping("/{orderId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteOrder(@PathVariable Long orderId) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> deleteOrder(@PathVariable Long orderId, Authentication authentication) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         if (!"COMPLETED".equalsIgnoreCase(order.getStatus())) {
             return ResponseEntity.badRequest().body("Chỉ có thể xóa đơn đã hoàn thành (COMPLETED)");
         }
+
+        User currentUser = userService.findByUsername(authentication.getName());
+        if (currentUser == null) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Unauthorized", "message", "Vui lòng đăng nhập lại"));
+        }
+
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        boolean isOwner = order.getRenter() != null && order.getRenter().getId().equals(currentUser.getId());
+
+        if (!isAdmin && !isOwner) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Forbidden", "message", "Bạn không có quyền xóa đơn hàng của người khác"));
+        }
+
         orderRepository.delete(order);
-        return ResponseEntity.ok("Order deleted successfully");
+        return ResponseEntity.ok(Map.of("message", "Order deleted successfully"));
     }
 
     private OrderResponseDTO mapOrderToDTO(Order order) {

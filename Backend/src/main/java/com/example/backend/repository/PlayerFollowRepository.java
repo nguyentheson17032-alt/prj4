@@ -39,21 +39,21 @@ public interface PlayerFollowRepository extends JpaRepository<PlayerFollow, Long
            "  WHERE f1.follower_id = ?1 " +
            "), " +
            "blocked_users AS (" +
-           "  SELECT blocked_id FROM user_blocks WHERE blocker_id = ?1 " +
+           "  SELECT blocked_id AS user_id FROM user_blocks WHERE blocker_id = ?1 " +
            "  UNION " +
-           "  SELECT blocker_id FROM user_blocks WHERE blocked_id = ?1 " +
+           "  SELECT blocker_id AS user_id FROM user_blocks WHERE blocked_id = ?1 " +
            ") " +
            "SELECT gp.id as gamePlayerId, gp.username, " +
-           "COUNT(f.id) as followerCount, " +
+           "COUNT(DISTINCT f.id) as followerCount, " +
            "COALESCE(AVG(r.rating), 0) as averageRating, " +
-           "COUNT(uf.game_player_id) as commonFollowers " +
+           "COUNT(DISTINCT uf.game_player_id) as commonFollowers " +
            "FROM game_players gp " +
            "LEFT JOIN player_follows f ON gp.id = f.game_player_id " +
            "LEFT JOIN reviews r ON gp.id = r.game_player_id " +
            "LEFT JOIN user_followers uf ON gp.id = uf.game_player_id " +
            "WHERE gp.user_id != ?1 " +
            "AND gp.id NOT IN (SELECT game_player_id FROM player_follows WHERE follower_id = ?1) " +
-           "AND gp.user_id NOT IN (SELECT id FROM blocked_users) " +
+           "AND gp.user_id NOT IN (SELECT bu.user_id FROM blocked_users bu) " +
            "AND gp.status = 'AVAILABLE' " +
            "GROUP BY gp.id, gp.username " +
            "ORDER BY commonFollowers DESC, followerCount DESC, averageRating DESC " +

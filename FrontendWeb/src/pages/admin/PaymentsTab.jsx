@@ -6,6 +6,7 @@ import {
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/apiService';
 import { MetricCard, StatusBadge, parseDateToDateObj } from './adminHelpers';
+import { getUserAvatar } from '../../utils/avatarUtils';
 
 export const PaymentsTab = () => {
   const { addToast } = useToast();

@@ -1,6 +1,8 @@
 package com.example.backend.exception;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -14,6 +16,18 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<?> handleAccessDeniedException(AccessDeniedException e, HttpServletRequest request) {
+        log.warn("Access denied for URI: {}, method: {}, message: {}", 
+            request.getRequestURI(), request.getMethod(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+            "error", "Forbidden",
+            "message", "Bạn không có quyền truy cập hoặc thực hiện thao tác này",
+            "path", request.getRequestURI(),
+            "timestamp", LocalDateTime.now()
+        ));
+    }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<?> handleBadCredentialsException(BadCredentialsException e) {
@@ -52,4 +66,4 @@ public class GlobalExceptionHandler {
             "timestamp", LocalDateTime.now()
         ));
     }
-} 
+}

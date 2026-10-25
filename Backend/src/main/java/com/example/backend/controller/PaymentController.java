@@ -119,10 +119,24 @@ public class PaymentController {
     @Operation(summary = "Process a payment")
     @PostMapping("/{id}/process")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Payment> processPayment(
+    public ResponseEntity<?> processPayment(
             @Parameter(description = "Payment ID") @PathVariable Long id,
-            @Valid @RequestBody ProcessPaymentRequest request) {
+            @Valid @RequestBody ProcessPaymentRequest request,
+            Authentication authentication) {
         try {
+            Payment existingPayment = paymentRepository.findById(id).orElse(null);
+            if (existingPayment == null) {
+                return ResponseEntity.notFound().build();
+            }
+            User currentUser = userService.findByUsername(authentication.getName());
+            boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
+                    (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+            boolean isOwner = existingPayment.getUser() != null && currentUser != null &&
+                    existingPayment.getUser().getId().equals(currentUser.getId());
+            if (!isAdmin && !isOwner) {
+                return ResponseEntity.status(403).body("Bạn không có quyền xử lý thanh toán này");
+            }
+
             Payment payment = paymentService.processPayment(id, request.getTransactionId());
             if (Payment.PaymentType.WITHDRAW.equals(payment.getType()) && payment.getUser() != null) {
                 try {
@@ -145,10 +159,24 @@ public class PaymentController {
     @Operation(summary = "Refund a payment")
     @PostMapping("/{id}/refund")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Payment> refundPayment(
+    public ResponseEntity<?> refundPayment(
             @Parameter(description = "Payment ID") @PathVariable Long id,
-            @Valid @RequestBody RefundRequest request) {
+            @Valid @RequestBody RefundRequest request,
+            Authentication authentication) {
         try {
+            Payment existingPayment = paymentRepository.findById(id).orElse(null);
+            if (existingPayment == null) {
+                return ResponseEntity.notFound().build();
+            }
+            User currentUser = userService.findByUsername(authentication.getName());
+            boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
+                    (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+            boolean isOwner = existingPayment.getUser() != null && currentUser != null &&
+                    existingPayment.getUser().getId().equals(currentUser.getId());
+            if (!isAdmin && !isOwner) {
+                return ResponseEntity.status(403).body("Bạn không có quyền yêu cầu hoàn tiền thanh toán này");
+            }
+
             Payment payment = paymentService.refundPayment(id, request.getReason());
             if (Payment.PaymentType.WITHDRAW.equals(payment.getType()) && payment.getUser() != null) {
                 try {
@@ -185,6 +213,7 @@ public class PaymentController {
 
     @Operation(summary = "Get payments by status")
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Payment>> getPaymentsByStatus(
             @Parameter(description = "Payment status") @PathVariable String status) {
         try {
@@ -197,6 +226,7 @@ public class PaymentController {
 
     @Operation(summary = "Get payments by date range")
     @GetMapping("/date-range")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Payment>> getPaymentsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
@@ -619,10 +649,15 @@ public class PaymentController {
     }
 
     @PostMapping("/vnpay/create")
-    public ResponseEntity<?> createVnPayPayment(@RequestParam Long amount, @RequestParam String orderInfo,
-            @RequestParam Long userId, HttpServletRequest request) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> createVnPayPayment(
+            @RequestParam Long amount,
+            @RequestParam String orderInfo,
+            @RequestParam(required = false) Long userId,
+            HttpServletRequest request,
+            Authentication authentication) {
         log.info("=== BẮT ĐẦU: Tạo link VNPay ===");
-        log.info("Request params: amount={}, orderInfo={}, userId={}", amount, orderInfo, userId);
+        log.info("Request params: amount={}, orderInfo={}, requestedUserId={}", amount, orderInfo, userId);
         log.info("Request URI: {}", request.getRequestURI());
         log.info("Request method: {}", request.getMethod());
 
@@ -639,9 +674,12 @@ public class PaymentController {
             String paymentUrl = vnPayService.createPaymentUrl(amount, orderInfo, ipAddr, txnRef);
             log.info("Payment URL tạo thành công: {}", paymentUrl);
 
-            log.info("Bước 4: Tìm user theo userId");
-            User user = userService.findById(userId);
-            log.info("User tìm thấy: id={}, username={}", user.getId(), user.getUsername());
+            log.info("Bước 4: Tìm user theo authentication");
+            User user = userService.findByUsername(authentication.getName());
+            if (user == null) {
+                return ResponseEntity.status(401).body("Không tìm thấy thông tin người dùng đăng nhập");
+            }
+            log.info("User xác thực: id={}, username={}", user.getId(), user.getUsername());
 
             log.info("Bước 5: Tạo Payment entity");
             Payment payment = new Payment();
