@@ -15,6 +15,9 @@ import com.example.backend.exception.ReportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -188,9 +191,8 @@ public class ReportService {
         report.setRefundAmount(renterRefundCoin);
 
         if (renter != null && renterRefundCoin > 0) {
-            long renterOldBalance = renter.getCoin() != null ? renter.getCoin() : 0L;
-            renter.setCoin(renterOldBalance + renterRefundCoin);
-            userRepository.save(renter);
+            userRepository.addCoinSafely(renter.getId(), renterRefundCoin);
+            renter.setCoin((renter.getCoin() != null ? renter.getCoin() : 0L) + renterRefundCoin);
             log.info("[ReportService] Refunded {} coins ({}%) to renter #{} for order #{}", renterRefundCoin, percent, renter.getId(), order.getId());
 
             try {
@@ -219,18 +221,16 @@ public class ReportService {
             if ("RELEASED".equalsIgnoreCase(order.getPayoutStatus())) {
                 // Tiền đã giải phóng trước đó -> thu hồi phần phạt từ số dư khả dụng của player
                 if (playerDeductedCoin > 0) {
-                    long playerOldBalance = playerUser.getCoin() != null ? playerUser.getCoin() : 0L;
-                    playerUser.setCoin(Math.max(0L, playerOldBalance - playerDeductedCoin));
-                    userRepository.save(playerUser);
+                    userRepository.deductCoinSafely(playerUser.getId(), playerDeductedCoin);
+                    playerUser.setCoin(Math.max(0L, (playerUser.getCoin() != null ? playerUser.getCoin() : 0L) - playerDeductedCoin));
                 }
             } else {
                 // Tiền đang ở trạng thái đóng băng (PENDING):
                 // - Phần phạt (playerDeductedCoin) bị trừ trực tiếp từ "số dư đang đóng băng"
                 // - Số tiền nhận được còn lại từ đơn đó (playerRemainingCoin) được chuyển từ trạng thái đang đóng băng vào Số Dư Khả Dụng!
                 if (playerRemainingCoin > 0) {
-                    long playerOldBalance = playerUser.getCoin() != null ? playerUser.getCoin() : 0L;
-                    playerUser.setCoin(playerOldBalance + playerRemainingCoin);
-                    userRepository.save(playerUser);
+                    userRepository.addCoinSafely(playerUser.getId(), playerRemainingCoin);
+                    playerUser.setCoin((playerUser.getCoin() != null ? playerUser.getCoin() : 0L) + playerRemainingCoin);
                 }
             }
 
@@ -318,21 +318,21 @@ public class ReportService {
 
         if (revenueRepository != null && platformFeeDeduct > 0) {
             try {
-                List<com.example.backend.entity.Revenue> allRevenues = revenueRepository.findAll();
-                for (com.example.backend.entity.Revenue rev : allRevenues) {
-                    if (rev.getPayment() != null && rev.getPayment().getDescription() != null
-                            && rev.getPayment().getDescription().contains("#" + order.getId())) {
-                        long oldAmount = rev.getAmount() != null ? rev.getAmount() : 0L;
-                        long newAmount = Math.max(0L, oldAmount - platformFeeDeduct);
-                        if (newAmount == 0) {
-                            revenueRepository.delete(rev);
-                        } else {
-                            rev.setAmount(newAmount);
-                            revenueRepository.save(rev);
-                        }
-                        log.info("[ReportService] Deducted {} from Revenue #{} for order #{}", platformFeeDeduct, rev.getId(), order.getId());
-                        break;
+                List<com.example.backend.entity.Revenue> orderRevenues = revenueRepository.findByOrderDescription(order.getId());
+                if (orderRevenues.isEmpty() && order.getPayment() != null) {
+                    orderRevenues = revenueRepository.findByPayment(order.getPayment());
+                }
+                for (com.example.backend.entity.Revenue rev : orderRevenues) {
+                    long oldAmount = rev.getAmount() != null ? rev.getAmount() : 0L;
+                    long newAmount = Math.max(0L, oldAmount - platformFeeDeduct);
+                    if (newAmount == 0) {
+                        revenueRepository.delete(rev);
+                    } else {
+                        rev.setAmount(newAmount);
+                        revenueRepository.save(rev);
                     }
+                    log.info("[ReportService] Deducted {} from Revenue #{} for order #{}", platformFeeDeduct, rev.getId(), order.getId());
+                    break;
                 }
             } catch (Exception ex) {
                 log.error("[ReportService] Failed to deduct revenue: {}", ex.getMessage());
@@ -363,6 +363,10 @@ public class ReportService {
 
     public List<Report> getAllReports() {
         return reportRepository.findAll();
+    }
+
+    public Page<Report> getAllReports(Pageable pageable) {
+        return reportRepository.findAll(pageable);
     }
 
     public void deleteReport(Long id) {

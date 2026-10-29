@@ -5,6 +5,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 import java.io.IOException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface UserService extends UserDetailsService {
     User save(User user);
@@ -21,8 +23,12 @@ public interface UserService extends UserDetailsService {
     long countUsers();
     double getUserGrowthPercentComparedToLastWeek();
     java.util.List<User> findAll();
+    Page<User> findAll(Pageable pageable);
+    java.util.List<User> findAllById(Iterable<Long> ids);
     void deleteById(Long id);
     void updateUserRoles(Long userId, java.util.Set<String> roles);
     void setUserOffline(Long userId);
     java.util.List<User> findRecentUsers();
-} 
+    boolean deductCoin(Long userId, Long amount);
+    void addCoin(Long userId, Long amount);
+}

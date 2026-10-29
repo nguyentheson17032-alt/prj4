@@ -40,7 +40,13 @@ public class Order {
     @Column(name = "payout_released_at")
     private LocalDateTime payoutReleasedAt;
 
+    @Column(name = "upcoming_reminder_sent")
+    private Boolean upcomingReminderSent = false;
+
+    @Column(name = "ending_reminder_sent")
+    private Boolean endingReminderSent = false;
+
     @OneToOne
     @JoinColumn(name = "payment_id")
     private Payment payment;
-} 
+}

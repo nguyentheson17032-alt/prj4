@@ -167,6 +167,10 @@ public class GamePlayerService {
         return gamePlayerRepository.findAll();
     }
 
+    public org.springframework.data.domain.Page<GamePlayer> getAllGamePlayers(org.springframework.data.domain.Pageable pageable) {
+        return gamePlayerRepository.findAll(pageable);
+    }
+
     public GamePlayer findById(Long id) {
         return gamePlayerRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Game player not found with id: " + id));
@@ -228,27 +232,6 @@ public class GamePlayerService {
             throw new ResourceNotFoundException("Player not found with id: " + playerId);
         }
         return new GamePlayerStatusResponse(player.getId(), player.getStatus());
-    }
-
-    @Scheduled(fixedRate = 60000) // Chạy mỗi phút
-    @Transactional
-    public void updateExpiredHires() {
-        LocalDateTime now = LocalDateTime.now();
-        // Tìm tất cả các payment đang ACTIVE và đã hết hạn
-        List<Payment> expiredPayments = paymentRepository.findByStatusAndEndTimeBefore(
-            Payment.PaymentStatus.CONFIRMED, now);
-
-        for (Payment payment : expiredPayments) {
-            // Cập nhật trạng thái payment
-            payment.setStatus(Payment.PaymentStatus.COMPLETED);
-            paymentRepository.save(payment);
-
-            // Cập nhật trạng thái game player
-            GamePlayer gamePlayer = payment.getGamePlayer();
-            if (gamePlayer != null) {
-                updateGamePlayerStatus(gamePlayer, "AVAILABLE", null);
-            }
-        }
     }
 
     private void updateGamePlayerStatus(GamePlayer gamePlayer, String status, User hiredBy) {

@@ -6,32 +6,34 @@ const AuthContext = createContext(null);
 
 const normalizeUser = (userData) => {
   if (!userData) return null;
+  // Bỏ token và refreshToken trước khi lưu vào state/localStorage để tránh rò rỉ qua XSS
+  const { token: _omitToken, refreshToken: _omitRefreshToken, ...rest } = userData;
   let finalBalance = 0;
   // Hệ thống dùng coin làm đơn vị tiền tệ thực tế cho mọi giao dịch (thuê, hoàn thành, nạp, donate)
-  if (userData.coin !== undefined && userData.coin !== null) {
-    finalBalance = Number(userData.coin);
-  } else if (userData.balance !== undefined && userData.balance !== null) {
-    finalBalance = Number(userData.balance);
-  } else if (userData.walletBalance !== undefined && userData.walletBalance !== null) {
-    finalBalance = Number(userData.walletBalance);
+  if (rest.coin !== undefined && rest.coin !== null) {
+    finalBalance = Number(rest.coin);
+  } else if (rest.balance !== undefined && rest.balance !== null) {
+    finalBalance = Number(rest.balance);
+  } else if (rest.walletBalance !== undefined && rest.walletBalance !== null) {
+    finalBalance = Number(rest.walletBalance);
   }
 
-  const phoneValue = userData.phoneNumber || userData.phone || '';
+  const phoneValue = rest.phoneNumber || rest.phone || '';
 
   return {
-    ...userData,
+    ...rest,
     phone: phoneValue,
     phoneNumber: phoneValue,
     balance: finalBalance,
     walletBalance: finalBalance,
     coin: finalBalance,
-    avatar: getUserAvatar(userData)
+    avatar: getUserAvatar(rest)
   };
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('jwt_token') || null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const refreshUser = async () => {
@@ -53,30 +55,50 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const storedToken = localStorage.getItem('jwt_token') || localStorage.getItem('token');
         const storedUser = localStorage.getItem('current_user');
-        let localUser = null;
         if (storedUser) {
           try {
-            localUser = normalizeUser(JSON.parse(storedUser));
-            setUser(localUser);
+            const parsed = JSON.parse(storedUser);
+            const cleaned = normalizeUser(parsed);
+            // Sanitize existing storage if token/refreshToken were stored previously
+            if (parsed.token || parsed.refreshToken) {
+              localStorage.setItem('current_user', JSON.stringify(cleaned));
+            }
+            setUser(cleaned);
           } catch (e) {
             console.error('Error parsing stored user:', e);
           }
         }
-        if (storedToken) {
-          setToken(storedToken);
-          // Fetch latest profile from backend
-          try {
-            const freshUser = await api.getCurrentUser();
-            if (freshUser) {
-              const normalized = normalizeUser(freshUser);
-              setUser(normalized);
-              localStorage.setItem('current_user', JSON.stringify(normalized));
-            }
-          } catch (e) {
-            console.warn('Could not sync current user from server:', e.message);
+
+        // Clean up legacy tokens from localStorage if any, keeping only in memory during migration
+        const legacyToken = localStorage.getItem('jwt_token') || localStorage.getItem('token');
+        if (legacyToken) {
+          api.setAuthToken(legacyToken);
+          setToken(legacyToken);
+          localStorage.removeItem('jwt_token');
+          localStorage.removeItem('token');
+        }
+
+        // Validate session with backend using HttpOnly cookie
+        try {
+          const freshUser = await api.getCurrentUser();
+          if (freshUser) {
+            const normalized = normalizeUser(freshUser);
+            setUser(normalized);
+            localStorage.setItem('current_user', JSON.stringify(normalized));
+          } else {
+            // Not authenticated on backend
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem('current_user');
+            localStorage.removeItem('roles');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('email');
           }
+        } catch (e) {
+          console.warn('Could not sync current user from server:', e.message);
         }
       } catch (err) {
         console.error('Init auth error:', err);
@@ -90,13 +112,13 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     const res = await api.login(username, password);
     if (res.success) {
+      const userToken = res.data?.token || '';
       const userData = normalizeUser(res.data);
       setUser(userData);
-      const userToken = userData.token || '';
       setToken(userToken);
+      api.setAuthToken(userToken);
       localStorage.setItem('current_user', JSON.stringify(userData));
-      localStorage.setItem('jwt_token', userToken);
-      localStorage.setItem('token', userToken);
+      // NOTE: Token is stored securely via HttpOnly cookie set by Backend, NOT in localStorage to protect against XSS
       localStorage.setItem('roles', JSON.stringify(userData.roles || ['ROLE_USER']));
       localStorage.setItem('userId', userData.id || '');
       localStorage.setItem('username', userData.username || '');
@@ -120,10 +142,15 @@ export const AuthProvider = ({ children }) => {
     return { success: false, error: res.error || 'Đăng ký thất bại' };
   };
 
-  const logout = () => {
-    api.logout();
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (e) {
+      console.warn('Logout error:', e);
+    }
     setUser(null);
     setToken(null);
+    api.setAuthToken(null);
     localStorage.removeItem('current_user');
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('token');

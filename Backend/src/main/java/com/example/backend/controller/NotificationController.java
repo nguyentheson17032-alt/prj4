@@ -17,6 +17,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import com.example.backend.dto.PagedResponse;
+
 
 import java.util.List;
 
@@ -91,9 +96,17 @@ public class NotificationController {
     @Operation(summary = "Get user notifications")
     @GetMapping("/user")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Notification>> getUserNotifications(Authentication authentication) {
+    public ResponseEntity<?> getUserNotifications(
+            Authentication authentication,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
         String username = authentication.getName();
         User user = userService.findByUsername(username);
+        if (page != null && size != null) {
+            Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)));
+            Page<Notification> paged = notificationService.getUserNotificationsPaged(user.getId(), pageable);
+            return ResponseEntity.ok(PagedResponse.from(paged));
+        }
         return ResponseEntity.ok(notificationService.getUserNotifications(user.getId()));
     }
 

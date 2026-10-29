@@ -16,6 +16,9 @@ import java.time.temporal.TemporalAdjusters;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.example.backend.repository.NotificationRepository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -197,6 +200,16 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    public org.springframework.data.domain.Page<User> findAll(org.springframework.data.domain.Pageable pageable) {
+        return userRepository.findAll(pageable);
+    }
+
+    @Override
+    public java.util.List<User> findAllById(Iterable<Long> ids) {
+        return userRepository.findAllById(ids);
+    }
+
+    @Override
     @Transactional
     public void deleteById(Long id) {
         notificationRepository.deleteByUserId(id);
@@ -222,4 +235,19 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public List<User> findRecentUsers() {
         return userRepository.findTop10ByOrderByCreatedAtDesc();
     }
-} 
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public boolean deductCoin(Long userId, Long amount) {
+        if (amount == null || amount <= 0) return false;
+        int updated = userRepository.deductCoinSafely(userId, amount);
+        return updated > 0;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void addCoin(Long userId, Long amount) {
+        if (amount == null || amount <= 0) return;
+        userRepository.addCoinSafely(userId, amount);
+    }
+}

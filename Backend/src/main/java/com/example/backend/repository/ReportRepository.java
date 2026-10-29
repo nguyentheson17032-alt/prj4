@@ -1,23 +1,33 @@
 package com.example.backend.repository;
 
 import com.example.backend.entity.Report;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
 public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByReporterId(Long reporterId);
+    Page<Report> findByReporterId(Long reporterId, Pageable pageable);
+
     List<Report> findByReportedPlayerId(Long reportedPlayerId);
+    Page<Report> findByReportedPlayerId(Long reportedPlayerId, Pageable pageable);
+
     List<Report> findByStatus(String status);
+    Page<Report> findByStatus(String status, Pageable pageable);
+
     List<Report> findByReporterIdAndStatus(Long reporterId, String status);
     List<Report> findByReportedPlayerIdAndStatus(Long reportedPlayerId, String status);
     List<Report> findByReporterIdAndReportedPlayerId(Long reporterId, Long reportedPlayerId);
     boolean existsByOrderId(Long orderId);
     Report findByOrderId(Long orderId);
+    List<Report> findByOrderIdIn(Collection<Long> orderIds);
     boolean existsByReporterIdAndReportedPlayerId(Long reporterId, Long reportedPlayerId);
     long countByStatus(String status);
     
@@ -32,4 +42,4 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     // Tìm tất cả báo cáo mà một user bị tố cáo (thông qua GamePlayer)
     @Query("SELECT r FROM Report r WHERE r.reportedPlayer.user.id = :reportedUserId")
     List<Report> findByReportedPlayerUserId(@Param("reportedUserId") Long reportedUserId);
-} 
+}

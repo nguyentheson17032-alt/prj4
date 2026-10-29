@@ -54,6 +54,11 @@ public class ReviewService {
         return reviewRepository.save(review);
     }
 
+    public Review findById(Long reviewId) {
+        return reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
+    }
+
     public Review updateReview(Long reviewId, Double rating, String comment) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found"));

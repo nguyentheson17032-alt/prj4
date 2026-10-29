@@ -3,20 +3,31 @@ import { getUserAvatar } from '../utils/avatarUtils';
 
 const BASE_URL = 'http://localhost:8080';
 
+// In-memory token storage (XSS cannot steal from localStorage)
+let inMemoryToken = null;
+
+export const setAuthToken = (token) => {
+  inMemoryToken = token;
+};
+
+export const getAuthToken = () => {
+  return inMemoryToken;
+};
+
 const client = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   }
 });
 
-// Attach JWT token from localStorage
+// Attach in-memory JWT token if present (optional/fallback; HttpOnly cookie handles auth automatically)
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('jwt_token') || localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (inMemoryToken) {
+    config.headers.Authorization = `Bearer ${inMemoryToken}`;
   }
   return config;
 });
@@ -220,10 +231,21 @@ export const normalizeMoment = (m) => {
 };
 
 export const api = {
+  // Auth token helpers
+  setAuthToken(token) {
+    setAuthToken(token);
+  },
+  getAuthToken() {
+    return getAuthToken();
+  },
+
   // Auth
   async login(username, password) {
     try {
       const res = await client.post('/api/auth/login', { username, password });
+      if (res.data?.token) {
+        setAuthToken(res.data.token);
+      }
       return { success: true, data: res.data };
     } catch (err) {
       const data = err.response?.data;
@@ -277,15 +299,24 @@ export const api = {
       const res = await client.get('/api/auth/me');
       return res.data;
     } catch (err) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setAuthToken(null);
+        return null;
+      }
       const stored = localStorage.getItem('current_user');
       if (stored) {
-        return JSON.parse(stored);
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          return null;
+        }
       }
       return null;
     }
   },
 
   async logout() {
+    setAuthToken(null);
     try {
       await client.post('/api/auth/logout');
     } catch (e) {

@@ -60,7 +60,30 @@ public class JwtTokenUtil {
     public String generateRefreshToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("type", "refresh");
-        return createToken(claims, userDetails.getUsername());
+        return createRefreshToken(claims, userDetails.getUsername());
+    }
+
+    private String createRefreshToken(Map<String, Object> claims, String subject) {
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String extractTokenType(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return (String) claims.get("type");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public boolean isRefreshToken(String token) {
+        return "refresh".equalsIgnoreCase(extractTokenType(token));
     }
 
     public String getUsernameFromToken(String token) {
@@ -113,10 +136,19 @@ public class JwtTokenUtil {
     }
 
     public String getTokenFromRequest() {
-        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) return null;
+        HttpServletRequest request = attributes.getRequest();
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
+        }
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("jwt_token".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
         }
         return null;
     }

@@ -33,7 +33,7 @@ public class PaymentService {
     public PaymentService(PaymentRepository paymentRepository,
             GamePlayerRepository gamePlayerRepository,
             UserRepository userRepository,
-            NotificationService notificationService) {
+            @org.springframework.beans.factory.annotation.Autowired(required = false) NotificationService notificationService) {
         this.paymentRepository = paymentRepository;
         this.gamePlayerRepository = gamePlayerRepository;
         this.userRepository = userRepository;
@@ -187,27 +187,41 @@ public class PaymentService {
         }
     }
 
-    // Scheduled task: Chuyển đơn thuê CONFIRMED sang COMPLETED khi hết hạn và gửi
-    // notification nhắc đánh giá
-    @Scheduled(fixedRate = 300000) // 5 phút
+    // Scheduled task duy nhất trong hệ thống: Chuyển đơn thuê CONFIRMED sang COMPLETED khi hết hạn,
+    // và giải phóng trạng thái GamePlayer. Nhắc đánh giá do OrderService đảm nhiệm.
+    @Scheduled(fixedRate = 60000) // Chạy mỗi phút
     public void completeExpiredHires() {
-        List<Payment> expiredHires = paymentRepository.findByStatusAndEndTimeBefore(Payment.PaymentStatus.CONFIRMED,
-                LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        List<Payment> expiredHires = paymentRepository.findByStatusAndEndTimeBefore(Payment.PaymentStatus.CONFIRMED, now);
         for (Payment payment : expiredHires) {
             payment.setStatus(Payment.PaymentStatus.COMPLETED);
-            payment.setCompletedAt(LocalDateTime.now());
+            payment.setCompletedAt(now);
             paymentRepository.save(payment);
-            // Gửi notification nhắc đánh giá cho người thuê
-            User user = payment.getUser();
+
+            // Cập nhật trạng thái game player về AVAILABLE
             GamePlayer gamePlayer = payment.getGamePlayer();
-            notificationService.createNotification(
-                    user.getId(),
-                    "Đánh giá trải nghiệm của bạn!",
-                    "Đơn thuê đã hoàn thành. Hãy để lại đánh giá cho player "
-                            + (gamePlayer != null ? gamePlayer.getUsername() : "player") + " nhé!",
-                    "review_reminder",
-                    null,
-                    payment.getId().toString());
+            if (gamePlayer != null) {
+                gamePlayer.setStatus("AVAILABLE");
+                gamePlayer.setHiredBy(null);
+                gamePlayer.setHireDate(null);
+                gamePlayer.setReturnDate(null);
+                gamePlayer.setHoursHired(null);
+                gamePlayerRepository.save(gamePlayer);
+            }
+
+            // Gửi thông báo nhắc đánh giá cho renter
+            if (notificationService != null && payment.getUser() != null) {
+                try {
+                    notificationService.createNotification(
+                            payment.getUser().getId(),
+                            "Đánh giá người chơi",
+                            "Đơn thuê của bạn đã kết thúc. Vui lòng để lại đánh giá cho Player nhé!",
+                            "review_reminder",
+                            null,
+                            payment.getId() != null ? String.valueOf(payment.getId()) : null
+                    );
+                } catch (Exception ignored) {}
+            }
         }
     }
 

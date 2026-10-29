@@ -15,7 +15,7 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
+    @Value("${spring.mail.username:noreply@gameplatform.com}")
     private String fromEmail;
 
     @Value("${app.name:Game Platform}")

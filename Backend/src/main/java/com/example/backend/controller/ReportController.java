@@ -15,6 +15,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import com.example.backend.dto.PagedResponse;
+
 
 import java.util.List;
 import com.example.backend.service.UserService;
@@ -187,6 +193,7 @@ public class ReportController {
 
     @Operation(summary = "Get reports by reported player")
     @GetMapping("/reported-player/{reportedPlayerId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Report>> getReportsByReportedPlayer(
             @Parameter(description = "Reported player ID") @PathVariable Long reportedPlayerId) {
         return ResponseEntity.ok(reportService.getReportsByReportedPlayer(reportedPlayerId));
@@ -194,6 +201,7 @@ public class ReportController {
 
     @Operation(summary = "Get reports by status")
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Report>> getReportsByStatus(
             @Parameter(description = "Report status") @PathVariable String status) {
         return ResponseEntity.ok(reportService.getReportsByStatus(status));
@@ -208,7 +216,14 @@ public class ReportController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllReports() {
+    public ResponseEntity<?> getAllReports(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page != null && size != null) {
+            Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)), Sort.by(Sort.Direction.DESC, "id"));
+            Page<Report> reportPage = reportService.getAllReports(pageable);
+            return ResponseEntity.ok(PagedResponse.from(reportPage));
+        }
         return ResponseEntity.ok(reportService.getAllReports());
     }
 

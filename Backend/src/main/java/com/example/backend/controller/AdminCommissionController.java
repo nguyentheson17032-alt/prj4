@@ -5,6 +5,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
@@ -47,16 +49,22 @@ public class AdminCommissionController {
     @Operation(summary = "Lấy thống kê tổng quan chiết khấu 15% nền tảng")
     public ResponseEntity<CommissionStatsDTO> getCommissionStats() {
         try {
-            List<Order> orders = orderRepository.findAll();
+            List<Order> validOrders = orderRepository.findValidOrdersForCommission();
             List<Payment> donates = paymentRepository.findByTypeOrderByCreatedAtDesc(Payment.PaymentType.DONATE);
 
-            // 1. Thống kê từ đơn thuê (Order): các đơn hợp lệ (hoàn thành hoặc đang xử lý)
-            List<Order> validOrders = orders.stream()
-                    .filter(o -> o.getStatus() != null && 
-                            !"CANCELLED".equalsIgnoreCase(o.getStatus()) && 
-                            !"CANCELED".equalsIgnoreCase(o.getStatus()) && 
-                            !"REJECTED".equalsIgnoreCase(o.getStatus()))
+            // Batch fetch reports for refunded orders (Zero N+1)
+            List<Long> refundedOrderIds = validOrders.stream()
+                    .filter(o -> "REFUNDED".equalsIgnoreCase(o.getStatus()))
+                    .map(Order::getId)
                     .toList();
+            Map<Long, com.example.backend.entity.Report> reportMap = new HashMap<>();
+            if (!refundedOrderIds.isEmpty() && reportRepository != null) {
+                for (com.example.backend.entity.Report rep : reportRepository.findByOrderIdIn(refundedOrderIds)) {
+                    if (rep.getOrder() != null && rep.getOrder().getId() != null) {
+                        reportMap.putIfAbsent(rep.getOrder().getId(), rep);
+                    }
+                }
+            }
 
             long hireGmv = 0L;
             long hireCommission = 0L;
@@ -68,11 +76,9 @@ public class AdminCommissionController {
 
                 if ("REFUNDED".equalsIgnoreCase(o.getStatus())) {
                     int refundPercent = 100;
-                    if (reportRepository != null) {
-                        com.example.backend.entity.Report rep = reportRepository.findByOrderId(o.getId());
-                        if (rep != null && rep.getRefundPercentage() != null && rep.getRefundPercentage() > 0) {
-                            refundPercent = rep.getRefundPercentage();
-                        }
+                    com.example.backend.entity.Report rep = reportMap.get(o.getId());
+                    if (rep != null && rep.getRefundPercentage() != null && rep.getRefundPercentage() > 0) {
+                        refundPercent = rep.getRefundPercentage();
                     }
                     long refundedPrice = Math.round(price * (refundPercent / 100.0));
                     long refundedFee = Math.round(fee * (refundPercent / 100.0));
@@ -151,7 +157,19 @@ public class AdminCommissionController {
         try {
             // 1. Thêm giao dịch từ Orders (Thuê Player)
             if ("ALL".equalsIgnoreCase(type) || "HIRE".equalsIgnoreCase(type)) {
-                List<Order> orders = orderRepository.findAll();
+                List<Order> orders = orderRepository.findValidOrdersForCommission();
+                List<Long> refundedOrderIds = orders.stream()
+                        .filter(o -> "REFUNDED".equalsIgnoreCase(o.getStatus()))
+                        .map(Order::getId)
+                        .toList();
+                Map<Long, com.example.backend.entity.Report> reportMap = new HashMap<>();
+                if (!refundedOrderIds.isEmpty() && reportRepository != null) {
+                    for (com.example.backend.entity.Report rep : reportRepository.findByOrderIdIn(refundedOrderIds)) {
+                        if (rep.getOrder() != null && rep.getOrder().getId() != null) {
+                            reportMap.putIfAbsent(rep.getOrder().getId(), rep);
+                        }
+                    }
+                }
                 for (Order o : orders) {
                     try {
                         long price = o.getPrice() != null ? o.getPrice() : 0L;
@@ -209,11 +227,9 @@ public class AdminCommissionController {
 
                         if ("REFUNDED".equalsIgnoreCase(o.getStatus())) {
                             int refundPercent = 100;
-                            if (reportRepository != null) {
-                                com.example.backend.entity.Report rep = reportRepository.findByOrderId(o.getId());
-                                if (rep != null && rep.getRefundPercentage() != null && rep.getRefundPercentage() > 0) {
-                                    refundPercent = rep.getRefundPercentage();
-                                }
+                            com.example.backend.entity.Report rep = reportMap.get(o.getId());
+                            if (rep != null && rep.getRefundPercentage() != null && rep.getRefundPercentage() > 0) {
+                                refundPercent = rep.getRefundPercentage();
                             }
                             long refundedFee = Math.round(fee * (refundPercent / 100.0));
                             long refundedRecv = Math.round(recv * (refundPercent / 100.0));

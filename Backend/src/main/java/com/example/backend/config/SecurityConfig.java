@@ -3,6 +3,7 @@ package com.example.backend.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -25,7 +26,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configure(http))
+            .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/game-players/available").permitAll()
@@ -39,8 +40,6 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users/{userId}/online-status").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users/{userId}/cover-image").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users/{userId}/cover-image-bytes").permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users/recent").permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users/summary").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/game-players/*").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/game-players/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/order-reviews/**").permitAll()
@@ -61,6 +60,12 @@ public class SecurityConfig {
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; script-src 'self'; img-src 'self' data: https://api.dicebear.com https://images.unsplash.com"))
+                .frameOptions(frame -> frame.deny())
+                .contentTypeOptions(Customizer.withDefaults())
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         

@@ -110,16 +110,7 @@ public class User {
     @PostLoad
     protected void onPostLoad() {
         if (this.coin == null) this.coin = 0L;
-        if (this.walletBalance == null) {
-            this.walletBalance = java.math.BigDecimal.valueOf(this.coin);
-        } else {
-            // If coin is 0 but walletBalance is positive (e.g. initial seeded accounts), adopt walletBalance
-            if (this.coin == 0L && this.walletBalance.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                this.coin = this.walletBalance.longValue();
-            } else {
-                this.walletBalance = java.math.BigDecimal.valueOf(this.coin);
-            }
-        }
+        this.walletBalance = java.math.BigDecimal.valueOf(this.coin);
     }
 
     public void setCoin(Long coin) {

@@ -131,9 +131,11 @@ public class UserBanService {
             unbannedBy = userRepository.findById(unbannedByUserId).orElse(null);
         }
         if (unbannedBy == null) {
-            unbannedBy = userRepository.findAll().stream()
-                    .filter(u -> u.getRoles() != null && u.getRoles().stream().anyMatch(r -> r.toUpperCase().contains("ADMIN")))
-                    .findFirst().orElse(user);
+            java.util.List<User> admins = userRepository.findAllAdmins();
+            if (admins.isEmpty()) {
+                admins = userRepository.findAllAdminsWithRole();
+            }
+            unbannedBy = !admins.isEmpty() ? admins.get(0) : user;
         }
 
         // Tìm tất cả active bans của user

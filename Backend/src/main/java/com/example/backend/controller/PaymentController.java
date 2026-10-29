@@ -5,6 +5,9 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -71,7 +74,6 @@ public class PaymentController {
     private final GamePlayerRepository gamePlayerRepository;
     private final AdminNotificationService adminNotificationService;
     private final RevenueRepository revenueRepository;
-    private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
     private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
 
     public PaymentController(PaymentService paymentService, UserService userService,
@@ -206,8 +208,22 @@ public class PaymentController {
 
     @Operation(summary = "Get game player payments")
     @GetMapping("/game-player/{gamePlayerId}")
-    public ResponseEntity<List<Payment>> getGamePlayerPayments(
-            @Parameter(description = "Game player ID") @PathVariable Long gamePlayerId) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getGamePlayerPayments(
+            @Parameter(description = "Game player ID") @PathVariable Long gamePlayerId,
+            Authentication authentication) {
+        GamePlayer gamePlayer = gamePlayerRepository.findById(gamePlayerId).orElse(null);
+        if (gamePlayer == null) {
+            return ResponseEntity.notFound().build();
+        }
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
+                (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+        boolean isOwner = gamePlayer.getUser() != null && currentUser != null &&
+                gamePlayer.getUser().getId().equals(currentUser.getId());
+        if (!isAdmin && !isOwner) {
+            return ResponseEntity.status(403).body("Bạn không có quyền xem lịch sử thanh toán của game player này");
+        }
         return ResponseEntity.ok(paymentService.getGamePlayerPayments(gamePlayerId));
     }
 
@@ -287,7 +303,7 @@ public class PaymentController {
                     "walletBalance", user.getWalletBalance(),
                     "balance", user.getWalletBalance()));
         } catch (Exception e) {
-            logger.error("Lỗi khi nạp coin: {}", e.getMessage());
+            log.error("Lỗi khi nạp coin: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Lỗi khi nạp coin: " + e.getMessage());
         }
     }
@@ -406,9 +422,12 @@ public class PaymentController {
                 return ResponseEntity.badRequest().body("Tên ngân hàng không được để trống");
             }
 
-            // Khấu trừ coin ngay lập tức để tránh double-spending
+            // Khấu trừ coin an toàn ngay lập tức để tránh double-spending
+            boolean deducted = userService.deductCoin(player.getId(), coin);
+            if (!deducted) {
+                return ResponseEntity.badRequest().body("Số dư coin không đủ hoặc tài khoản đang có giao dịch khác.");
+            }
             player.setCoin(currentCoin - coin);
-            userService.save(player);
 
             Payment payment = new Payment();
             payment.setUser(player);
@@ -462,7 +481,7 @@ public class PaymentController {
                     "newBalance", player.getCoin(),
                     "paymentId", savedPayment.getId()));
         } catch (Exception e) {
-            logger.error("Lỗi khi rút tiền: {}", e.getMessage());
+            log.error("Lỗi khi rút tiền: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Lỗi khi rút tiền: " + e.getMessage());
         }
     }
@@ -717,6 +736,7 @@ public class PaymentController {
         }
     }
 
+    @Transactional
     @GetMapping("/vnpay-return")
     public ResponseEntity<String> vnpayReturn(HttpServletRequest request) {
         Map<String, String> params = new HashMap<>();
@@ -765,7 +785,7 @@ public class PaymentController {
             return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
         }
         if ("00".equals(responseCode)) {
-            // Chống Replay Attack: Nếu giao dịch đã hoàn tất trước đó thì không cộng xu trùng lặp
+            // Chống Replay Attack / Race Condition: Nếu giao dịch đã hoàn tất trước đó thì không cộng xu trùng lặp
             if (Payment.PaymentStatus.COMPLETED.equals(payment.getStatus())) {
                 html = "<div style='text-align:center;margin-top:50px;'>"
                     + "<h1 style='color:green;font-size:2.5em;'>Giao dịch đã được ghi nhận thành công!</h1>"
@@ -774,19 +794,39 @@ public class PaymentController {
                 return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
             }
 
+            // Atomic UPDATE ... WHERE status='PENDING' để ngăn chặn cộng xu nhiều lần khi concurrent callback
+            int affectedRows = paymentRepository.updatePaymentStatusIfExpected(
+                payment.getId(),
+                Payment.PaymentStatus.COMPLETED,
+                LocalDateTime.now(),
+                Payment.PaymentStatus.PENDING
+            );
+
+            if (affectedRows == 0) {
+                // Đã có callback/request khác xử lý thành công trước đó
+                html = "<div style='text-align:center;margin-top:50px;'>"
+                    + "<h1 style='color:green;font-size:2.5em;'>Giao dịch đã được ghi nhận thành công!</h1>"
+                    + "<p style='font-size:1.2em;'>Số xu đã được cộng vào tài khoản của bạn trước đó.</p>"
+                    + "</div>";
+                return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+            }
+
             payment.setStatus(Payment.PaymentStatus.COMPLETED);
-            paymentRepository.save(payment);
-            // Cộng xu cho user
+            payment.setCompletedAt(LocalDateTime.now());
+
+            // Cộng xu cho user (chỉ thực hiện 1 lần duy nhất khi chuyển trạng thái thành công)
             User user = payment.getUser();
-            user.setCoin(user.getCoin() + payment.getCoin());
-            userService.save(user);
-            
-            // Gửi thông báo cho admin về giao dịch VNPay thành công
-            try {
-                adminNotificationService.notifyAdminsAboutVnPayTransaction(user, payment.getCoin(), "THÀNH CÔNG");
-            } catch (Exception e) {
-                System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutVnPayTransaction: " + e.getMessage());
-                e.printStackTrace();
+            if (user != null) {
+                userService.addCoin(user.getId(), payment.getCoin());
+                user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + payment.getCoin());
+
+                // Gửi thông báo cho admin về giao dịch VNPay thành công
+                try {
+                    adminNotificationService.notifyAdminsAboutVnPayTransaction(user, payment.getCoin(), "THÀNH CÔNG");
+                } catch (Exception e) {
+                    System.err.println("[PaymentController] Error calling adminNotificationService.notifyAdminsAboutVnPayTransaction: " + e.getMessage());
+                    e.printStackTrace();
+                }
             }
             html = "<div style='text-align:center;margin-top:50px;'>"
                 + "<h1 style='color:green;font-size:2.5em;'>Nạp tiền thành công!</h1>"
@@ -807,7 +847,7 @@ public class PaymentController {
         }
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     @PostMapping("/donate")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> donate(@RequestBody DonateRequest request, Authentication authentication) {
@@ -1112,6 +1152,19 @@ public class PaymentController {
         // 4. Danh sách Top Player kèm Exp (Số giờ chơi của đơn ĐÃ HOÀN THÀNH * 600 + Exp Quà Tặng) - Gộp theo userId
         Map<Long, Map<String, Object>> userPlayerMap = new java.util.LinkedHashMap<>();
 
+        // Batch prefetch review stats to eliminate N+1 queries in leaderboard
+        List<Object[]> allGpReviewStats = playerReviewRepository.getAllGamePlayerReviewStats();
+        Map<Long, Object[]> gpReviewMap = new HashMap<>();
+        for (Object[] row : allGpReviewStats) {
+            if (row != null && row[0] != null) gpReviewMap.put(((Number) row[0]).longValue(), row);
+        }
+
+        List<Object[]> allUserReviewStats = playerReviewRepository.getAllUserReviewStats();
+        Map<Long, Object[]> userReviewMap = new HashMap<>();
+        for (Object[] row : allUserReviewStats) {
+            if (row != null && row[0] != null) userReviewMap.put(((Number) row[0]).longValue(), row);
+        }
+
         for (GamePlayer gp : allPlayers) {
             if ("BANNED".equalsIgnoreCase(gp.getStatus())) continue;
             Long gpId = gp.getId();
@@ -1121,34 +1174,23 @@ public class PaymentController {
             long completedOrders = playerCompletedOrderCountMap.getOrDefault(gpId, 0L);
             long orderHours = playerTotalHoursMap.getOrDefault(gpId, 0L);
 
-            // Lấy reviews thực tế từ playerReviewRepository
-            List<PlayerReview> userReviews = (gp.getUser() != null)
-                    ? playerReviewRepository.findByGamePlayerUserId(gp.getUser().getId())
-                    : java.util.Collections.emptyList();
-            List<PlayerReview> gpReviews = playerReviewRepository.findByGamePlayerId(gpId);
-            int reviewCount = Math.max(userReviews.size(), gpReviews.size());
+            // Lấy review stats từ precomputed batch maps (Zero N+1)
+            Object[] userStat = (gp.getUser() != null) ? userReviewMap.get(gp.getUser().getId()) : null;
+            Object[] gpStat = gpReviewMap.get(gpId);
+
+            int userReviewCount = (userStat != null && userStat[1] != null) ? ((Number) userStat[1]).intValue() : 0;
+            int gpReviewCount = (gpStat != null && gpStat[1] != null) ? ((Number) gpStat[1]).intValue() : 0;
+            int reviewCount = Math.max(userReviewCount, gpReviewCount);
 
             Double avgRating = null;
-            if (reviewCount > 0) {
-                if (gp.getUser() != null) {
-                    avgRating = playerReviewRepository.getAverageRatingByPlayerId(gp.getUser().getId());
-                }
-                if (avgRating == null) {
-                    avgRating = playerReviewRepository.getAverageRatingByGamePlayerId(gpId);
-                }
+            if (userStat != null && userStat[2] != null) {
+                avgRating = ((Number) userStat[2]).doubleValue();
+            } else if (gpStat != null && gpStat[2] != null) {
+                avgRating = ((Number) gpStat[2]).doubleValue();
             }
             double finalRating = (reviewCount > 0 && avgRating != null)
                     ? Math.round(avgRating * 10.0) / 10.0
                     : 0.0;
-
-            // Đồng bộ DB nếu chưa có review nào nhưng DB lưu rating ảo
-            if (reviewCount == 0 && gp.getRating() != null) {
-                gp.setRating(null);
-                gamePlayerRepository.save(gp);
-            } else if (reviewCount > 0 && (gp.getRating() == null || !gp.getRating().equals(finalRating))) {
-                gp.setRating(finalRating);
-                gamePlayerRepository.save(gp);
-            }
 
             if (!userPlayerMap.containsKey(userId)) {
                 Map<String, Object> pMap = new HashMap<>();
@@ -1211,15 +1253,18 @@ public class PaymentController {
             return ratB.compareTo(ratA);
         });
 
-        // 5. Danh sách Top Phú Hộ (Chỉ tính Donate Quà + Thuê Player)
-        List<User> allUsers = userService.findAll();
+        // 5. Danh sách Top Phú Hộ (Chỉ load các user có giao dịch chi tiêu > 0)
+        Set<Long> activeSpenderIds = new HashSet<>(userDonateSpentMap.keySet());
+        activeSpenderIds.addAll(userHireSpentMap.keySet());
+        List<User> spenderUsers = activeSpenderIds.isEmpty() ? Collections.emptyList() : userService.findAllById(activeSpenderIds);
         List<Map<String, Object>> topDonatorList = new java.util.ArrayList<>();
 
-        for (User u : allUsers) {
+        for (User u : spenderUsers) {
             Long uId = u.getId();
             long donateSpent = userDonateSpentMap.getOrDefault(uId, 0L);
             long hireSpent = userHireSpentMap.getOrDefault(uId, 0L);
             long totalSpent = donateSpent + hireSpent;
+            if (totalSpent <= 0) continue;
 
             Map<String, Object> uMap = new HashMap<>();
             uMap.put("id", u.getId());

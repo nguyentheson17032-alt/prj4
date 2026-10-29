@@ -45,15 +45,16 @@ public class OrderService {
     @Autowired(required = false)
     private OrderPayoutService orderPayoutService;
 
-    // Chạy mỗi 5 phút
+    // Chạy mỗi 5 phút để nhắc nhở đơn sắp bắt đầu / sắp kết thúc
+    // Có cờ upcomingReminderSent và endingReminderSent trên Order để chống gửi trùng lặp
     @Scheduled(fixedRate = 300000)
+    @Transactional
     public void notifyUpcomingOrders() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime soon = now.plusMinutes(15);
-        List<Order> upcoming = orderRepository.findAll().stream()
-            .filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus()))
-            .filter(o -> o.getStartTime() != null && o.getStartTime().isAfter(now) && o.getStartTime().isBefore(soon))
-            .toList();
+
+        // 1. Nhắc sắp đến giờ thuê (query chỉ lấy đơn CONFIRMED, chưa gửi nhắc, startTime trong [now, soon])
+        List<Order> upcoming = orderRepository.findUpcomingOrdersToNotify(now, soon);
         java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("HH:mm 'ngày' dd/MM/yyyy");
         for (Order order : upcoming) {
             String startTimeStr = order.getStartTime() != null ? order.getStartTime().format(dtf) : "";
@@ -77,12 +78,13 @@ public class OrderService {
                     order.getId().toString()
                 );
             }
+            // Đánh dấu đã gửi nhắc nhở để không gửi lại
+            order.setUpcomingReminderSent(true);
+            orderRepository.save(order);
         }
-        // Nhắc nhở khi sắp kết thúc
-        List<Order> ending = orderRepository.findAll().stream()
-            .filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus()))
-            .filter(o -> o.getEndTime() != null && o.getEndTime().isAfter(now) && o.getEndTime().isBefore(soon))
-            .toList();
+
+        // 2. Nhắc nhở khi sắp kết thúc (query chỉ lấy đơn CONFIRMED, chưa gửi nhắc kết thúc, endTime trong [now, soon])
+        List<Order> ending = orderRepository.findEndingOrdersToNotify(now, soon);
         for (Order order : ending) {
             String endTimeStr = order.getEndTime() != null ? order.getEndTime().format(dtf) : "";
             if (order.getRenter() != null) {
@@ -105,6 +107,9 @@ public class OrderService {
                     order.getId().toString()
                 );
             }
+            // Đánh dấu đã gửi nhắc nhở kết thúc
+            order.setEndingReminderSent(true);
+            orderRepository.save(order);
         }
     }
 
@@ -115,11 +120,8 @@ public class OrderService {
         LocalDateTime now = LocalDateTime.now();
         logger.info("Checking for orders that need to be auto-completed and review notifications...");
         
-        // Lấy tất cả đơn hàng đã kết thúc (endTime < now) và có trạng thái CONFIRMED
-        List<Order> expiredOrders = orderRepository.findAll().stream()
-            .filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus()))
-            .filter(o -> o.getEndTime() != null && o.getEndTime().isBefore(now))
-            .toList();
+        // Sử dụng query trực tiếp theo status và endTime, không tải toàn bộ bảng orders
+        List<Order> expiredOrders = orderRepository.findExpiredConfirmedOrders(now);
         
         logger.info("Found {} expired orders to auto-complete", expiredOrders.size());
         
@@ -263,7 +265,7 @@ public class OrderService {
                 notificationService.createNotification(
                     order.getRenter().getId(),
                     "Đánh giá player sau khi thuê",
-                    "Đơn thuê với " + playerName + " đã hoàn thành. Hãy đánh giá trải nghiệm của bạn!",
+                    "Đơn thuê với " + playerName + " đã kết thúc. Hãy đánh giá trải nghiệm của bạn!",
                     "order_review_reminder",
                     null,
                     order.getId().toString()
@@ -279,9 +281,7 @@ public class OrderService {
 
     @Transactional
     public void migratePaymentsToOrders() {
-        List<Payment> payments = paymentRepository.findAll().stream()
-            .filter(p -> p.getType() != null && p.getType().name().equals("HIRE"))
-            .toList();
+        List<Payment> payments = paymentRepository.findByType(Payment.PaymentType.HIRE);
         for (Payment payment : payments) {
             Order order = new Order();
             order.setRenter(payment.getUser());
@@ -293,4 +293,4 @@ public class OrderService {
             orderRepository.save(order);
         }
     }
-} 
+}

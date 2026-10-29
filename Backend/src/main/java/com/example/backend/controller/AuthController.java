@@ -6,8 +6,11 @@ import com.example.backend.service.UserService;
 import com.example.backend.service.NotificationService;
 import com.example.backend.service.PasswordResetService;
 import lombok.Data;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import jakarta.servlet.http.Cookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -156,7 +159,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request) {
         try {
             // Validate input
             if (loginRequest.getUsername() == null || loginRequest.getUsername().trim().isEmpty()) {
@@ -257,7 +260,17 @@ public class AuthController {
             response.put("avatar", avatar);
             response.put("avatarUrl", avatar);
 
-            return ResponseEntity.ok(response);
+            ResponseCookie jwtCookie = ResponseCookie.from("jwt_token", token)
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .path("/")
+                .maxAge(86400)
+                .sameSite("Lax")
+                .build();
+
+            return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                .body(response);
         } catch (BadCredentialsException e) {
             logger.warn("Đăng nhập thất bại cho user: {}", loginRequest.getUsername());
             return ResponseEntity.status(401).body("Tên đăng nhập hoặc mật khẩu không đúng");
@@ -322,8 +335,11 @@ public class AuthController {
     }
 
     @PostMapping("/refresh-token")
-    public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest request, HttpServletRequest httpRequest) {
         try {
+            if (!jwtTokenUtil.isRefreshToken(request.getRefreshToken())) {
+                return ResponseEntity.status(401).body("Token không phải là refresh token hợp lệ");
+            }
             String username = jwtTokenUtil.getUsernameFromToken(request.getRefreshToken());
             UserDetails userDetails = userService.loadUserByUsername(username);
             
@@ -331,10 +347,20 @@ public class AuthController {
                 String newToken = jwtTokenUtil.generateToken(userDetails);
                 String newRefreshToken = jwtTokenUtil.generateRefreshToken(userDetails);
                 
-                return ResponseEntity.ok(Map.of(
-                    "token", newToken,
-                    "refreshToken", newRefreshToken
-                ));
+                ResponseCookie jwtCookie = ResponseCookie.from("jwt_token", newToken)
+                    .httpOnly(true)
+                    .secure(httpRequest.isSecure())
+                    .path("/")
+                    .maxAge(86400)
+                    .sameSite("Lax")
+                    .build();
+
+                return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                    .body(Map.of(
+                        "token", newToken,
+                        "refreshToken", newRefreshToken
+                    ));
             }
             
             return ResponseEntity.status(401).body("Refresh token không hợp lệ");
@@ -346,27 +372,48 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest request, Authentication authentication) {
+        String jwt = null;
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String jwt = authHeader.substring(7);
+            jwt = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("jwt_token".equals(cookie.getName())) {
+                    jwt = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        if (jwt != null && !jwt.trim().isEmpty()) {
             try {
                 jwtTokenUtil.invalidateToken(jwt);
             } catch (Exception e) {
                 logger.warn("Could not invalidate JWT on logout: {}", e.getMessage());
             }
         }
-        if (authentication == null) return ResponseEntity.ok().build();
-        User user = userService.findByUsername(authentication.getName());
-        if (user != null) {
-            userService.setUserOffline(user.getId());
-            user.setDeviceToken(null);
-            userRepository.save(user);
+        if (authentication != null) {
+            User user = userService.findByUsername(authentication.getName());
+            if (user != null) {
+                userService.setUserOffline(user.getId());
+                user.setDeviceToken(null);
+                userRepository.save(user);
+            }
         }
-        return ResponseEntity.ok().build();
+        ResponseCookie clearCookie = ResponseCookie.from("jwt_token", "")
+            .httpOnly(true)
+            .secure(request.isSecure())
+            .path("/")
+            .maxAge(0)
+            .sameSite("Lax")
+            .build();
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+            .build();
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
+    public ResponseEntity<?> getCurrentUser(Authentication authentication, HttpServletRequest request) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).body("Chưa đăng nhập");
         }
@@ -420,7 +467,19 @@ public class AuthController {
         response.put("avatar", avatar);
         response.put("avatarUrl", avatar);
 
-        return ResponseEntity.ok(response);
+        String token = jwtTokenUtil.getTokenFromRequest();
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok();
+        if (token != null && !token.trim().isEmpty()) {
+            ResponseCookie jwtCookie = ResponseCookie.from("jwt_token", token)
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .path("/")
+                .maxAge(86400)
+                .sameSite("Lax")
+                .build();
+            responseBuilder.header(HttpHeaders.SET_COOKIE, jwtCookie.toString());
+        }
+        return responseBuilder.body(response);
     }
 
     @PutMapping("/update")
@@ -514,6 +573,9 @@ public class AuthController {
     @GetMapping(value = "/avatar/{userId}", produces = MediaType.IMAGE_JPEG_VALUE)
     public ResponseEntity<byte[]> getAvatar(@PathVariable Long userId) {
         User user = userService.findById(userId);
+        if (user == null || user.getAvatarData() == null) {
+            return ResponseEntity.notFound().build();
+        }
         byte[] image = user.getAvatarData();
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(image);
     }
@@ -529,20 +591,40 @@ public class AuthController {
     @GetMapping(value = "/profile-image/{userId}", produces = MediaType.IMAGE_JPEG_VALUE)
     public ResponseEntity<byte[]> getProfileImage(@PathVariable Long userId) {
         User user = userService.findById(userId);
+        if (user == null || user.getProfileImageData() == null) {
+            return ResponseEntity.notFound().build();
+        }
         byte[] image = user.getProfileImageData();
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(image);
     }
 
     @PostMapping("/update/avatar-from-url")
     public ResponseEntity<?> updateAvatarFromUrl(@RequestBody ImageUrlRequest request, Authentication authentication) throws IOException {
+        if (request == null || request.getUrl() == null || request.getUrl().isBlank()) {
+            return ResponseEntity.badRequest().body("URL không được để trống");
+        }
+        URL parsedUrl;
+        try {
+            parsedUrl = java.net.URI.create(request.getUrl()).toURL();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("URL không hợp lệ");
+        }
+        String host = parsedUrl.getHost() != null ? parsedUrl.getHost().toLowerCase() : "";
+        if (!"https".equalsIgnoreCase(parsedUrl.getProtocol()) ||
+            (!host.equals("dicebear.com") && !host.endsWith(".dicebear.com") && !host.equals("api.dicebear.com"))) {
+            return ResponseEntity.badRequest().body("URL không được phép. Chỉ chấp nhận HTTPS từ dicebear.com");
+        }
+
         User currentUser = userService.findByUsername(authentication.getName());
-        URL url = new URL(request.getUrl());
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (InputStream is = url.openStream()) {
+        try (InputStream is = parsedUrl.openStream()) {
             byte[] buffer = new byte[8192];
             int n;
             while ((n = is.read(buffer)) > 0) {
                 baos.write(buffer, 0, n);
+                if (baos.size() > 2 * 1024 * 1024) {
+                    return ResponseEntity.badRequest().body("File quá lớn. Kích thước tối đa là 2MB");
+                }
             }
         }
         currentUser.setAvatarData(baos.toByteArray());
@@ -552,14 +634,31 @@ public class AuthController {
 
     @PostMapping("/update/profile-image-from-url")
     public ResponseEntity<?> updateProfileImageFromUrl(@RequestBody ImageUrlRequest request, Authentication authentication) throws IOException {
+        if (request == null || request.getUrl() == null || request.getUrl().isBlank()) {
+            return ResponseEntity.badRequest().body("URL không được để trống");
+        }
+        URL parsedUrl;
+        try {
+            parsedUrl = java.net.URI.create(request.getUrl()).toURL();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("URL không hợp lệ");
+        }
+        String host = parsedUrl.getHost() != null ? parsedUrl.getHost().toLowerCase() : "";
+        if (!"https".equalsIgnoreCase(parsedUrl.getProtocol()) ||
+            (!host.equals("dicebear.com") && !host.endsWith(".dicebear.com") && !host.equals("api.dicebear.com"))) {
+            return ResponseEntity.badRequest().body("URL không được phép. Chỉ chấp nhận HTTPS từ dicebear.com");
+        }
+
         User currentUser = userService.findByUsername(authentication.getName());
-        URL url = new URL(request.getUrl());
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (InputStream is = url.openStream()) {
+        try (InputStream is = parsedUrl.openStream()) {
             byte[] buffer = new byte[8192];
             int n;
             while ((n = is.read(buffer)) > 0) {
                 baos.write(buffer, 0, n);
+                if (baos.size() > 2 * 1024 * 1024) {
+                    return ResponseEntity.badRequest().body("File quá lớn. Kích thước tối đa là 2MB");
+                }
             }
         }
         currentUser.setProfileImageData(baos.toByteArray());
@@ -574,7 +673,10 @@ public class AuthController {
         if (imageUrlObj == null) {
             return ResponseEntity.badRequest().body("imageUrl is required");
         }
-        String imageUrl = imageUrlObj.toString();
+        String imageUrl = imageUrlObj.toString().trim();
+        if (!imageUrl.startsWith("https://")) {
+            return ResponseEntity.badRequest().body("Chỉ chấp nhận HTTPS URL");
+        }
         currentUser.setAvatarUrl(imageUrl);
         userService.save(currentUser);
         return ResponseEntity.ok(Map.of("avatarUrl", imageUrl));
@@ -597,6 +699,12 @@ public class AuthController {
         if (token == null || newPassword == null || newPassword.isBlank()) {
             return ResponseEntity.badRequest().body("Token và mật khẩu mới là bắt buộc");
         }
+        if (newPassword.length() < 8) {
+            return ResponseEntity.badRequest().body("Mật khẩu phải có ít nhất 8 ký tự");
+        }
+        if (!newPassword.matches("^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=]).*$")) {
+            return ResponseEntity.badRequest().body("Mật khẩu phải chứa ít nhất 1 chữ số, 1 chữ thường, 1 chữ hoa và 1 ký tự đặc biệt");
+        }
         boolean result = passwordResetService.resetPassword(token, newPassword);
         if (result) {
             return ResponseEntity.ok(Map.of("message", "Đặt lại mật khẩu thành công!"));
@@ -616,14 +724,19 @@ public class AuthController {
         if (oldPassword == null || oldPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu hiện tại và mật khẩu mới là bắt buộc"));
         }
-        if (newPassword.length() < 6) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu mới phải có ít nhất 6 ký tự"));
+        if (newPassword.length() < 8) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu mới phải có ít nhất 8 ký tự"));
+        }
+        if (!newPassword.matches("^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=]).*$")) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu mới phải chứa ít nhất 1 chữ số, 1 chữ thường, 1 chữ hoa và 1 ký tự đặc biệt (@#$%^&+=)"));
         }
         User user = userService.findByUsername(authentication.getName());
         if (user == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Không tìm thấy thông tin tài khoản"));
         }
-        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+        org.springframework.security.crypto.password.PasswordEncoder encoder = passwordEncoder != null
+                ? passwordEncoder
+                : new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
         if (!encoder.matches(oldPassword, user.getPassword())) {
             return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu hiện tại không chính xác"));
         }

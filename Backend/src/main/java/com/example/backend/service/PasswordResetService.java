@@ -100,4 +100,10 @@ public class PasswordResetService {
         tokenRepository.delete(resetToken);
         return true;
     }
+
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 */30 * * * *") // Chạy định kỳ mỗi 30 phút xóa token reset hết hạn
+    @Transactional
+    public void cleanupExpiredResetTokens() {
+        tokenRepository.deleteByExpiryDateBefore(LocalDateTime.now());
+    }
 }

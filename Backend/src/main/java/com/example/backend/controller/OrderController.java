@@ -19,6 +19,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import com.example.backend.dto.PagedResponse;
+
 
 import org.springframework.security.core.Authentication;
 import com.example.backend.entity.User;
@@ -198,8 +204,10 @@ public class OrderController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<OrderResponseDTO>> getAllOrders(
+    public ResponseEntity<?> getAllOrders(
             @RequestParam(required = false, defaultValue = "false") boolean all,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
             Authentication authentication) {
         User currentUser = null;
         if (authentication != null) {
@@ -208,21 +216,33 @@ public class OrderController {
 
         boolean isAdmin = currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
 
-        List<Order> orders;
-        if (all && isAdmin) {
-            // Xem toàn bộ đơn trong hệ thống (dành cho PlayZone Admin)
-            orders = orderRepository.findAll();
-        } else if (currentUser != null) {
-            // Xem đơn của chính người dùng (người thuê hoặc Idol được thuê)
-            orders = orderRepository.findAllByUserId(currentUser.getId());
-        } else {
-            orders = new ArrayList<>();
-        }
-
         if (orderPayoutService != null) {
             try {
                 orderPayoutService.checkAndReleasePendingPayouts();
             } catch (Exception ignored) {}
+        }
+
+        if (page != null && size != null) {
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                    Math.max(0, page), Math.min(100, Math.max(1, size)), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"));
+            org.springframework.data.domain.Page<Order> paged;
+            if (all && isAdmin) {
+                paged = orderRepository.findAll(pageable);
+            } else if (currentUser != null) {
+                paged = orderRepository.findAllByUserId(currentUser.getId(), pageable);
+            } else {
+                paged = org.springframework.data.domain.Page.empty(pageable);
+            }
+            return ResponseEntity.ok(PagedResponse.from(paged.map(this::mapOrderToDTO)));
+        }
+
+        List<Order> orders;
+        if (all && isAdmin) {
+            orders = orderRepository.findAll();
+        } else if (currentUser != null) {
+            orders = orderRepository.findAllByUserId(currentUser.getId());
+        } else {
+            orders = new ArrayList<>();
         }
 
         orders.sort((o1, o2) -> {
@@ -237,7 +257,15 @@ public class OrderController {
 
     @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<OrderResponseDTO>> getAllOrdersAdmin() {
+    public ResponseEntity<?> getAllOrdersAdmin(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page != null && size != null) {
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                    Math.max(0, page), Math.min(100, Math.max(1, size)), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"));
+            org.springframework.data.domain.Page<Order> paged = orderRepository.findAll(pageable);
+            return ResponseEntity.ok(PagedResponse.from(paged.map(this::mapOrderToDTO)));
+        }
         List<Order> orders = orderRepository.findAll();
         orders.sort((o1, o2) -> {
             if (o1.getStartTime() != null && o2.getStartTime() != null) {
@@ -507,14 +535,33 @@ public class OrderController {
             @RequestParam(required = false) Long playerId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
-        List<Order> orders = orderRepository.findAll();
+        if (userId == null && playerId == null && from == null && to == null) {
+            List<Object[]> rows = orderRepository.getGlobalAggregatedOrderStats();
+            if (!rows.isEmpty() && rows.get(0) != null) {
+                Object[] r = rows.get(0);
+                long totalOrders = r[0] != null ? ((Number) r[0]).longValue() : 0L;
+                long completedOrders = r[1] != null ? ((Number) r[1]).longValue() : 0L;
+                long canceledOrders = r[2] != null ? ((Number) r[2]).longValue() : 0L;
+                long confirmedOrders = r[3] != null ? ((Number) r[3]).longValue() : 0L;
+                long pendingOrders = r[4] != null ? ((Number) r[4]).longValue() : 0L;
+                long totalRevenue = r[5] != null ? ((Number) r[5]).longValue() : 0L;
+                return ResponseEntity.ok(Map.of(
+                        "totalOrders", totalOrders,
+                        "completedOrders", completedOrders,
+                        "canceledOrders", canceledOrders,
+                        "confirmedOrders", confirmedOrders,
+                        "pendingOrders", pendingOrders,
+                        "totalRevenue", totalRevenue));
+            }
+        }
+        List<Order> orders = (userId != null) ? orderRepository.findByRenter_Id(userId)
+                : (playerId != null) ? orderRepository.findByPlayer_Id(playerId)
+                : orderRepository.findAll();
         if (userId != null) {
-            orders = orders.stream().filter(o -> o.getRenter() != null && o.getRenter().getId().equals(userId))
-                    .toList();
+            orders = orders.stream().filter(o -> o.getRenter() != null && o.getRenter().getId().equals(userId)).toList();
         }
         if (playerId != null) {
-            orders = orders.stream().filter(o -> o.getPlayer() != null && o.getPlayer().getId().equals(playerId))
-                    .toList();
+            orders = orders.stream().filter(o -> o.getPlayer() != null && o.getPlayer().getId().equals(playerId)).toList();
         }
         if (from != null) {
             orders = orders.stream().filter(o -> o.getStartTime() != null && !o.getStartTime().isBefore(from)).toList();
@@ -524,19 +571,18 @@ public class OrderController {
         }
         long totalOrders = orders.size();
         long completedOrders = orders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus())).count();
-        long canceledOrders = orders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus())).count();
+        long canceledOrders = orders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus()) || "CANCELLED".equalsIgnoreCase(o.getStatus())).count();
         long confirmedOrders = orders.stream().filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus())).count();
         long pendingOrders = orders.stream().filter(o -> "PENDING".equalsIgnoreCase(o.getStatus())).count();
         long totalRevenue = orders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()))
                 .mapToLong(o -> o.getPrice() != null ? o.getPrice() : 0L).sum();
-        Map<String, Object> stats = Map.of(
+        return ResponseEntity.ok(Map.of(
                 "totalOrders", totalOrders,
                 "completedOrders", completedOrders,
                 "canceledOrders", canceledOrders,
                 "confirmedOrders", confirmedOrders,
                 "pendingOrders", pendingOrders,
-                "totalRevenue", totalRevenue);
-        return ResponseEntity.ok(stats);
+                "totalRevenue", totalRevenue));
     }
 
     @GetMapping("/summary")

@@ -1,6 +1,8 @@
 package com.example.backend.repository;
 
 import com.example.backend.entity.GamePlayer;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,9 +13,16 @@ import java.util.List;
 @Repository
 public interface GamePlayerRepository extends JpaRepository<GamePlayer, Long> {
     List<GamePlayer> findByGameId(Long gameId);
+    Page<GamePlayer> findByGameId(Long gameId, Pageable pageable);
+
     List<GamePlayer> findByUserId(Long userId);
+    Page<GamePlayer> findByUserId(Long userId, Pageable pageable);
+
     boolean existsByUserIdAndGameId(Long userId, Long gameId);
+
     List<GamePlayer> findByStatus(String status);
+    Page<GamePlayer> findByStatus(String status, Pageable pageable);
+
     List<GamePlayer> findByRank(String rank);
     List<GamePlayer> findByRole(String role);
     List<GamePlayer> findByServer(String server);

@@ -12,8 +12,14 @@ import lombok.Data;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import com.example.backend.dto.PagedResponse;
+
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.Arrays;
 import com.example.backend.entity.Game;
 import com.example.backend.repository.GameRepository;
@@ -62,6 +68,7 @@ public class GamePlayerController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.backend.service.OrderPayoutService orderPayoutService;
     private static final Logger log = LoggerFactory.getLogger(GamePlayerController.class);
+    private static final Set<String> VALID_STATUSES = Set.of("AVAILABLE", "HIRED", "OFFLINE", "BUSY", "PENDING", "REJECTED", "BANNED", "APPROVED");
 
     public GamePlayerController(GamePlayerService gamePlayerService, GameRepository gameRepository, UserService userService, PaymentRepository paymentRepository, NotificationService notificationService, RevenueRepository revenueRepository, ReviewRepository reviewRepository, OrderRepository orderRepository, PlayerReviewRepository playerReviewRepository, OrderService orderService) {
         this.gamePlayerService = gamePlayerService;
@@ -249,9 +256,13 @@ public class GamePlayerController {
     public ResponseEntity<ApiResponse<GamePlayer>> updatePlayerStatus(
             @PathVariable Long id,
             @RequestParam String status) {
+        if (status == null || !VALID_STATUSES.contains(status.trim().toUpperCase())) {
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Trạng thái không hợp lệ. Các trạng thái cho phép: " + VALID_STATUSES, null));
+        }
         GamePlayer gamePlayer = gamePlayerService.findById(id);
-        gamePlayer.setStatus(status.toUpperCase());
-        if ("AVAILABLE".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status)) {
+        String normalizedStatus = status.trim().toUpperCase();
+        gamePlayer.setStatus(normalizedStatus);
+        if ("AVAILABLE".equals(normalizedStatus) || "APPROVED".equals(normalizedStatus)) {
             gamePlayer.setStatus("AVAILABLE");
             User user = gamePlayer.getUser();
             if (user != null && !user.getRoles().contains("ROLE_PLAYER")) {
@@ -396,8 +407,12 @@ public class GamePlayerController {
             long platformFee = Math.round(originalCoin * 0.15); // 15% chiết khấu nền tảng
             long playerReceivedTotal = originalCoin - platformFee; // 85% Idol thực nhận
 
+            boolean deducted = userService.deductCoin(user.getId(), originalCoin);
+            if (!deducted) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Số coin trong ví không đủ hoặc tài khoản đang có giao dịch khác. Cần " + originalCoin + " xu để thuê.", null));
+            }
             user.setCoin(user.getCoin() - originalCoin);
-            userService.save(user);
 
             // Tạo đơn thuê (Order) với thông tin chiết khấu
             Order order = new Order();
@@ -655,7 +670,15 @@ public class GamePlayerController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllGamePlayers() {
+    public ResponseEntity<?> getAllGamePlayers(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (page != null && size != null) {
+            Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)));
+            Page<GamePlayer> playerPage = gamePlayerService.getAllGamePlayers(pageable);
+            Page<Map<String, Object>> enrichedPage = playerPage.map(this::enrichGamePlayerData);
+            return ResponseEntity.ok(new ApiResponse<>(true, "All game players retrieved successfully", PagedResponse.from(enrichedPage)));
+        }
         List<GamePlayer> gamePlayers = gamePlayerService.getAllGamePlayers();
         List<Map<String, Object>> result = new ArrayList<>();
         for (GamePlayer gp : gamePlayers) {
@@ -704,10 +727,12 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Chỉ có thể từ chối đơn khi đang chờ xác nhận", null));
             }
 
-            // Hoàn lại coin cho người thuê (vì đã trừ khi tạo đơn)
+            // Hoàn lại coin an toàn cho người thuê (vì đã trừ khi tạo đơn)
             User renter = order.getRenter();
-            renter.setCoin(renter.getCoin() + order.getPrice());
-            userService.save(renter);
+            if (renter != null && order.getPrice() != null && order.getPrice() > 0) {
+                userService.addCoin(renter.getId(), order.getPrice());
+                renter.setCoin((renter.getCoin() != null ? renter.getCoin() : 0L) + order.getPrice());
+            }
 
             // Cập nhật trạng thái player
             gamePlayer.setStatus("AVAILABLE");
@@ -772,10 +797,12 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Chỉ có thể hủy đơn khi đang chờ xác nhận", null));
             }
 
-            // Hoàn lại coin cho người thuê (vì đã trừ khi tạo đơn)
+            // Hoàn lại coin an toàn cho người thuê (vì đã trừ khi tạo đơn)
             User renter = order.getRenter();
-            renter.setCoin(renter.getCoin() + order.getPrice());
-            userService.save(renter);
+            if (renter != null && order.getPrice() != null && order.getPrice() > 0) {
+                userService.addCoin(renter.getId(), order.getPrice());
+                renter.setCoin((renter.getCoin() != null ? renter.getCoin() : 0L) + order.getPrice());
+            }
 
             // Cập nhật trạng thái player
             gamePlayer.setStatus("AVAILABLE");

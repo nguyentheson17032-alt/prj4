@@ -1,5 +1,6 @@
 package com.example.backend.repository;
 
+import com.example.backend.entity.Payment;
 import com.example.backend.entity.Revenue;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -7,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface RevenueRepository extends JpaRepository<Revenue, Long> {
@@ -18,4 +20,11 @@ public interface RevenueRepository extends JpaRepository<Revenue, Long> {
 
     @Query("SELECT COALESCE(SUM(r.amount), 0) FROM Revenue r")
     Long sumTotalRevenue();
-} 
+
+    @Query("SELECT r FROM Revenue r WHERE r.payment.description LIKE CONCAT('%#', :orderId, '%')")
+    List<Revenue> findByOrderDescription(@Param("orderId") Long orderId);
+
+    List<Revenue> findByPayment(Payment payment);
+
+    Optional<Revenue> findFirstByOrderByIdAsc();
+}

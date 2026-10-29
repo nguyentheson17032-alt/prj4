@@ -39,16 +39,15 @@ public class PlayerRewardService {
                 long rewardCoin = REWARDS.get(i);
                 User user = player.getUser();
                 if (user != null) {
-                    user.setCoin(user.getCoin() + rewardCoin);
-                    userRepository.save(user);
+                    userRepository.addCoinSafely(user.getId(), rewardCoin);
+                    user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + rewardCoin);
                 }
-                // Trừ vào doanh thu app (giả sử có 1 bản ghi doanh thu tổng)
-                List<Revenue> revenues = revenueRepository.findAll();
-                if (!revenues.isEmpty()) {
-                    Revenue appRevenue = revenues.get(0);
-                    appRevenue.setAmount(appRevenue.getAmount() - rewardCoin);
+                // Trừ vào doanh thu app
+                revenueRepository.findFirstByOrderByIdAsc().ifPresent(appRevenue -> {
+                    long newAmt = Math.max(0L, (appRevenue.getAmount() != null ? appRevenue.getAmount() : 0L) - rewardCoin);
+                    appRevenue.setAmount(newAmt);
                     revenueRepository.save(appRevenue);
-                }
+                });
                 PlayerRewardHistory history = new PlayerRewardHistory();
                 history.setPlayer(player);
                 history.setMilestone(i + 1);

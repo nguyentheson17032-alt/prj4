@@ -1,6 +1,7 @@
 package com.example.backend.controller;
 
 import com.example.backend.entity.Review;
+import com.example.backend.entity.User;
 import com.example.backend.service.ReviewService;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.exception.ReviewException;
@@ -55,10 +56,21 @@ public class ReviewController {
     @Operation(summary = "Update a review")
     @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Review> updateReview(
+    public ResponseEntity<?> updateReview(
             @Parameter(description = "Review ID") @PathVariable Long id,
-            @Valid @RequestBody ReviewRequest request) {
+            @Valid @RequestBody ReviewRequest request,
+            Authentication authentication) {
         try {
+            Review existing = reviewService.findById(id);
+            User currentUser = userService.findByUsername(authentication.getName());
+            boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
+                    (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+            boolean isOwner = existing.getUser() != null && currentUser != null &&
+                    existing.getUser().getId().equals(currentUser.getId());
+            if (!isAdmin && !isOwner) {
+                return ResponseEntity.status(403).body("Bạn không có quyền chỉnh sửa đánh giá này");
+            }
+
             Review review = reviewService.updateReview(
                     id,
                     request.getRating(),
@@ -73,9 +85,20 @@ public class ReviewController {
     @Operation(summary = "Delete a review")
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteReview(
-            @Parameter(description = "Review ID") @PathVariable Long id) {
+    public ResponseEntity<?> deleteReview(
+            @Parameter(description = "Review ID") @PathVariable Long id,
+            Authentication authentication) {
         try {
+            Review existing = reviewService.findById(id);
+            User currentUser = userService.findByUsername(authentication.getName());
+            boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
+                    (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+            boolean isOwner = existing.getUser() != null && currentUser != null &&
+                    existing.getUser().getId().equals(currentUser.getId());
+            if (!isAdmin && !isOwner) {
+                return ResponseEntity.status(403).body("Bạn không có quyền xóa đánh giá này");
+            }
+
             reviewService.deleteReview(id);
             return ResponseEntity.ok().build();
         } catch (ResourceNotFoundException e) {

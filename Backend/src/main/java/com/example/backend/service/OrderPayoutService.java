@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -52,8 +54,8 @@ public class OrderPayoutService {
 
         User playerUser = order.getPlayer().getUser();
         if (amount > 0) {
-            long oldCoin = playerUser.getCoin() != null ? playerUser.getCoin() : 0L;
-            playerUser.setCoin(oldCoin + amount);
+            userRepository.addCoinSafely(playerUser.getId(), amount);
+            playerUser.setCoin((playerUser.getCoin() != null ? playerUser.getCoin() : 0L) + amount);
             userRepository.save(playerUser);
         }
 
@@ -103,25 +105,34 @@ public class OrderPayoutService {
     }
 
     /**
-     * Quét và tự động mở khóa các đơn đã quá 24h hoặc đã đánh giá >= 4 sao
+     * Quét và tự động mở khóa các đơn đã quá 24h hoặc đã đánh giá >= 4 sao.
+     * Tối ưu hóa: Chỉ truy vấn các đơn có status = COMPLETED và payoutStatus = PENDING (không dùng findAll).
+     * Truy vấn batch review và report để tránh N+1.
      */
     @Scheduled(fixedRate = 60000) // chạy mỗi phút
     @Transactional
     public void checkAndReleasePendingPayouts() {
         try {
-            List<Order> orders = orderRepository.findAll();
+            List<Order> pendingOrders = orderRepository.findByStatusIgnoreCaseAndPayoutStatusIgnoreCase("COMPLETED", "PENDING");
+            if (pendingOrders.isEmpty()) {
+                return;
+            }
+
             LocalDateTime now = LocalDateTime.now();
+            List<Long> orderIds = pendingOrders.stream().map(Order::getId).toList();
 
-            for (Order order : orders) {
-                if (!"COMPLETED".equalsIgnoreCase(order.getStatus())) {
-                    continue;
-                }
-                if (!"PENDING".equalsIgnoreCase(order.getPayoutStatus())) {
-                    continue;
-                }
+            // Batch fetch reviews để giải quyết vấn đề N+1
+            Map<Long, PlayerReview> reviewMap = playerReviewRepository.findByOrderIdIn(orderIds).stream()
+                    .collect(Collectors.toMap(r -> r.getOrder().getId(), r -> r, (a, b) -> a));
 
+            // Batch fetch reports để giải quyết vấn đề N+1
+            Map<Long, Report> reportMap = reportRepository.findByOrderIdIn(orderIds).stream()
+                    .filter(r -> r.getOrder() != null)
+                    .collect(Collectors.toMap(r -> r.getOrder().getId(), r -> r, (a, b) -> a));
+
+            for (Order order : pendingOrders) {
                 // Điều kiện 1: Đã được đánh giá từ 4 sao trở lên
-                PlayerReview review = playerReviewRepository.findByOrderId(order.getId());
+                PlayerReview review = reviewMap.get(order.getId());
                 if (review != null && review.getRating() != null && review.getRating() >= 4.0) {
                     releaseOrderPayout(order, "Được đánh giá " + review.getRating() + " sao");
                     continue;
@@ -137,7 +148,7 @@ public class OrderPayoutService {
                 }
 
                 if (endTime != null && now.isAfter(endTime.plusHours(24))) {
-                    Report report = reportRepository.findByOrderId(order.getId());
+                    Report report = reportMap.get(order.getId());
                     if (report == null || "REJECTED".equalsIgnoreCase(report.getStatus())) {
                         releaseOrderPayout(order, "Đã qua 24h sau khi đơn thuê kết thúc");
                     }
@@ -149,27 +160,31 @@ public class OrderPayoutService {
     }
 
     /**
-     * Tính tổng số tiền đang đóng băng (chờ qua 24h hoặc chờ đánh giá >= 4 sao) của player
+     * Tính tổng số tiền đang đóng băng (chờ qua 24h hoặc chờ đánh giá >= 4 sao) của player.
+     * Tối ưu hóa: Chỉ truy vấn đơn hàng của player cụ thể với status=COMPLETED và payoutStatus=PENDING.
+     * Batch fetch reviews tránh N+1.
      */
     @Transactional(readOnly = true)
     public long getFrozenBalanceForUser(Long userId) {
         if (userId == null) return 0L;
         try {
-            List<Order> orders = orderRepository.findAll();
+            List<Order> orders = orderRepository.findPendingPayoutOrdersByPlayerUserId(userId);
+            if (orders.isEmpty()) {
+                return 0L;
+            }
+
+            List<Long> orderIds = orders.stream().map(Order::getId).toList();
+            Map<Long, PlayerReview> reviewMap = playerReviewRepository.findByOrderIdIn(orderIds).stream()
+                    .collect(Collectors.toMap(r -> r.getOrder().getId(), r -> r, (a, b) -> a));
+
             long total = 0L;
             for (Order order : orders) {
-                if (order.getPlayer() != null && order.getPlayer().getUser() != null 
-                        && userId.equals(order.getPlayer().getUser().getId())) {
-                    if ("COMPLETED".equalsIgnoreCase(order.getStatus()) 
-                            && "PENDING".equalsIgnoreCase(order.getPayoutStatus())) {
-                        PlayerReview review = playerReviewRepository.findByOrderId(order.getId());
-                        if (review == null || review.getRating() == null || review.getRating() < 4.0) {
-                            long amount = order.getPlayerReceived() != null 
-                                    ? order.getPlayerReceived() 
-                                    : Math.round((order.getPrice() != null ? order.getPrice() : 0L) * 0.85);
-                            total += amount;
-                        }
-                    }
+                PlayerReview review = reviewMap.get(order.getId());
+                if (review == null || review.getRating() == null || review.getRating() < 4.0) {
+                    long amount = order.getPlayerReceived() != null 
+                            ? order.getPlayerReceived() 
+                            : Math.round((order.getPrice() != null ? order.getPrice() : 0L) * 0.85);
+                    total += amount;
                 }
             }
             return total;

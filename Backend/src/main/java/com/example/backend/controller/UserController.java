@@ -1,13 +1,22 @@
 package com.example.backend.controller;
 
 import com.example.backend.entity.User;
+import com.example.backend.service.FileStorageService;
 import com.example.backend.service.UserService;
 import com.example.backend.repository.OrderRepository;
 import com.example.backend.repository.PlayerReviewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import com.example.backend.dto.PagedResponse;
+
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +35,11 @@ public class UserController {
     private final UserService userService;
     private final OrderRepository orderRepository;
     private final PlayerReviewRepository playerReviewRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final FileStorageService fileStorageService;
+
+    @Autowired(required = false)
+    private com.example.backend.repository.UserRepository userRepository;
 
     @Autowired(required = false)
     private com.example.backend.repository.UserBanRepository userBanRepository;
@@ -34,55 +48,26 @@ public class UserController {
     private com.example.backend.service.UserBanService userBanService;
 
     @Autowired
-    public UserController(UserService userService, OrderRepository orderRepository, PlayerReviewRepository playerReviewRepository) {
+    public UserController(UserService userService, OrderRepository orderRepository, PlayerReviewRepository playerReviewRepository, PasswordEncoder passwordEncoder, FileStorageService fileStorageService) {
         this.userService = userService;
         this.orderRepository = orderRepository;
         this.playerReviewRepository = playerReviewRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.fileStorageService = fileStorageService;
     }
 
     @GetMapping("/distribution")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> getUserDistribution() {
         try {
-            List<User> allUsers = userService.findAll();
-            
-            // Đếm số lượng user theo vai trò
-            long regularUsers = 0;
-            long gamers = 0;
-            long newUsers = 0;
-            long admins = 0;
-            
             LocalDateTime oneWeekAgo = LocalDateTime.now().minusDays(7);
-            
-            for (User user : allUsers) {
-                // Kiểm tra vai trò
-                boolean isAdmin = false;
-                boolean isGamer = false;
-                
-                if (user.getRoles() != null) {
-                    String rolesStr = user.getRoles().toString().toUpperCase();
-                    isAdmin = rolesStr.contains("ADMIN") || rolesStr.contains("ROLE_ADMIN");
-                    isGamer = rolesStr.contains("GAMER") || rolesStr.contains("PLAYER") || rolesStr.contains("ROLE_GAMER");
-                }
-                
-                // Kiểm tra user mới (đăng ký trong 7 ngày qua)
-                boolean isNewUser = user.getCreatedAt() != null && 
-                                  user.getCreatedAt().isAfter(oneWeekAgo);
-                
-                if (isAdmin) {
-                    admins++;
-                } else if (isGamer) {
-                    gamers++;
-                } else if (isNewUser) {
-                    newUsers++;
-                } else {
-                    regularUsers++;
-                }
-            }
-            
-            // Tạo dữ liệu cho biểu đồ
+            long total = userRepository.count();
+            long admins = userRepository.countAdmins();
+            long gamers = userRepository.countGamers();
+            long newUsers = userRepository.countByCreatedAtAfter(oneWeekAgo);
+            long regularUsers = Math.max(0L, total - admins - gamers);
+
             List<Map<String, Object>> chartData = new ArrayList<>();
-            
             if (regularUsers > 0) {
                 chartData.add(Map.of(
                     "name", "Người dùng thường",
@@ -90,7 +75,6 @@ public class UserController {
                     "color", "#4F46E5"
                 ));
             }
-            
             if (gamers > 0) {
                 chartData.add(Map.of(
                     "name", "Game thủ",
@@ -98,7 +82,6 @@ public class UserController {
                     "color", "#10B981"
                 ));
             }
-            
             if (newUsers > 0) {
                 chartData.add(Map.of(
                     "name", "Người dùng mới",
@@ -106,7 +89,6 @@ public class UserController {
                     "color", "#F59E0B"
                 ));
             }
-            
             if (admins > 0) {
                 chartData.add(Map.of(
                     "name", "Admin",
@@ -114,11 +96,11 @@ public class UserController {
                     "color", "#EF4444"
                 ));
             }
-            
+
             Map<String, Object> result = new HashMap<>();
             result.put("data", chartData);
-            result.put("total", allUsers.size());
-            
+            result.put("total", total);
+
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Lỗi khi lấy dữ liệu phân bổ người dùng: " + e.getMessage()));
@@ -156,7 +138,35 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllUsers() {
+    public ResponseEntity<?> getAllUsers(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        if (userBanService != null) {
+            try {
+                userBanService.processExpiredBans();
+            } catch (Exception ignored) {}
+        }
+        if (page != null && size != null) {
+            Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)), Sort.by(Sort.Direction.DESC, "id"));
+            Page<User> userPage = userService.findAll(pageable);
+            if (userBanRepository != null) {
+                try {
+                    List<com.example.backend.entity.UserBan> activeBans = userBanRepository.findAllActiveBans();
+                    Map<Long, com.example.backend.entity.UserBan> banMap = new HashMap<>();
+                    for (com.example.backend.entity.UserBan b : activeBans) {
+                        if (b.getUser() != null) {
+                            banMap.putIfAbsent(b.getUser().getId(), b);
+                        }
+                    }
+                    for (User u : userPage.getContent()) {
+                        if (banMap.containsKey(u.getId())) {
+                            u.setActiveBan(banMap.get(u.getId()));
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+            return ResponseEntity.ok(PagedResponse.from(userPage));
+        }
         if (userBanService != null) {
             try {
                 userBanService.processExpiredBans();
@@ -234,18 +244,63 @@ public class UserController {
 
     @GetMapping("/details")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllUsersDetails() {
-        List<User> users = userService.findAll();
+    public ResponseEntity<?> getAllUsersDetails(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        List<User> users;
+        org.springframework.data.domain.Page<User> userPage = null;
+        if (page != null && size != null) {
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                    Math.max(0, page), Math.min(100, Math.max(1, size)), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"));
+            userPage = userService.findAll(pageable);
+            users = userPage.getContent();
+        } else {
+            users = userService.findAll();
+        }
+
+        List<Long> userIds = users.stream().map(User::getId).toList();
+
+        // 1. Batch load order counts (Zero N+1)
+        Map<Long, Integer> orderCountMap = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (Object[] row : orderRepository.countOrdersByUserIds(userIds)) {
+                if (row != null && row[0] != null) {
+                    orderCountMap.put(((Number) row[0]).longValue(), ((Number) row[1]).intValue());
+                }
+            }
+        }
+
+        // 2. Batch load review stats (Zero N+1)
+        Map<Long, Integer> reviewCountMap = new HashMap<>();
+        Map<Long, Double> avgRatingMap = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (Object[] row : playerReviewRepository.getUserReviewStatsByUserIds(userIds)) {
+                if (row != null && row[0] != null) {
+                    Long uId = ((Number) row[0]).longValue();
+                    int count = row[1] != null ? ((Number) row[1]).intValue() : 0;
+                    Double avg = row[2] != null ? ((Number) row[2]).doubleValue() : null;
+                    reviewCountMap.put(uId, count);
+                    avgRatingMap.put(uId, avg);
+                }
+            }
+        }
+
         List<UserDetailDTO> userDetails = users.stream()
             .map(user -> {
                 UserDetailDTO dto = UserDetailDTO.fromUser(user);
-                // Tính toán thống kê
-                dto.setTotalOrders(calculateTotalOrders(user.getId()));
-                dto.setTotalReviews(calculateTotalReviews(user.getId()));
-                dto.setAverageRating(calculateAverageRating(user.getId()));
+                dto.setTotalOrders(orderCountMap.getOrDefault(user.getId(), 0));
+                dto.setTotalReviews(reviewCountMap.getOrDefault(user.getId(), 0));
+                dto.setAverageRating(avgRatingMap.get(user.getId()));
                 return dto;
             })
             .collect(java.util.stream.Collectors.toList());
+
+        if (userPage != null) {
+            org.springframework.data.domain.Page<UserDetailDTO> dtoPage = new org.springframework.data.domain.PageImpl<>(
+                    userDetails, userPage.getPageable(), userPage.getTotalElements());
+            return ResponseEntity.ok(PagedResponse.from(dtoPage));
+        }
+
         return ResponseEntity.ok(userDetails);
     }
 
@@ -271,6 +326,11 @@ public class UserController {
         }
         if (userService.existsByEmail(user.getEmail())) {
             return ResponseEntity.badRequest().body("Email already exists");
+        }
+        if (user.getPassword() != null && !user.getPassword().trim().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(user.getPassword().trim()));
+        } else {
+            return ResponseEntity.badRequest().body("Password không được để trống");
         }
         userService.save(user);
         return ResponseEntity.ok(user);
@@ -340,8 +400,7 @@ public class UserController {
         if (newPassword == null || newPassword.length() < 8) {
             return ResponseEntity.badRequest().body("Password must be at least 8 characters");
         }
-        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
-        user.setPassword(encoder.encode(newPassword));
+        user.setPassword(passwordEncoder.encode(newPassword));
         userService.save(user);
         return ResponseEntity.ok("Password reset successfully");
     }
@@ -378,34 +437,41 @@ public class UserController {
     @GetMapping(value = "/{userId}/cover-image-bytes", produces = MediaType.IMAGE_JPEG_VALUE)
     public ResponseEntity<byte[]> getUserCoverImageBytes(@PathVariable Long userId) throws IOException {
         User user = userService.findById(userId);
-        if (user == null || user.getCoverImageUrl() == null) {
+        if (user == null || user.getCoverImageUrl() == null || user.getCoverImageUrl().isBlank()) {
             return ResponseEntity.notFound().build();
         }
-        String filePath = user.getCoverImageUrl();
-        // Đảm bảo đường dẫn vật lý đúng thư mục uploads/cover-images
-        if (!filePath.startsWith("uploads/")) {
-            if (filePath.startsWith("cover-images/")) {
-                filePath = "uploads/" + filePath;
-            } else {
-                filePath = "uploads/cover-images/" + filePath;
-            }
-        }
-        String absPath = System.getProperty("user.dir") + java.io.File.separator + filePath.replace("/", java.io.File.separator);
-        java.io.File file = new java.io.File(absPath);
-        if (!file.exists()) {
+        String filePath = user.getCoverImageUrl().trim();
+        // Không xử lý nếu là external URL
+        if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
             return ResponseEntity.notFound().build();
         }
-        byte[] imageBytes = Files.readAllBytes(Paths.get(file.getAbsolutePath()));
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(imageBytes);
+        // Xóa tiền tố uploads/ nếu có vì FileStorageService resolve từ thư mục uploadDir
+        if (filePath.startsWith("uploads/")) {
+            filePath = filePath.substring("uploads/".length());
+        } else if (!filePath.startsWith("cover-images/")) {
+            filePath = "cover-images/" + filePath;
+        }
+
+        try {
+            Resource resource = fileStorageService.loadFileAsResource(filePath);
+            byte[] imageBytes = resource.getInputStream().readAllBytes();
+            return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(imageBytes);
+        } catch (SecurityException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/recent")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getRecentUsers() {
         var users = userService.findRecentUsers();
         return ResponseEntity.ok(users.stream().map(UserRecentDTO::fromUser).toList());
     }
 
     @GetMapping("/summary")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getUserSummary() {
         var users = userService.findAll();
         return ResponseEntity.ok(users.stream().map(UserSummaryDTO::fromUser).toList());

@@ -7,6 +7,8 @@ import com.example.backend.repository.UserRepository;
 import com.example.backend.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,6 +113,10 @@ public class NotificationService {
 
     public List<Notification> getUserNotifications(Long userId) {
         return notificationRepository.findActiveNotificationsForUser(userId);
+    }
+
+    public Page<Notification> getUserNotificationsPaged(Long userId, Pageable pageable) {
+        return notificationRepository.findActiveNotificationsForUser(userId, pageable);
     }
 
     public List<Notification> getUnreadNotifications(Long userId) {

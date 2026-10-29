@@ -28,7 +28,7 @@ public class TokenBlacklistService {
         return repository.existsById(token);
     }
 
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 */30 * * * *") // Chạy định kỳ mỗi 30 phút xóa token hết hạn
     @Transactional
     public void cleanupExpiredTokens() {
         repository.deleteExpiredTokens(LocalDateTime.now());
