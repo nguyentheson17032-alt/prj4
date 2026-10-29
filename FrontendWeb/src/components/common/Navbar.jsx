@@ -23,12 +23,18 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getUserAvatar } from '../../utils/avatarUtils';
 import api from '../../api/apiService';
+import realtimeService from '../../services/realtimeService';
+import { useLanguage } from '../../context/LanguageContext';
+import { useToast } from '../../context/ToastContext';
+import { Globe } from 'lucide-react';
 import { NotificationDropdown } from './NotificationDropdown';
 import '../../styles/navbar.css';
 
 export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { language, changeLanguage, t } = useLanguage();
+  const { addToast } = useToast();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +44,36 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   const navigate = useNavigate();
+
+  // Real-time WebSocket listener for immediate badge updates
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubMsg = realtimeService.onMessage((msg) => {
+      if (window.location.pathname !== '/chat' && String(msg.senderId) !== String(user.id)) {
+        setUnreadMsgCount(prev => prev + 1);
+      }
+    });
+
+    const unsubNotif = realtimeService.onNotification((notif) => {
+      setUnreadNotifCount(prev => prev + 1);
+      setBellBadgeCount(prev => prev + 1);
+      if (notif?.title) {
+        addToast(`${notif.title}: ${notif.message || ''}`, 'info');
+      }
+    });
+
+    const unsubCounts = realtimeService.onCountsUpdate((counts) => {
+      if (counts?.unreadMessages != null) setUnreadMsgCount(counts.unreadMessages);
+      if (counts?.unreadNotifications != null) setUnreadNotifCount(counts.unreadNotifications);
+    });
+
+    return () => {
+      unsubMsg();
+      unsubNotif();
+      unsubCounts();
+    };
+  }, [user]);
 
   // Poll unread messages and notifications count
   useEffect(() => {
@@ -146,19 +182,19 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
         <nav className="nav-menu">
           <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Flame size={18} />
-            <span>Trang Chủ</span>
+            <span>{t('nav.home')}</span>
           </NavLink>
           <NavLink to="/explore" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Compass size={18} />
-            <span>Khám Phá</span>
+            <span>{t('nav.explore')}</span>
           </NavLink>
           <NavLink to="/moments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Sparkles size={18} />
-            <span>Khoảnh Khắc</span>
+            <span>{t('nav.moments')}</span>
           </NavLink>
           <NavLink to="/orders" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <ShoppingBag size={18} />
-            <span>Đơn Thuê</span>
+            <span>{t('nav.orders')}</span>
           </NavLink>
           {isAdmin && (
             <NavLink
@@ -167,13 +203,37 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
               style={{ color: '#f43f5e', fontWeight: 700 }}
             >
               <ShieldCheck size={18} />
-              <span>Quản Trị</span>
+              <span>{t('nav.admin')}</span>
             </NavLink>
           )}
         </nav>
 
         {/* Right Actions */}
         <div className="nav-actions">
+          {/* Language Switcher */}
+          <button
+            type="button"
+            onClick={() => changeLanguage(language === 'vi' ? 'en' : 'vi')}
+            className="nav-icon-btn"
+            title={language === 'vi' ? 'Chuyển sang Tiếng Anh (EN)' : 'Switch to Vietnamese (VI)'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '6px 10px',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
+            }}
+          >
+            <Globe size={16} />
+            <span>{language === 'vi' ? 'VI' : 'EN'}</span>
+          </button>
+
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}

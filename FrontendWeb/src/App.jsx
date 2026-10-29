@@ -4,6 +4,11 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AudioProvider } from './context/AudioContext';
+import { LanguageProvider } from './context/LanguageContext';
+import { useAuth } from './context/AuthContext';
+import { useEffect } from 'react';
+import { getAuthToken } from './api/apiService';
+import realtimeService from './services/realtimeService';
 
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
@@ -35,7 +40,21 @@ const AppContent = ({
   isWithdrawOpen, setIsWithdrawOpen,
   isAuthOpen, setIsAuthOpen
 }) => {
+  const { user, token } = useAuth();
   const location = useLocation();
+
+  // Realtime connection lifecycle: connect when authenticated user & token are present, disconnect on logout
+  useEffect(() => {
+    const currentToken = token || getAuthToken();
+    if (user?.id && currentToken) {
+      realtimeService.connect(user.id, currentToken);
+    } else {
+      realtimeService.disconnect();
+    }
+    return () => {
+      realtimeService.disconnect();
+    };
+  }, [user?.id, token]);
   const isAdminRoute = location.pathname.startsWith('/admin');
 
   return (
@@ -144,6 +163,7 @@ export const App = () => {
       <AuthProvider>
         <AudioProvider>
           <ToastProvider>
+          <LanguageProvider>
             <Router>
               <AppContent
                 selectedPlayerForHire={selectedPlayerForHire}
@@ -158,6 +178,7 @@ export const App = () => {
                 setIsAuthOpen={setIsAuthOpen}
               />
             </Router>
+          </LanguageProvider>
           </ToastProvider>
         </AudioProvider>
       </AuthProvider>

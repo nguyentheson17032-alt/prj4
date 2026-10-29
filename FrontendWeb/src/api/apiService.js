@@ -38,7 +38,7 @@ export const normalizeGamePlayer = (gp) => {
   const game = gp.game || {};
   const fullName = gp.username || user.fullName || user.username || 'Idol PlayZone';
   const avatar = gp.avatarUrl || user.avatarUrl || gp.avatar || getUserAvatar(user || { username: fullName });
-  const price = Number(gp.pricePerHour || gp.price || 50000);
+  const price = Number(gp.pricePerHour || gp.price || 0);
   const status = (gp.status || 'PENDING').toUpperCase();
 
   const reviewCount = Number(gp.reviewCount ?? gp.ratingCount ?? gp.totalReviews ?? 0);
@@ -58,7 +58,7 @@ export const normalizeGamePlayer = (gp) => {
     avatar: avatar,
     avatarUrl: avatar,
     coverImage: user.coverImageUrl || gp.coverImage || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
-    bio: gp.description || user.bio || gp.bio || 'Sẵn sàng duo leo rank cùng anh em!',
+    bio: gp.description || user.bio || gp.bio || '',
     pricePerHour: price,
     rating: rating,
     reviewCount: reviewCount,
@@ -68,22 +68,22 @@ export const normalizeGamePlayer = (gp) => {
     gender: user.gender || gp.gender || 'FEMALE',
     isVip: isVip,
     isHot: isHot,
-    voiceIntroUrl: gp.voiceIntroUrl || 'https://actions.google.com/sounds/v1/water/rain_heavy.ogg',
-    voiceDuration: gp.voiceDuration || '0:15',
-    rank: gp.rank || 'Cao Thủ',
-    role: gp.role || 'ALL',
-    server: gp.server || 'VN',
-    primaryGame: game.name || gp.primaryGame || 'Liên Quân Mobile',
-    games: gp.games || [
+    voiceIntroUrl: gp.voiceIntroUrl || null,
+    voiceDuration: gp.voiceDuration || null,
+    rank: gp.rank || '',
+    role: gp.role || '',
+    server: gp.server || '',
+    primaryGame: game.name || gp.primaryGame || '',
+    games: Array.isArray(gp.games) && gp.games.length > 0 ? gp.games : (game.name ? [
       {
-        name: game.name || gp.primaryGame || 'Liên Quân Mobile',
-        rank: gp.rank || 'Cao Thủ',
-        role: gp.role || 'ALL',
+        name: game.name,
+        rank: gp.rank || '',
+        role: gp.role || '',
         price: price
       }
-    ],
-    tags: gp.tags || ['Nhiệt tình', 'Leo rank', 'Voice mic'],
-    submittedAt: gp.createdAt ? new Date(gp.createdAt).toLocaleString('vi-VN') : (gp.submittedAt || 'Mới đây')
+    ] : []),
+    tags: Array.isArray(gp.tags) ? gp.tags : [],
+    submittedAt: gp.createdAt ? new Date(gp.createdAt).toLocaleString('vi-VN') : (gp.submittedAt || '')
   };
 };
 
@@ -374,36 +374,21 @@ export const api = {
       console.warn('Backend getPlayers error:', err.message);
     }
 
-    // Lấy danh sách player đăng ký local
-    let localPlayers = [];
-    try {
-      const stored = localStorage.getItem('local_registered_players');
-      if (stored) {
-        localPlayers = JSON.parse(stored).map(normalizeGamePlayer).filter(Boolean);
-      }
-    } catch (e) {
-      console.error('Error reading local_registered_players:', e);
-    }
-
-    // Gộp theo userId — mỗi user chỉ hiển thị 1 card, games[] chứa tất cả game đã đăng ký
+    // Deduplicate by userId so each user shows 1 card
     const byUser = new Map();
-    const allPlayers = [...localPlayers, ...backendPlayers];
-    allPlayers.forEach(p => {
+    backendPlayers.forEach(p => {
       const key = String(p.userId || p.id);
       if (!byUser.has(key)) {
         byUser.set(key, { ...p });
       } else {
         const existing = byUser.get(key);
-        // Merge games array
         const newGames = p.games || [];
         const mergedGames = [...(existing.games || [])];
         newGames.forEach(g => {
           if (!mergedGames.some(eg => eg.name === g.name)) mergedGames.push(g);
         });
         existing.games = mergedGames;
-        // Keep lowest price as display price
         if (p.pricePerHour < existing.pricePerHour) existing.pricePerHour = p.pricePerHour;
-        // Use AVAILABLE status if any registration is available
         if (p.status === 'AVAILABLE') existing.status = 'AVAILABLE';
       }
     });
@@ -441,55 +426,18 @@ export const api = {
   },
 
   async approvePlayer(playerId) {
-    // Cập nhật local storage
-    try {
-      const stored = localStorage.getItem('local_registered_players');
-      if (stored) {
-        const list = JSON.parse(stored);
-        const updated = list.map(p => {
-          if (String(p.id) === String(playerId) || String(p.userId) === String(playerId)) {
-            return { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' };
-          }
-          return p;
-        });
-        localStorage.setItem('local_registered_players', JSON.stringify(updated));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    // Cập nhật backend DB
     try {
       const res = await client.post(`/api/game-players/${playerId}/approve`);
       return res.data;
     } catch (err) {
-      try {
-        const res = await client.put(`/api/game-players/${playerId}/status?status=AVAILABLE`);
-        return res.data;
-      } catch (e) {
-        return { success: true, message: 'Đã phê duyệt' };
-      }
+      const res = await client.put(`/api/game-players/${playerId}/status?status=AVAILABLE`);
+      return res.data;
     }
   },
 
   async rejectPlayer(playerId) {
-    try {
-      const stored = localStorage.getItem('local_registered_players');
-      if (stored) {
-        const list = JSON.parse(stored);
-        const updated = list.filter(p => String(p.id) !== String(playerId) && String(p.userId) !== String(playerId));
-        localStorage.setItem('local_registered_players', JSON.stringify(updated));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    try {
-      const res = await client.delete(`/api/game-players/${playerId}`);
-      return res.data;
-    } catch (err) {
-      return { success: true, message: 'Đã từ chối hồ sơ' };
-    }
+    const res = await client.delete(`/api/game-players/${playerId}`);
+    return res.data;
   },
 
   // Moments
@@ -1369,7 +1317,46 @@ export const api = {
       } catch (_) {}
     }
     return success;
-  }
+  },
+
+  // Payments (VNPay, MoMo, ZaloPay)
+  async createVnPayPayment(amount, orderInfo = 'Nạp coin PlayZone qua VNPay') {
+    const res = await client.post('/api/payments/vnpay/create', null, {
+      params: { amount: Number(amount), orderInfo }
+    });
+    return res.data;
+  },
+
+  async createMomoPayment(amount, orderInfo = 'Nạp coin PlayZone qua MoMo') {
+    const res = await client.post('/api/payments/momo/create', null, {
+      params: { amount: Number(amount), orderInfo }
+    });
+    return res.data;
+  },
+
+  async createZaloPayPayment(amount, orderInfo = 'Nạp coin PlayZone qua ZaloPay') {
+    const res = await client.post('/api/payments/zalopay/create', null, {
+      params: { amount: Number(amount), orderInfo }
+    });
+    return res.data;
+  },
+
+  // Player Income Report & Statements
+  async getPlayerIncomeReport() {
+    const res = await client.get('/api/statistics/player/income');
+    return res.data;
+  },
+
+  async exportPlayerStatement(from, to) {
+    const params = {};
+    if (from) params.from = from;
+    if (to) params.to = to;
+    const res = await client.get('/api/statistics/player/statement', {
+      params,
+      responseType: 'blob'
+    });
+    return res.data;
+  },
 };
 
 export default api;

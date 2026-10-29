@@ -12,6 +12,10 @@ import {
   Gift
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
+import PlayerIncomeDashboard from '../components/wallet/PlayerIncomeDashboard';
+import { Download, BarChart2 } from 'lucide-react';
 import api from '../api/apiService';
 import { getRefundPercentage } from '../components/modals/OrderDetailModal';
 import '../styles/wallet.css';
@@ -211,6 +215,26 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
   const [transactions, setTransactions] = useState([]);
   const [frozenAmount, setFrozenAmount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [mainTab, setMainTab] = useState('TRANSACTIONS'); // 'TRANSACTIONS' | 'IDOL_REPORT'
+  const { addToast } = useToast();
+  const { t } = useLanguage();
+
+  const handleExportStatement = async () => {
+    try {
+      const blob = await api.exportPlayerStatement();
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'text/csv;charset=utf-8;' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `sao_ke_thu_nhap_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      addToast(t('wallet.statementDownloaded', 'Đã xuất và tải file sao kê CSV thành công!'), 'success');
+    } catch (err) {
+      addToast('Xuất sao kê thất bại, vui lòng thử lại', 'error');
+    }
+  };
 
   useEffect(() => {
     if (typeof refreshUser === 'function') {
@@ -598,6 +622,29 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
         </p>
       </div>
 
+      {/* Main Tab Navigation */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+        <button
+          className={`order-tab-btn ${mainTab === 'TRANSACTIONS' ? 'active' : ''}`}
+          onClick={() => setMainTab('TRANSACTIONS')}
+          style={{ padding: '8px 18px', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Wallet size={18} />
+          <span>{t('wallet.history', 'Ví Tiền & Lịch Sử Giao Dịch')}</span>
+        </button>
+        <button
+          className={`order-tab-btn ${mainTab === 'IDOL_REPORT' ? 'active' : ''}`}
+          onClick={() => setMainTab('IDOL_REPORT')}
+          style={{ padding: '8px 18px', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <BarChart2 size={18} />
+          <span>{t('wallet.idolReport', 'Báo Cáo Thu Nhập Idol (Theo Ngày & Tuần)')}</span>
+        </button>
+      </div>
+
+      {mainTab === 'IDOL_REPORT' ? (
+        <PlayerIncomeDashboard />
+      ) : (
       <div className="wallet-grid">
         {/* Left: Balance Card */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -671,7 +718,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 onClick={onOpenDeposit}
               >
                 <PlusCircle size={18} />
-                <span>Nạp Tiền</span>
+                <span>{t('wallet.topup', 'Nạp Tiền')}</span>
               </button>
               <button
                 className="btn btn-outline"
@@ -688,7 +735,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 onClick={onOpenWithdraw}
               >
                 <ArrowUpRight size={18} />
-                <span>Rút Tiền</span>
+                <span>{t('wallet.withdraw', 'Rút Tiền')}</span>
               </button>
             </div>
           </div>
@@ -711,56 +758,67 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
         {/* Right: Transaction History */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Lịch Sử Biến Động Số Dư</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Lịch Sử Biến Động Số Dư</h3>
+              <button
+                className="btn btn-outline"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={handleExportStatement}
+                title="Xuất sao kê giao dịch dạng file CSV / Excel"
+              >
+                <Download size={14} />
+                <span>{t('wallet.exportStatement', 'Xuất CSV')}</span>
+              </button>
+            </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 className={`order-tab-btn ${filterType === 'ALL' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                 onClick={() => setFilterType('ALL')}
               >
-                Tất Cả
+                {t('wallet.all', 'Tất Cả')}
               </button>
               <button
                 className={`order-tab-btn ${filterType === 'DEPOSIT' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                 onClick={() => setFilterType('DEPOSIT')}
               >
-                Nạp Tiền
+                {t('wallet.deposit', 'Nạp Tiền')}
               </button>
               <button
                 className={`order-tab-btn ${filterType === 'WITHDRAW' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                 onClick={() => setFilterType('WITHDRAW')}
               >
-                Rút Tiền
+                {t('wallet.withdraw', 'Rút Tiền')}
               </button>
               <button
                 className={`order-tab-btn ${filterType === 'PAYMENT' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                 onClick={() => setFilterType('PAYMENT')}
               >
-                Thuê Player
+                {t('wallet.payment', 'Thuê Player')}
               </button>
               <button
                 className={`order-tab-btn ${filterType === 'RECEIVE' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                 onClick={() => setFilterType('RECEIVE')}
               >
-                Nhận Tiền Thuê
+                {t('wallet.receive', 'Nhận Tiền Thuê')}
               </button>
               <button
                 className={`order-tab-btn ${filterType === 'DONATE' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                 onClick={() => setFilterType('DONATE')}
               >
-                Tặng / Nhận Quà
+                {t('wallet.donate', 'Tặng / Nhận Quà')}
               </button>
               <button
                 className={`order-tab-btn ${filterType === 'REFUND' ? 'active' : ''}`}
                 style={{ padding: '6px 12px', fontSize: '0.82rem' }}
                 onClick={() => setFilterType('REFUND')}
               >
-                Tiền Hoàn
+                {t('wallet.refund', 'Tiền Hoàn')}
               </button>
             </div>
           </div>
@@ -901,6 +959,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

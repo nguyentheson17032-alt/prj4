@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { X, Wallet, QrCode, CreditCard, ShieldCheck, Check, Sparkles } from 'lucide-react';
+import { X, Wallet, QrCode, CreditCard, ShieldCheck, Check, Sparkles, Smartphone, ExternalLink } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
+import api from '../../api/apiService';
 import '../../styles/modals.css';
 
 export const DepositModal = ({ isOpen, onClose }) => {
   const { deposit, user } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
 
   const [amount, setAmount] = useState(100000);
-  const [paymentMethod, setPaymentMethod] = useState('VIETQR'); // VIETQR, VNPAY, MOMO
+  const [paymentMethod, setPaymentMethod] = useState('VIETQR'); // VIETQR, VNPAY, MOMO, ZALOPAY
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastDepositInfo, setLastDepositInfo] = useState(null);
@@ -37,25 +40,45 @@ export const DepositModal = ({ isOpen, onClose }) => {
   const handleDeposit = async () => {
     setIsProcessing(true);
     try {
-      await deposit(totalReceived);
-      setLastDepositInfo({
-        amount,
-        bonusAmount,
-        bonusLabel: selectedPreset.bonus,
-        totalReceived
-      });
-      setIsProcessing(false);
-      setIsSuccess(true);
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-      const bonusText = bonusAmount > 0 ? ` (+${bonusAmount.toLocaleString('vi-VN')} đ thưởng)` : '';
-      addToast(`Nạp thành công! Đã cộng ${totalReceived.toLocaleString('vi-VN')} đ${bonusText} vào ví.`, 'success');
+      if (paymentMethod === 'VNPAY') {
+        const gatewayResult = await api.createVnPayPayment(amount, `Nạp coin PlayZone ${amount} đ qua VNPay`);
+        const targetUrl = gatewayResult?.paymentUrl || gatewayResult?.payUrl;
+        if (targetUrl) {
+          window.location.href = targetUrl;
+          return;
+        }
+        throw new Error('Không nhận được liên kết thanh toán từ cổng VNPay');
+      }
+
+      if (paymentMethod === 'MOMO') {
+        const gatewayResult = await api.createMomoPayment(amount, `Nạp coin PlayZone ${amount} đ qua MoMo`);
+        const targetUrl = gatewayResult?.payUrl || gatewayResult?.paymentUrl;
+        if (targetUrl) {
+          window.location.href = targetUrl;
+          return;
+        }
+        throw new Error('Không nhận được liên kết thanh toán từ cổng MoMo');
+      }
+
+      if (paymentMethod === 'ZALOPAY') {
+        const gatewayResult = await api.createZaloPayPayment(amount, `Nạp coin PlayZone ${amount} đ qua ZaloPay`);
+        const targetUrl = gatewayResult?.payUrl || gatewayResult?.paymentUrl || gatewayResult?.orderUrl;
+        if (targetUrl) {
+          window.location.href = targetUrl;
+          return;
+        }
+        throw new Error('Không nhận được liên kết thanh toán từ cổng ZaloPay');
+      }
+
+      if (paymentMethod === 'VIETQR') {
+        setIsProcessing(false);
+        addToast('Vui lòng quét mã VietQR và chuyển khoản đúng số tiền để hệ thống tự động cộng coin.', 'info');
+        return;
+      }
     } catch (err) {
       setIsProcessing(false);
-      addToast(err.message || 'Nạp tiền thất bại, vui lòng thử lại', 'error');
+      const errorMsg = err.response?.data?.message || err.response?.data || err.message || 'Nạp tiền thất bại, vui lòng thử lại';
+      addToast(typeof errorMsg === 'string' ? errorMsg : 'Nạp tiền thất bại, vui lòng thử lại', 'error');
     }
   };
 
@@ -72,7 +95,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
         <div className="modal-header">
           <div className="modal-title">
             <Wallet className="gradient-text" size={22} />
-            <span>Nạp Coin Vào Ví PlayZone</span>
+            <span>{t('deposit.title', 'Nạp Coin Vào Ví PlayZone')}</span>
           </div>
           <button className="modal-close-btn" onClick={handleClose}>
             <X size={18} />
@@ -100,7 +123,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
               Nạp Tiền Thành Công!
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Coin đã được nạp tự động vào ví PlayZone của bạn.
+              Coin đã được cộng tự động vào ví PlayZone qua {lastDepositInfo?.method || paymentMethod}.
             </p>
 
             {/* Detailed summary receipt */}
@@ -115,6 +138,14 @@ export const DepositModal = ({ isOpen, onClose }) => {
               flexDirection: 'column',
               gap: '10px'
             }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                <span>Phương thức thanh toán:</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {lastDepositInfo?.method === 'MOMO' ? 'Ví MoMo' :
+                   lastDepositInfo?.method === 'ZALOPAY' ? 'Ví ZaloPay' :
+                   lastDepositInfo?.method === 'VNPAY' ? 'Cổng VNPay' : 'VietQR Quét Mã'}
+                </span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
                 <span>Mệnh giá nạp:</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{(lastDepositInfo?.amount || amount).toLocaleString('vi-VN')} đ</span>
@@ -152,6 +183,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
               <span style={{ color: 'var(--text-secondary)' }}>Số dư ví hiện tại: </span>
               <span className="gradient-text">{(user?.balance || 0).toLocaleString('vi-VN')} đ</span>
             </div>
+
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleClose}>
               Xác Nhận & Tiếp Tục
             </button>
@@ -168,7 +200,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
               borderRadius: 'var(--radius-md)',
               marginBottom: '20px'
             }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Số dư ví hiện tại:</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t('deposit.currentBalance', 'Số dư ví hiện tại:')}</span>
               <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-amber)' }}>
                 {(user?.balance || 0).toLocaleString('vi-VN')} đ
               </span>
@@ -176,7 +208,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
 
             {/* Select Amount Presets */}
             <div className="form-group">
-              <label className="form-label">Chọn Mệnh Giá Nạp:</label>
+              <label className="form-label">{t('deposit.chooseAmount', 'Chọn Mệnh Giá Nạp:')}</label>
               <div className="preset-grid">
                 {presetAmounts.map((p) => (
                   <button
@@ -223,48 +255,57 @@ export const DepositModal = ({ isOpen, onClose }) => {
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>Thực nhận vào ví:</span>
+                <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>{t('deposit.receive', 'Thực nhận vào ví:')}</span>
                 <span style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--accent-green)' }}>
                   +{totalReceived.toLocaleString('vi-VN')} đ
                 </span>
               </div>
             </div>
 
-            {/* Select Method */}
+            {/* Select Method (VietQR, VNPay, MoMo, ZaloPay) */}
             <div className="form-group">
-              <label className="form-label">Phương Thức Thanh Toán:</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              <label className="form-label">{t('deposit.chooseMethod', 'Chọn Kênh Thanh Toán:')}</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                 <button
                   type="button"
                   className={`preset-chip ${paymentMethod === 'VIETQR' ? 'active' : ''}`}
                   onClick={() => setPaymentMethod('VIETQR')}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '12px 6px' }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '10px 4px' }}
                 >
                   <QrCode size={20} color="#06b6d4" />
-                  <span style={{ fontSize: '0.8rem' }}>VietQR Quét Mã</span>
+                  <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>VietQR</span>
                 </button>
                 <button
                   type="button"
                   className={`preset-chip ${paymentMethod === 'VNPAY' ? 'active' : ''}`}
                   onClick={() => setPaymentMethod('VNPAY')}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '12px 6px' }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '10px 4px' }}
                 >
                   <CreditCard size={20} color="#3b82f6" />
-                  <span style={{ fontSize: '0.8rem' }}>Cổng VNPay</span>
+                  <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>VNPay</span>
                 </button>
                 <button
                   type="button"
                   className={`preset-chip ${paymentMethod === 'MOMO' ? 'active' : ''}`}
                   onClick={() => setPaymentMethod('MOMO')}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '12px 6px' }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '10px 4px' }}
                 >
                   <Sparkles size={20} color="#ec4899" />
-                  <span style={{ fontSize: '0.8rem' }}>Ví MoMo</span>
+                  <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>Ví MoMo</span>
+                </button>
+                <button
+                  type="button"
+                  className={`preset-chip ${paymentMethod === 'ZALOPAY' ? 'active' : ''}`}
+                  onClick={() => setPaymentMethod('ZALOPAY')}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '10px 4px' }}
+                >
+                  <Smartphone size={20} color="#0068ff" />
+                  <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>ZaloPay</span>
                 </button>
               </div>
             </div>
 
-            {/* Simulated VietQR preview */}
+            {/* Gateway Previews */}
             {paymentMethod === 'VIETQR' && (
               <div style={{
                 textAlign: 'center',
@@ -289,8 +330,62 @@ export const DepositModal = ({ isOpen, onClose }) => {
                   />
                 </div>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                  Quét mã QR bằng ứng dụng ngân hàng bất kỳ để nạp tự động 24/7 (Khớp lệnh sau 3s)
+                  {t('deposit.vietqrDesc', 'Quét mã QR bằng ứng dụng ngân hàng bất kỳ để nạp tự động 24/7 (Khớp lệnh sau 3s)')}
                 </div>
+              </div>
+            )}
+
+            {paymentMethod === 'MOMO' && (
+              <div style={{
+                textAlign: 'center',
+                padding: '16px',
+                background: 'rgba(236, 72, 153, 0.08)',
+                border: '1px dashed #ec4899',
+                borderRadius: 'var(--radius-md)',
+                marginTop: '16px'
+              }}>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ec4899', marginBottom: '6px' }}>
+                  Cổng Thanh Toán Ví MoMo
+                </div>
+                <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  {t('deposit.momoDesc', 'Thanh toán siêu tốc qua ứng dụng MoMo bằng mã QR hoặc tài khoản ví MoMo.')}
+                </p>
+              </div>
+            )}
+
+            {paymentMethod === 'ZALOPAY' && (
+              <div style={{
+                textAlign: 'center',
+                padding: '16px',
+                background: 'rgba(0, 104, 255, 0.08)',
+                border: '1px dashed #0068ff',
+                borderRadius: 'var(--radius-md)',
+                marginTop: '16px'
+              }}>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0068ff', marginBottom: '6px' }}>
+                  Cổng Thanh Toán Ví ZaloPay
+                </div>
+                <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  {t('deposit.zalopayDesc', 'Thanh toán qua ví ZaloPay hoặc quét mã QR trong app Zalo bảo mật 100%.')}
+                </p>
+              </div>
+            )}
+
+            {paymentMethod === 'VNPAY' && (
+              <div style={{
+                textAlign: 'center',
+                padding: '16px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px dashed #3b82f6',
+                borderRadius: 'var(--radius-md)',
+                marginTop: '16px'
+              }}>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#3b82f6', marginBottom: '6px' }}>
+                  Cổng Quốc Gia VNPay-QR
+                </div>
+                <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  {t('deposit.vnpayDesc', 'Hỗ trợ hơn 40 ngân hàng nội địa Việt Nam và thẻ quốc tế Visa / Mastercard.')}
+                </p>
               </div>
             )}
           </div>
@@ -300,7 +395,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
         {!isSuccess && (
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={handleClose}>
-              Hủy
+              {t('common.cancel', 'Hủy')}
             </button>
             <button
               className="btn btn-cyan"
@@ -310,10 +405,10 @@ export const DepositModal = ({ isOpen, onClose }) => {
               <ShieldCheck size={18} />
               <span>
                 {isProcessing
-                  ? 'Đang Xử Lý...'
+                  ? t('deposit.processing', 'Đang Xử Lý...')
                   : bonusAmount > 0
-                    ? `Nạp ${amount.toLocaleString('vi-VN')} đ (Nhận ${totalReceived.toLocaleString('vi-VN')} đ)`
-                    : `Nạp ${amount.toLocaleString('vi-VN')} đ`}
+                    ? `${t('deposit.submit', 'Nạp')} ${amount.toLocaleString('vi-VN')} đ (${t('deposit.receive', 'Nhận')} ${totalReceived.toLocaleString('vi-VN')} đ)`
+                    : `${t('deposit.submit', 'Nạp')} ${amount.toLocaleString('vi-VN')} đ`}
               </span>
             </button>
           </div>

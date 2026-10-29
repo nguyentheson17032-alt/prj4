@@ -4,6 +4,9 @@ import com.example.backend.entity.Message;
 import com.example.backend.entity.User;
 import com.example.backend.entity.GamePlayer;
 import com.example.backend.entity.Conversation;
+import com.example.backend.dto.DetailMessageDTO;
+import com.example.backend.service.WebSocketRealtimeService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.example.backend.service.MessageService;
 import com.example.backend.service.UserService;
 import com.example.backend.service.GamePlayerService;
@@ -33,6 +36,10 @@ public class MessageController {
     private final GamePlayerService gamePlayerService;
     private final GamePlayerRepository gamePlayerRepository;
     private final PlayerImageRepository playerImageRepository;
+
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private WebSocketRealtimeService webSocketRealtimeService;
 
     public MessageController(MessageService messageService,
                              UserService userService,
@@ -91,6 +98,10 @@ public class MessageController {
             message.getTimestamp(),
             message.isRead()
         );
+        if (webSocketRealtimeService != null) {
+            webSocketRealtimeService.broadcastChatMessage(response, sender.getUsername(), receiver.getUsername());
+            webSocketRealtimeService.broadcastUnreadCounts(receiver.getId());
+        }
         return ResponseEntity.ok(response);
     }
 
@@ -160,8 +171,14 @@ public class MessageController {
     }
 
     @PostMapping("/read/{messageId}")
-    public ResponseEntity<?> markMessageAsRead(@PathVariable Long messageId) {
+    public ResponseEntity<?> markMessageAsRead(@PathVariable Long messageId, Authentication authentication) {
         messageService.markMessageAsRead(messageId);
+        if (authentication != null && webSocketRealtimeService != null) {
+            User user = userService.findByUsername(authentication.getName());
+            if (user != null) {
+                webSocketRealtimeService.broadcastUnreadCounts(user.getId());
+            }
+        }
         return ResponseEntity.ok().build();
     }
 
@@ -173,6 +190,9 @@ public class MessageController {
         User otherUser = resolveTargetUser(userId);
         if (otherUser != null) {
             messageService.markAllMessagesAsRead(currentUser, otherUser);
+            if (webSocketRealtimeService != null) {
+                webSocketRealtimeService.broadcastUnreadCounts(currentUser.getId());
+            }
         }
         return ResponseEntity.ok().build();
     }
@@ -312,18 +332,4 @@ class ConversationDetailDTO {
     private LocalDateTime lastMessageTime;
     private int unreadCount;
     private List<DetailMessageDTO> messages;
-}
-
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-class DetailMessageDTO {
-    private Long id;
-    private String content;
-    private Long senderId;
-    private String senderName;
-    private Long receiverId;
-    private String receiverName;
-    private LocalDateTime timestamp;
-    private boolean read;
 }

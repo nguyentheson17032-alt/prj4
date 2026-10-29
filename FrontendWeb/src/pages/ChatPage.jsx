@@ -13,6 +13,7 @@ import api from '../api/apiService';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getUserAvatar } from '../utils/avatarUtils';
+import realtimeService from '../services/realtimeService';
 import '../styles/chat.css';
 
 const formatTime = (timeStr) => {
@@ -247,7 +248,65 @@ export const ChatPage = ({ onHirePlayer }) => {
     };
   }, [user, searchParams]);
 
-  // Polling for incoming messages while viewing ChatPage
+  // Real-time WebSocket listener for instant message arrival
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = realtimeService.onMessage((realtimeMsg) => {
+      if (!realtimeMsg) return;
+      const mapped = mapBackendMessage(realtimeMsg, user.id);
+      const otherPartyId = String(realtimeMsg.senderId) === String(user.id)
+        ? realtimeMsg.receiverId
+        : realtimeMsg.senderId;
+
+      // 1. If currently active conversation matches the message, append it immediately
+      const currentActive = activeConvRef.current;
+      const curPartnerId = currentActive?.partner?.id || currentActive?.partnerId;
+
+      if (curPartnerId && String(curPartnerId) === String(otherPartyId)) {
+        setActiveConv((prev) => {
+          if (!prev) return prev;
+          const prevMsgs = prev.messages || [];
+          if (prevMsgs.some(m => String(m.id) === String(mapped.id))) {
+            return prev;
+          }
+          return {
+            ...prev,
+            lastMessage: mapped.text,
+            lastMessageTime: mapped.time,
+            messages: [...prevMsgs, mapped]
+          };
+        });
+
+        if (mapped.sender === 'them') {
+          api.markAllMessagesAsRead(curPartnerId).catch(() => {});
+        }
+      }
+
+      // 2. Update conversation list
+      setConversations((prev) => {
+        const foundIndex = prev.findIndex(c => String(c.partner?.id || c.partnerId) === String(otherPartyId));
+        if (foundIndex !== -1) {
+          const target = { ...prev[foundIndex] };
+          target.lastMessage = mapped.text;
+          target.lastMessageTime = mapped.time;
+          if (String(curPartnerId) !== String(otherPartyId) && mapped.sender === 'them') {
+            target.unreadCount = (target.unreadCount || 0) + 1;
+          }
+          const list = [...prev];
+          list.splice(foundIndex, 1);
+          return [target, ...list];
+        }
+        return prev;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user]);
+
+  // Background polling as safety fallback while viewing ChatPage
   useEffect(() => {
     if (!user) return;
 

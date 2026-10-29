@@ -95,6 +95,14 @@ public class PaymentController {
     @Autowired(required = false)
     private com.example.backend.service.CommissionService commissionService;
 
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.example.backend.service.MomoService momoService;
+
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.example.backend.service.ZaloPayService zaloPayService;
+
     public PaymentController(PaymentService paymentService, UserService userService,
             PaymentRepository paymentRepository, QRCodeService qrCodeService,
             PlayerReviewRepository playerReviewRepository,
@@ -918,6 +926,334 @@ public class PaymentController {
         }
     }
 
+    @PostMapping("/momo/create")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> createMomoPayment(
+            @RequestParam Long amount,
+            @RequestParam String orderInfo,
+            Authentication authentication) {
+        log.info("=== BẮT ĐẦU: Tạo link MoMo ===");
+        try {
+            if (amount == null || amount <= 0) {
+                return ResponseEntity.badRequest().body("Số tiền nạp không hợp lệ");
+            }
+            User user = userService.findByUsername(authentication.getName());
+            if (user == null) {
+                return ResponseEntity.status(401).body("Không tìm thấy thông tin người dùng đăng nhập");
+            }
+
+            String txnRef = "MOMO_" + System.currentTimeMillis();
+            Payment payment = new Payment();
+            payment.setUser(user);
+            payment.setCoin(amount);
+            payment.setCurrency("VND");
+            payment.setPaymentMethod(Payment.PaymentMethod.MOMO);
+            payment.setStatus(Payment.PaymentStatus.PENDING);
+            payment.setTransactionId(txnRef);
+            payment.setVnpTxnRef(txnRef);
+            payment.setDescription(orderInfo);
+            payment.setCreatedAt(LocalDateTime.now());
+            payment.setType(Payment.PaymentType.TOPUP);
+            Payment savedPayment = paymentRepository.save(payment);
+
+            if (momoService == null) {
+                return ResponseEntity.badRequest().body("Dịch vụ MoMo chưa được khởi tạo");
+            }
+            Map<String, Object> result = momoService.createPayment(amount, orderInfo, txnRef);
+            result.put("paymentId", savedPayment.getId());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo giao dịch MoMo: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Lỗi tạo giao dịch MoMo: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    @GetMapping("/momo-return")
+    public ResponseEntity<String> momoReturn(HttpServletRequest request) {
+        Map<String, String> params = new HashMap<>();
+        request.getParameterMap().forEach((k, v) -> params.put(k, v[0]));
+        if (momoService == null) {
+            String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;'>Dịch vụ MoMo chưa sẵn sàng</h1></div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+        boolean valid = momoService.verifyCallback(new HashMap<>(params));
+
+        String orderId = params.get("orderId");
+        String amountStr = params.get("amount");
+        String transId = params.getOrDefault("transId", "-");
+
+        if (!valid) {
+            String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;font-size:2.5em;'>Chữ ký MoMo không hợp lệ!</h1><p>Giao dịch đã bị từ chối.</p></div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        Payment payment = null;
+        if (orderId != null) {
+            payment = paymentRepository.findByTransactionId(orderId)
+                    .orElseGet(() -> paymentRepository.findByVnpTxnRef(orderId).orElse(null));
+        }
+
+        if (payment == null) {
+            String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;font-size:2.5em;'>Không tìm thấy thông tin đơn hàng MoMo!</h1></div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        if (amountStr != null) {
+            try {
+                long amount = Long.parseLong(amountStr);
+                if (payment.getCoin() == null || payment.getCoin() != amount) {
+                    log.warn("MoMo amount mismatch: order={}, payment={}", amount, payment.getCoin());
+                    String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;font-size:2.5em;'>Số tiền thanh toán MoMo không khớp!</h1></div>";
+                    return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        if (Payment.PaymentStatus.COMPLETED.equals(payment.getStatus())) {
+            String html = "<div style='text-align:center;margin-top:50px;font-family:sans-serif;'>"
+                    + "<h1 style='color:green;font-size:2.5em;'>Giao dịch MoMo đã được ghi nhận trước đó!</h1>"
+                    + "<p style='font-size:1.2em;'>Số xu đã được cộng vào tài khoản của bạn.</p>"
+                    + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 24px;background:#ec4899;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;'>Về ví PlayZone</a>"
+                    + "</div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        int affectedRows = paymentRepository.updatePaymentStatusIfExpected(
+                payment.getId(),
+                Payment.PaymentStatus.COMPLETED,
+                LocalDateTime.now(),
+                Payment.PaymentStatus.PENDING
+        );
+
+        if (affectedRows == 0) {
+            String html = "<div style='text-align:center;margin-top:50px;font-family:sans-serif;'>"
+                    + "<h1 style='color:green;font-size:2.5em;'>Giao dịch MoMo đã được xử lý thành công!</h1>"
+                    + "<p style='font-size:1.2em;'>Số xu đã được cộng vào ví của bạn.</p>"
+                    + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 24px;background:#ec4899;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;'>Về ví PlayZone</a>"
+                    + "</div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        payment.setStatus(Payment.PaymentStatus.COMPLETED);
+        payment.setCompletedAt(LocalDateTime.now());
+
+        User user = payment.getUser();
+        if (user != null) {
+            userService.addCoin(user.getId(), payment.getCoin());
+            user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + payment.getCoin());
+
+            notificationService.createNotification(
+                    user.getId(),
+                    "Nạp xu MoMo thành công!",
+                    "Bạn vừa nạp thành công " + payment.getCoin() + " xu qua Ví MoMo.",
+                    "topup",
+                    "/wallet",
+                    payment.getId().toString()
+            );
+
+            try {
+                adminNotificationService.notifyAdminsAboutTopup(user, payment.getCoin());
+            } catch (Exception ignored) {}
+        }
+
+        String html = "<div style='text-align:center;margin-top:50px;font-family:sans-serif;'>"
+                + "<h1 style='color:#ec4899;font-size:2.5em;'>Nạp Tiền Qua MoMo Thành Công!</h1>"
+                + "<div style='margin: 30px auto; max-width:480px; text-align:left; font-size:1.1em; background:#fdf2f8; border-radius:12px; padding:24px 32px; border:1px solid #fbcfe8;'>"
+                + "<p><b>Mã giao dịch:</b> " + transId + "</p>"
+                + "<p><b>Số xu nhận được:</b> <span style='color:#db2777;font-weight:bold;'>" + String.format("%,d xu", payment.getCoin()).replace(',', '.') + "</span></p>"
+                + "<p><b>Phương thức:</b> Ví điện tử MoMo</p>"
+                + "</div>"
+                + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 28px;background:#ec4899;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:1.05rem;'>Quay Lại Ví PlayZone</a>"
+                + "</div>";
+        return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+    }
+
+    @Transactional
+    @PostMapping("/momo-ipn")
+    public ResponseEntity<Map<String, Object>> momoIpn(@RequestBody(required = false) Map<String, String> body, HttpServletRequest request) {
+        Map<String, String> params = new HashMap<>();
+        if (body != null && !body.isEmpty()) {
+            params.putAll(body);
+        } else {
+            request.getParameterMap().forEach((k, v) -> params.put(k, v[0]));
+        }
+
+        if (momoService == null || !momoService.verifyCallback(new HashMap<>(params))) {
+            return ResponseEntity.badRequest().body(Map.of("resultCode", 99, "message", "Invalid signature"));
+        }
+
+        String orderId = params.get("orderId");
+        Payment payment = paymentRepository.findByTransactionId(orderId)
+                .orElseGet(() -> paymentRepository.findByVnpTxnRef(orderId).orElse(null));
+
+        if (payment == null) {
+            return ResponseEntity.badRequest().body(Map.of("resultCode", 99, "message", "Order not found"));
+        }
+
+        if (Payment.PaymentStatus.PENDING.equals(payment.getStatus())) {
+            int affected = paymentRepository.updatePaymentStatusIfExpected(
+                    payment.getId(),
+                    Payment.PaymentStatus.COMPLETED,
+                    LocalDateTime.now(),
+                    Payment.PaymentStatus.PENDING
+            );
+            if (affected > 0 && payment.getUser() != null) {
+                userService.addCoin(payment.getUser().getId(), payment.getCoin());
+            }
+        }
+        return ResponseEntity.ok(Map.of("resultCode", 0, "message", "Success"));
+    }
+
+    @PostMapping("/zalopay/create")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> createZaloPayPayment(
+            @RequestParam Long amount,
+            @RequestParam String orderInfo,
+            Authentication authentication) {
+        log.info("=== BẮT ĐẦU: Tạo link ZaloPay ===");
+        try {
+            if (amount == null || amount <= 0) {
+                return ResponseEntity.badRequest().body("Số tiền nạp không hợp lệ");
+            }
+            User user = userService.findByUsername(authentication.getName());
+            if (user == null) {
+                return ResponseEntity.status(401).body("Không tìm thấy thông tin người dùng đăng nhập");
+            }
+
+            String txnRef = "ZP_" + System.currentTimeMillis();
+            Payment payment = new Payment();
+            payment.setUser(user);
+            payment.setCoin(amount);
+            payment.setCurrency("VND");
+            payment.setPaymentMethod(Payment.PaymentMethod.ZALOPAY);
+            payment.setStatus(Payment.PaymentStatus.PENDING);
+            payment.setTransactionId(txnRef);
+            payment.setVnpTxnRef(txnRef);
+            payment.setDescription(orderInfo);
+            payment.setCreatedAt(LocalDateTime.now());
+            payment.setType(Payment.PaymentType.TOPUP);
+            Payment savedPayment = paymentRepository.save(payment);
+
+            if (zaloPayService == null) {
+                return ResponseEntity.badRequest().body("Dịch vụ ZaloPay chưa được khởi tạo");
+            }
+            Map<String, Object> result = zaloPayService.createPayment(amount, orderInfo, txnRef);
+            result.put("paymentId", savedPayment.getId());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo giao dịch ZaloPay: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Lỗi tạo giao dịch ZaloPay: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    @GetMapping("/zalopay-return")
+    public ResponseEntity<String> zaloPayReturn(HttpServletRequest request) {
+        Map<String, String> params = new HashMap<>();
+        request.getParameterMap().forEach((k, v) -> params.put(k, v[0]));
+        if (zaloPayService == null) {
+            String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;'>Dịch vụ ZaloPay chưa sẵn sàng</h1></div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+        boolean valid = zaloPayService.verifyCallback(new HashMap<>(params));
+
+        String rawTxnRef = params.get("txnRef");
+        if (rawTxnRef == null && params.get("apptransid") != null) {
+            String apptransid = params.get("apptransid");
+            int idx = apptransid.indexOf('_');
+            if (idx >= 0) rawTxnRef = apptransid.substring(idx + 1);
+        }
+        final String txnRef = rawTxnRef;
+        String amountStr = params.get("amount");
+
+        if (!valid) {
+            String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;font-size:2.5em;'>Chữ ký ZaloPay không hợp lệ!</h1><p>Giao dịch đã bị từ chối.</p></div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        Payment payment = null;
+        if (txnRef != null) {
+            payment = paymentRepository.findByTransactionId(txnRef)
+                    .orElseGet(() -> paymentRepository.findByVnpTxnRef(txnRef).orElse(null));
+        }
+
+        if (payment == null) {
+            String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;font-size:2.5em;'>Không tìm thấy thông tin đơn hàng ZaloPay!</h1></div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        if (amountStr != null) {
+            try {
+                long amount = Long.parseLong(amountStr);
+                if (payment.getCoin() == null || payment.getCoin() != amount) {
+                    log.warn("ZaloPay amount mismatch: order={}, payment={}", amount, payment.getCoin());
+                    String html = "<div style='text-align:center;margin-top:50px;'><h1 style='color:red;font-size:2.5em;'>Số tiền thanh toán ZaloPay không khớp!</h1></div>";
+                    return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        if (Payment.PaymentStatus.COMPLETED.equals(payment.getStatus())) {
+            String html = "<div style='text-align:center;margin-top:50px;font-family:sans-serif;'>"
+                    + "<h1 style='color:green;font-size:2.5em;'>Giao dịch ZaloPay đã được ghi nhận trước đó!</h1>"
+                    + "<p style='font-size:1.2em;'>Số xu đã được cộng vào tài khoản của bạn.</p>"
+                    + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 24px;background:#0068ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;'>Về ví PlayZone</a>"
+                    + "</div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        int affectedRows = paymentRepository.updatePaymentStatusIfExpected(
+                payment.getId(),
+                Payment.PaymentStatus.COMPLETED,
+                LocalDateTime.now(),
+                Payment.PaymentStatus.PENDING
+        );
+
+        if (affectedRows == 0) {
+            String html = "<div style='text-align:center;margin-top:50px;font-family:sans-serif;'>"
+                    + "<h1 style='color:green;font-size:2.5em;'>Giao dịch ZaloPay đã được xử lý thành công!</h1>"
+                    + "<p style='font-size:1.2em;'>Số xu đã được cộng vào ví của bạn.</p>"
+                    + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 24px;background:#0068ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;'>Về ví PlayZone</a>"
+                    + "</div>";
+            return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+        }
+
+        payment.setStatus(Payment.PaymentStatus.COMPLETED);
+        payment.setCompletedAt(LocalDateTime.now());
+
+        User user = payment.getUser();
+        if (user != null) {
+            userService.addCoin(user.getId(), payment.getCoin());
+            user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + payment.getCoin());
+
+            notificationService.createNotification(
+                    user.getId(),
+                    "Nạp xu ZaloPay thành công!",
+                    "Bạn vừa nạp thành công " + payment.getCoin() + " xu qua Ví ZaloPay.",
+                    "topup",
+                    "/wallet",
+                    payment.getId().toString()
+            );
+
+            try {
+                adminNotificationService.notifyAdminsAboutTopup(user, payment.getCoin());
+            } catch (Exception ignored) {}
+        }
+
+        String html = "<div style='text-align:center;margin-top:50px;font-family:sans-serif;'>"
+                + "<h1 style='color:#0068ff;font-size:2.5em;'>Nạp Tiền Qua ZaloPay Thành Công!</h1>"
+                + "<div style='margin: 30px auto; max-width:480px; text-align:left; font-size:1.1em; background:#eff6ff; border-radius:12px; padding:24px 32px; border:1px solid #bfdbfe;'>"
+                + "<p><b>Mã giao dịch:</b> " + (params.getOrDefault("apptransid", "-")) + "</p>"
+                + "<p><b>Số xu nhận được:</b> <span style='color:#1d4ed8;font-weight:bold;'>" + String.format("%,d xu", payment.getCoin()).replace(',', '.') + "</span></p>"
+                + "<p><b>Phương thức:</b> Ví điện tử ZaloPay</p>"
+                + "</div>"
+                + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 28px;background:#0068ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:1.05rem;'>Quay Lại Ví PlayZone</a>"
+                + "</div>";
+        return ResponseEntity.ok().header("Content-Type", "text/html; charset=UTF-8").body(html);
+    }
+
+
     @Transactional(isolation = Isolation.SERIALIZABLE)
     @PostMapping("/donate")
     @PreAuthorize("isAuthenticated()")
@@ -1186,7 +1522,7 @@ public class PaymentController {
 
         for (Order o : allOrders) {
             String status = o.getStatus() != null ? o.getStatus().toUpperCase() : "";
-            boolean isCanceledOrRejected = "CANCELED".equals(status) || "REJECTED".equals(status) || "EXPIRED".equals(status);
+            boolean isCanceledOrRejected = "CANCELED".equals(status) || "REJECTED".equals(status);
             Long price = o.getPrice() != null ? o.getPrice() : 0L;
 
             // 1. Tiền thuê mà Renter đã chi: tính các đơn hợp lệ đã thanh toán (không bị hủy/từ chối)
@@ -1449,13 +1785,13 @@ public class PaymentController {
         @NotNull
         @Positive
         private Long coin;
-
+        
         @NotBlank(message = "Số tài khoản ngân hàng là bắt buộc")
         private String bankAccountNumber;
-
+        
         @NotBlank(message = "Tên chủ tài khoản là bắt buộc")
         private String bankAccountName;
-
+        
         @NotBlank(message = "Tên ngân hàng là bắt buộc")
         private String bankName;
     }

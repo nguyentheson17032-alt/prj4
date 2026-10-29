@@ -29,6 +29,8 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/ws/**", "/ws").permitAll()
+                .requestMatchers("/api/realtime/**").permitAll()
                 .requestMatchers("/api/game-players/available").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/game-players").permitAll()
                 .requestMatchers("/api/games").permitAll()
@@ -45,6 +47,9 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/order-reviews/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/**").permitAll()
                 .requestMatchers("/api/payments/vnpay-return").permitAll()
+                .requestMatchers("/api/payments/momo-return").permitAll()
+                .requestMatchers("/api/payments/momo-ipn").permitAll()
+                .requestMatchers("/api/payments/zalopay-return").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/payments/leaderboard").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/uploads/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/avatars/**").permitAll()
@@ -81,4 +86,4 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-} 
+}

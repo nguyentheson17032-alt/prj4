@@ -56,7 +56,7 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   const [currentGameIndex, setCurrentGameIndex] = useState(0);
 
   // Step 4
-  const [voiceUrl, setVoiceUrl] = useState('https://actions.google.com/sounds/v1/water/rain_heavy.ogg');
+  const [voiceUrl, setVoiceUrl] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
   const [isPolicyAccepted, setIsPolicyAccepted] = useState(true);
 

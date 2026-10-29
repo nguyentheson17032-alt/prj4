@@ -21,6 +21,8 @@ import {
   Wallet
 } from 'lucide-react';
 import api from '../../api/apiService';
+import realtimeService from '../../services/realtimeService';
+import { useLanguage } from '../../context/LanguageContext';
 import '../../styles/notificationDropdown.css';
 
 /**
@@ -140,6 +142,7 @@ const getNotificationTypeConfig = (type) => {
 };
 
 export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCountChange }) => {
+  const { t } = useLanguage();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'unread'
@@ -169,8 +172,16 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
 
     fetchNotifications();
 
+    const unsubRealtime = realtimeService.onNotification((newNotif) => {
+      if (newNotif && isMounted) {
+        setNotifications((prev) => [newNotif, ...prev]);
+        // Navbar already maintains the badge count and listens to counts_update; avoid double increment
+      }
+    });
+
     return () => {
       isMounted = false;
+      unsubRealtime();
     };
   }, [isOpen, onUnreadCountChange]);
 
@@ -292,9 +303,9 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
       {/* Header */}
       <div className="notif-header">
         <div className="notif-header-title">
-          <span className="notif-title-text">Thông Báo</span>
+          <span className="notif-title-text">{t('notif.title', 'Thông Báo')}</span>
           {unreadCount > 0 && (
-            <span className="notif-badge-pill">{unreadCount} mới</span>
+            <span className="notif-badge-pill">{unreadCount} {t('notif.newBadge', 'mới')}</span>
           )}
         </div>
         <div className="notif-header-actions">
@@ -303,14 +314,14 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
               className="notif-action-btn delete-read-btn"
               onClick={handleDeleteAllRead}
               disabled={isDeletingRead}
-              title="Xóa tất cả thông báo đã đọc"
+              title={t('notif.deleteRead', 'Xóa tất cả thông báo đã đọc')}
             >
               {isDeletingRead ? (
                 <Loader2 size={13} className="animate-spin" />
               ) : (
                 <Trash2 size={13} />
               )}
-              <span>Xóa đã đọc ({readItemsCount})</span>
+              <span>{t('notif.deleteRead', 'Xóa đã đọc')} ({readItemsCount})</span>
             </button>
           )}
 
@@ -318,14 +329,14 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
             className="notif-action-btn"
             onClick={handleMarkAllAsRead}
             disabled={unreadCount === 0 || isMarkingAll}
-            title={unreadCount > 0 ? 'Đánh dấu tất cả thông báo là đã đọc' : 'Không có thông báo mới'}
+            title={unreadCount > 0 ? t('notif.markAll', 'Đánh dấu tất cả thông báo là đã đọc') : t('notif.emptyUnread', 'Không có thông báo mới')}
           >
             {isMarkingAll ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
               <CheckCheck size={15} />
             )}
-            <span>Đã đọc tất cả</span>
+            <span>{t('notif.markAll', 'Đã đọc tất cả')}</span>
           </button>
         </div>
       </div>
@@ -336,14 +347,14 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
           className={`notif-tab ${activeTab === 'all' ? 'active' : ''}`}
           onClick={() => setActiveTab('all')}
         >
-          <span>Tất cả</span>
+          <span>{t('notif.all', 'Tất cả')}</span>
           <span className="notif-tab-count">{notifications.length}</span>
         </button>
         <button
           className={`notif-tab ${activeTab === 'unread' ? 'active' : ''}`}
           onClick={() => setActiveTab('unread')}
         >
-          <span>Chưa đọc</span>
+          <span>{t('notif.unread', 'Chưa đọc')}</span>
           <span className="notif-tab-count">{unreadItems.length}</span>
         </button>
       </div>
@@ -369,8 +380,8 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
             </div>
             <div className="notif-empty-title">
               {activeTab === 'unread'
-                ? 'Không có thông báo chưa đọc'
-                : 'Bạn chưa có thông báo nào'}
+                ? t('notif.emptyUnread', 'Không có thông báo chưa đọc')
+                : t('notif.empty', 'Bạn chưa có thông báo nào')}
             </div>
             <div className="notif-empty-sub">
               {activeTab === 'unread'
@@ -455,7 +466,7 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
             navigate('/orders');
           }}
         >
-          <span>Xem lịch sử đơn hàng</span>
+          <span>{t('notif.orderHistory', 'Xem lịch sử đơn hàng')}</span>
           <ExternalLink size={14} />
         </div>
       </div>

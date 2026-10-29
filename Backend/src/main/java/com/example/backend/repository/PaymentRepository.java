@@ -49,6 +49,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
     Optional<Payment> findByVnpTxnRef(String vnpTxnRef);
+    Optional<Payment> findByTransactionId(String transactionId);
 
     List<Payment> findByGamePlayerIdAndStatusAndEndTimeAfter(Long gamePlayerId, Payment.PaymentStatus status, LocalDateTime endTime);
     List<Payment> findByUserIdOrderByCreatedAtDesc(Long userId);
