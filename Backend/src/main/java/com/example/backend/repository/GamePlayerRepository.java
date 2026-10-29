@@ -20,6 +20,12 @@ public interface GamePlayerRepository extends JpaRepository<GamePlayer, Long> {
 
     boolean existsByUserIdAndGameId(Long userId, Long gameId);
 
+    // Giải phóng trạng thái thuê bằng bulk update: không đi qua @PreUpdate validate của entity
+    // và không ghi đè các trường khác bằng bản sao cũ của entity
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE GamePlayer gp SET gp.status = 'AVAILABLE', gp.hiredBy = null, gp.hireDate = null, gp.returnDate = null, gp.hoursHired = null WHERE gp.id = :id")
+    int releaseHire(@Param("id") Long id);
+
     List<GamePlayer> findByStatus(String status);
     Page<GamePlayer> findByStatus(String status, Pageable pageable);
 

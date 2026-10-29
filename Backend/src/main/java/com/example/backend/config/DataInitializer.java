@@ -10,9 +10,13 @@ import com.example.backend.repository.UserRepository;
 import com.example.backend.repository.GameCategoryRepository;
 import com.example.backend.repository.GamePlatformRepository;
 import com.example.backend.repository.GameStatusRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +27,8 @@ import java.util.Set;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
+    private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
+
     @Autowired
     private UserRepository userRepository;
     
@@ -38,16 +44,51 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private GameStatusRepository gameStatusRepository;
 
+    @Autowired(required = false)
+    private PasswordEncoder passwordEncoder;
+
+    @Value("${app.seed.enabled:true}")
+    private boolean seedEnabled;
+
+    @Value("${app.seed.admin.username:admin}")
+    private String seedAdminUsername;
+
+    @Value("${app.seed.admin.password:Admin@Secure123!}")
+    private String seedAdminPassword;
+
+    @Value("${app.seed.admin.email:admin@playzone.vn}")
+    private String seedAdminEmail;
+
+    @Value("${app.seed.user.username:user123}")
+    private String seedUserUsername;
+
+    @Value("${app.seed.user.password:User@Secure123!}")
+    private String seedUserPassword;
+
+    @Value("${app.seed.user.email:user123@playzone.vn}")
+    private String seedUserEmail;
+
+    private PasswordEncoder getEncoder() {
+        return passwordEncoder != null ? passwordEncoder : new BCryptPasswordEncoder();
+    }
+
     @Override
     @Transactional
     public void run(String... args) {
-        // Khởi tạo hoặc cập nhật tài khoản admin
-        User admin = userRepository.findByUsername("admin").orElse(null);
+        if (!seedEnabled) {
+            log.info("[DataInitializer] Seed data bị tắt qua cấu hình app.seed.enabled=false");
+            return;
+        }
+
+        PasswordEncoder encoder = getEncoder();
+
+        // 1. Khởi tạo tài khoản admin (chỉ tạo mới nếu chưa tồn tại, không bao giờ ghi đè mật khẩu của admin sẵn có)
+        User admin = userRepository.findByUsername(seedAdminUsername).orElse(null);
         if (admin == null) {
             admin = new User();
-            admin.setUsername("admin");
-            admin.setPassword(new BCryptPasswordEncoder().encode("Admin@123456"));
-            admin.setEmail("admin@playzone.vn");
+            admin.setUsername(seedAdminUsername);
+            admin.setPassword(encoder.encode(seedAdminPassword));
+            admin.setEmail(seedAdminEmail);
             admin.setFullName("Quản Trị Viên");
             admin.setPhoneNumber("0987654321");
             admin.setAddress("Hà Nội, Việt Nam");
@@ -58,25 +99,26 @@ public class DataInitializer implements CommandLineRunner {
             roles.add("ROLE_PLAYER");
             admin.setRoles(roles);
             userRepository.save(admin);
-            System.out.println("Tạo tài khoản admin thành công (Username: admin / Pass: Admin@123456)!");
+            log.info("[DataInitializer] Khởi tạo tài khoản admin mặc định (username: {}). Vui lòng đổi mật khẩu sau khi đăng nhập.", seedAdminUsername);
         } else {
-            // Cập nhật lại mật khẩu mới cho admin nếu đã tồn tại
-            admin.setPassword(new BCryptPasswordEncoder().encode("Admin@123456"));
+            // Không ghi đè mật khẩu của admin đã tồn tại khi khởi động lại
             if (admin.getRoles() == null) {
                 admin.setRoles(new HashSet<>());
             }
-            admin.getRoles().add("ROLE_ADMIN");
-            userRepository.save(admin);
-            System.out.println("Cập nhật mật khẩu tài khoản admin thành công (Pass: Admin@123456)!");
+            if (!admin.getRoles().contains("ROLE_ADMIN")) {
+                admin.getRoles().add("ROLE_ADMIN");
+                userRepository.save(admin);
+                log.info("[DataInitializer] Đã bổ sung quyền ROLE_ADMIN cho tài khoản admin {}", seedAdminUsername);
+            }
         }
 
-        // Khởi tạo hoặc cập nhật tài khoản user thường
-        User normalUser = userRepository.findByUsername("user123").orElse(null);
+        // 2. Khởi tạo tài khoản user thường (chỉ tạo mới nếu chưa tồn tại)
+        User normalUser = userRepository.findByUsername(seedUserUsername).orElse(null);
         if (normalUser == null) {
             normalUser = new User();
-            normalUser.setUsername("user123");
-            normalUser.setPassword(new BCryptPasswordEncoder().encode("User@123456"));
-            normalUser.setEmail("user123@playzone.vn");
+            normalUser.setUsername(seedUserUsername);
+            normalUser.setPassword(encoder.encode(seedUserPassword));
+            normalUser.setEmail(seedUserEmail);
             normalUser.setFullName("Nguyễn Thành Nam");
             normalUser.setPhoneNumber("0912345678");
             normalUser.setAddress("Hồ Chí Minh, Việt Nam");
@@ -86,11 +128,7 @@ public class DataInitializer implements CommandLineRunner {
             roles.add("ROLE_USER");
             normalUser.setRoles(roles);
             userRepository.save(normalUser);
-            System.out.println("Tạo tài khoản user mẫu thành công (Username: user123 / Pass: User@123456)!");
-        } else {
-            normalUser.setPassword(new BCryptPasswordEncoder().encode("User@123456"));
-            userRepository.save(normalUser);
-            System.out.println("Cập nhật tài khoản user mẫu thành công (Pass: User@123456)!");
+            log.info("[DataInitializer] Khởi tạo tài khoản user mẫu thành công (username: {})", seedUserUsername);
         }
         
         // Khởi tạo dữ liệu game categories, platforms và statuses

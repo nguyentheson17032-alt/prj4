@@ -67,9 +67,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
         // Cập nhật trạng thái online và lastActiveAt khi user hoạt động
-        user.setIsOnline(true);
-        user.setLastActiveAt(java.time.LocalDateTime.now());
-        userRepository.save(user);
+        userRepository.updateActivity(user.getId(), true, java.time.LocalDateTime.now());
         return user;
     }
 
@@ -225,10 +223,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public void setUserOffline(Long userId) {
-        User user = findById(userId);
-        user.setIsOnline(false);
-        user.setLastActiveAt(java.time.LocalDateTime.now());
-        userRepository.save(user);
+        userRepository.updateActivity(userId, false, java.time.LocalDateTime.now());
     }
 
     @Override

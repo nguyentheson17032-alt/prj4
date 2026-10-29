@@ -96,10 +96,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Object[]> getGlobalAggregatedOrderStats();
 
     // Tìm các đơn PENDING đã quá thời gian xác nhận (mặc định sau X phút)
-    @Query("SELECT o FROM Order o WHERE UPPER(o.status) = 'PENDING' AND " +
+    @Query("SELECT o FROM Order o LEFT JOIN o.payment p WHERE UPPER(o.status) = 'PENDING' AND " +
            "((o.createdAt IS NOT NULL AND o.createdAt <= :threshold) OR " +
-           "(o.createdAt IS NULL AND o.payment IS NOT NULL AND o.payment.createdAt IS NOT NULL AND o.payment.createdAt <= :threshold) OR " +
-           "(o.createdAt IS NULL AND o.payment IS NULL AND o.startTime <= :threshold))")
+           "(o.createdAt IS NULL AND p.id IS NOT NULL AND p.createdAt <= :threshold) OR " +
+           "(o.createdAt IS NULL AND p.id IS NULL AND o.startTime <= :threshold))")
     List<Order> findPendingOrdersCreatedBefore(@Param("threshold") LocalDateTime threshold);
 
     // Kiểm tra đơn trùng lịch (cả PENDING lẫn CONFIRMED)
@@ -108,7 +108,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     // Cập nhật trạng thái EXPIRED một cách nguyên tử (atomic) chỉ khi đơn vẫn đang là PENDING
     // Tránh race condition hoàn tiền 2 lần khi renter bấm hủy hoặc player accept cùng lúc
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @org.springframework.transaction.annotation.Transactional
     @Query("UPDATE Order o SET o.status = 'EXPIRED', o.cancellationReason = :reason, o.payoutStatus = 'REFUNDED' WHERE o.id = :id AND UPPER(o.status) = 'PENDING'")
     int markOrderExpiredIfPending(@Param("id") Long id, @Param("reason") String reason);

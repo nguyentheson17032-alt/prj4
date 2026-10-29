@@ -42,14 +42,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllAdminsWithRole();
 
     // Khấu trừ coin an toàn chống race condition / double-spending
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.coin = u.coin - :amount WHERE u.id = :userId AND u.coin >= :amount")
     int deductCoinSafely(@Param("userId") Long userId, @Param("amount") Long amount);
 
     // Cộng coin an toàn chống ghi đè số dư đồng thời
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.coin = COALESCE(u.coin, 0) + :amount WHERE u.id = :userId")
     int addCoinSafely(@Param("userId") Long userId, @Param("amount") Long amount);
+
+    // Cập nhật trạng thái hoạt động chỉ ghi 2 cột này, không ghi lại cả dòng user (tránh ghi đè coin bằng giá trị cũ)
+    @Modifying(clearAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional
+    @Query("UPDATE User u SET u.isOnline = :online, u.lastActiveAt = :now WHERE u.id = :userId")
+    int updateActivity(@Param("userId") Long userId, @Param("online") boolean online, @Param("now") LocalDateTime now);
 
     long countByCreatedAtAfter(LocalDateTime date);
 

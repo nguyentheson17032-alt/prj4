@@ -51,6 +51,8 @@ public class Notification {
     private String title = "";
     private String actionUrl;
     private String status;
+
+    @Column(name = "order_id")
     private Long orderId;
 
     @PrePersist

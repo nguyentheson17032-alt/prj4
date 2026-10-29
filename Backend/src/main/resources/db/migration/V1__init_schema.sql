@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     type VARCHAR(100),
     action_url VARCHAR(500),
-    order_id VARCHAR(50),
+    order_id BIGINT,
     is_read BOOLEAN DEFAULT FALSE,
     status VARCHAR(50) DEFAULT 'ACTIVE',
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP

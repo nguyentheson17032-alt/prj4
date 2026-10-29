@@ -72,12 +72,7 @@ public class OrderExpirationProcessor {
         // Reset trạng thái GamePlayer
         if (order.getPlayer() != null) {
             try {
-                order.getPlayer().setStatus("AVAILABLE");
-                order.getPlayer().setHiredBy(null);
-                order.getPlayer().setHireDate(null);
-                order.getPlayer().setReturnDate(null);
-                order.getPlayer().setHoursHired(null);
-                gamePlayerService.save(order.getPlayer());
+                gamePlayerService.releaseHire(order.getPlayer().getId());
             } catch (Exception ex) {
                 log.warn("[OrderExpirationProcessor] Lỗi reset trạng thái player đơn #{}: {}", order.getId(), ex.getMessage());
             }

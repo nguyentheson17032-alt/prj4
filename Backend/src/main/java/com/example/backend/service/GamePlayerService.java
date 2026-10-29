@@ -217,6 +217,10 @@ public class GamePlayerService {
         return gamePlayerRepository.save(gamePlayer);
     }
 
+    public void releaseHire(Long id) {
+        gamePlayerRepository.releaseHire(id);
+    }
+
     public GamePlayer returnPlayer(Long id) {
         GamePlayer gamePlayer = findById(id);
         gamePlayer.setStatus("AVAILABLE");
