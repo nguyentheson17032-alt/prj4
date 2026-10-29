@@ -55,6 +55,8 @@ public class OrderController {
     private com.example.backend.repository.ReportRepository reportRepository;
     @Autowired(required = false)
     private com.example.backend.service.OrderPayoutService orderPayoutService;
+    @Autowired(required = false)
+    private com.example.backend.service.CommissionService commissionService;
     private final PlayerReviewRepository playerReviewRepository;
     private final OrderService orderService;
 
@@ -433,7 +435,7 @@ public class OrderController {
         long completedHired = hiredOrders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus())).count();
         long pendingHired = hiredOrders.stream().filter(o -> "PENDING".equalsIgnoreCase(o.getStatus())).count();
         long confirmedHired = hiredOrders.stream().filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus())).count();
-        long canceledHired = hiredOrders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus())).count();
+        long canceledHired = hiredOrders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus()) || "EXPIRED".equalsIgnoreCase(o.getStatus())).count();
         long totalSpent = hiredOrders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()))
                 .mapToLong(o -> o.getPrice() != null ? o.getPrice() : 0L).sum();
 
@@ -442,9 +444,9 @@ public class OrderController {
         long completedHiring = hiringOrders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus())).count();
         long pendingHiring = hiringOrders.stream().filter(o -> "PENDING".equalsIgnoreCase(o.getStatus())).count();
         long confirmedHiring = hiringOrders.stream().filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus())).count();
-        long canceledHiring = hiringOrders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus())).count();
+        long canceledHiring = hiringOrders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus()) || "EXPIRED".equalsIgnoreCase(o.getStatus())).count();
         long totalEarned = hiringOrders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()))
-                .mapToLong(o -> o.getPlayerReceived() != null ? o.getPlayerReceived() : Math.round((o.getPrice() != null ? o.getPrice() : 0L) * 0.85)).sum();
+                .mapToLong(o -> o.getPlayerReceived() != null ? o.getPlayerReceived() : (o.getPrice() != null ? Math.round(o.getPrice() * (1 - (o.getDiscountRate() != null ? o.getDiscountRate() : 0.15))) : 0L)).sum();
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalOrders", totalHired + totalHiring);
@@ -571,7 +573,7 @@ public class OrderController {
         }
         long totalOrders = orders.size();
         long completedOrders = orders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus())).count();
-        long canceledOrders = orders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus()) || "CANCELLED".equalsIgnoreCase(o.getStatus())).count();
+        long canceledOrders = orders.stream().filter(o -> "CANCELED".equalsIgnoreCase(o.getStatus()) || "CANCELLED".equalsIgnoreCase(o.getStatus()) || "EXPIRED".equalsIgnoreCase(o.getStatus())).count();
         long confirmedOrders = orders.stream().filter(o -> "CONFIRMED".equalsIgnoreCase(o.getStatus())).count();
         long pendingOrders = orders.stream().filter(o -> "PENDING".equalsIgnoreCase(o.getStatus())).count();
         long totalRevenue = orders.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()))
@@ -622,6 +624,8 @@ public class OrderController {
                 statusLabel = "Đã hoàn thành";
             } else if ("CANCELED".equalsIgnoreCase(status) || "REJECTED".equalsIgnoreCase(status)) {
                 statusLabel = "Bị hủy";
+            } else if ("EXPIRED".equalsIgnoreCase(status)) {
+                statusLabel = "Hết hạn xác nhận";
             } else if ("IN_PROGRESS".equalsIgnoreCase(status)) {
                 statusLabel = "Đang diễn ra";
             } else {
@@ -802,11 +806,14 @@ public class OrderController {
         dto.setStartTime(order.getStartTime());
         dto.setEndTime(order.getEndTime());
 
-        // Chiết khấu 15%
+        // Chiết khấu nền tảng
         long orderPrice = order.getPrice() != null ? order.getPrice() : 0L;
-        long fee = order.getPlatformFee() != null ? order.getPlatformFee() : Math.round(orderPrice * 0.15);
+        double rate = order.getDiscountRate() != null 
+                ? order.getDiscountRate() 
+                : (commissionService != null ? commissionService.getCommissionRateForPlayer(order.getPlayer()) : 0.15);
+        long fee = order.getPlatformFee() != null ? order.getPlatformFee() : Math.round(orderPrice * rate);
         long recv = order.getPlayerReceived() != null ? order.getPlayerReceived() : (orderPrice - fee);
-        dto.setDiscountRate(order.getDiscountRate() != null ? order.getDiscountRate() : 0.15);
+        dto.setDiscountRate(rate);
         dto.setPlatformFee(fee);
         dto.setPlayerReceived(recv);
 
@@ -823,7 +830,7 @@ public class OrderController {
 
         com.example.backend.entity.Report rep = null;
         if (reportRepository != null && order.getId() != null) {
-            rep = reportRepository.findByOrderId(order.getId());
+            rep = reportRepository.findFirstByOrderIdOrderByCreatedAtDesc(order.getId());
         }
 
         if (rep != null) {
@@ -877,6 +884,8 @@ public class OrderController {
             return "Đã hoàn thành";
         } else if ("CANCELED".equalsIgnoreCase(status) || "REJECTED".equalsIgnoreCase(status)) {
             return "Bị hủy";
+        } else if ("EXPIRED".equalsIgnoreCase(status)) {
+            return "Hết hạn xác nhận";
         } else if ("IN_PROGRESS".equalsIgnoreCase(status)) {
             return "Đang diễn ra";
         } else {

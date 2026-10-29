@@ -93,6 +93,21 @@ public class GamePlayer {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "work_start_time")
+    private String workStartTime = "00:00";
+
+    @Column(name = "work_end_time")
+    private String workEndTime = "23:59";
+
+    @Column(name = "working_days")
+    private String workingDays = "MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY";
+
+    @Column(name = "accepting_orders")
+    private Boolean acceptingOrders = true;
+
+    @Column(name = "commission_rate")
+    private Double commissionRate;
+
     @PrePersist
     @PreUpdate
     public void validateData() {

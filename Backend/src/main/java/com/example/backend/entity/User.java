@@ -95,6 +95,30 @@ public class User {
     @Column(name = "is_online")
     private Boolean isOnline = false;
 
+    @Column(name = "vip_tier")
+    private String vipTier = "STANDARD";
+
+    @Column(name = "custom_commission_rate")
+    private Double customCommissionRate;
+
+    @Column(name = "kyc_status")
+    private String kycStatus = "UNVERIFIED"; // UNVERIFIED, PENDING, VERIFIED, REJECTED
+
+    @Column(name = "citizen_id")
+    private String citizenId;
+
+    @Column(name = "id_card_front_url")
+    private String idCardFrontUrl;
+
+    @Column(name = "id_card_back_url")
+    private String idCardBackUrl;
+
+    @Column(name = "kyc_verified_at")
+    private LocalDateTime kycVerifiedAt;
+
+    @Column(name = "kyc_rejection_reason")
+    private String kycRejectionReason;
+
     @PrePersist
     @PreUpdate
     protected void onCreateOrUpdate() {

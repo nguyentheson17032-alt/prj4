@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class OrderPayoutService {
 
@@ -32,6 +31,35 @@ public class OrderPayoutService {
     private final PlayerReviewRepository playerReviewRepository;
     private final ReportRepository reportRepository;
     private final NotificationService notificationService;
+    private final CommissionService commissionService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OrderPayoutService(
+            OrderRepository orderRepository,
+            UserRepository userRepository,
+            PaymentRepository paymentRepository,
+            PlayerReviewRepository playerReviewRepository,
+            ReportRepository reportRepository,
+            NotificationService notificationService,
+            CommissionService commissionService) {
+        this.orderRepository = orderRepository;
+        this.userRepository = userRepository;
+        this.paymentRepository = paymentRepository;
+        this.playerReviewRepository = playerReviewRepository;
+        this.reportRepository = reportRepository;
+        this.notificationService = notificationService;
+        this.commissionService = commissionService;
+    }
+
+    public OrderPayoutService(
+            OrderRepository orderRepository,
+            UserRepository userRepository,
+            PaymentRepository paymentRepository,
+            PlayerReviewRepository playerReviewRepository,
+            ReportRepository reportRepository,
+            NotificationService notificationService) {
+        this(orderRepository, userRepository, paymentRepository, playerReviewRepository, reportRepository, notificationService, new CommissionService());
+    }
 
     /**
      * Mở khóa tiền đóng băng và chuyển vào số dư khả dụng (coin) của Player
@@ -41,22 +69,33 @@ public class OrderPayoutService {
         if (order == null) {
             return false;
         }
-        if ("RELEASED".equalsIgnoreCase(order.getPayoutStatus()) || "REFUNDED".equalsIgnoreCase(order.getPayoutStatus())) {
+        if ("RELEASED".equalsIgnoreCase(order.getPayoutStatus()) || 
+            "REFUNDED".equalsIgnoreCase(order.getPayoutStatus()) ||
+            "RESOLVED_PARTIALLY_REFUNDED".equalsIgnoreCase(order.getPayoutStatus())) {
             return false;
         }
         if (order.getPlayer() == null || order.getPlayer().getUser() == null) {
             return false;
         }
 
+        // CHẶN GIẢI NGÂN NẾU ĐƠN ĐANG CÓ KHIẾU NẠI CHƯA XỬ LÝ (PENDING hoặc INVESTIGATING)
+        boolean hasActiveDispute = reportRepository.existsByOrderIdAndStatusIn(order.getId(), List.of("PENDING", "INVESTIGATING"));
+        if (hasActiveDispute) {
+            log.warn("[OrderPayoutService] Chặn giải ngân cho đơn #{} do có báo cáo/khiếu nại chưa xử lý (PENDING hoặc INVESTIGATING)", order.getId());
+            return false;
+        }
+
+        double commissionRate = order.getDiscountRate() != null 
+                ? order.getDiscountRate() 
+                : commissionService.getCommissionRateForPlayer(order.getPlayer());
+
         long amount = order.getPlayerReceived() != null 
                 ? order.getPlayerReceived() 
-                : Math.round((order.getPrice() != null ? order.getPrice() : 0L) * 0.85);
+                : commissionService.calculatePlayerReceived(order.getPrice() != null ? order.getPrice() : 0L, commissionRate);
 
         User playerUser = order.getPlayer().getUser();
         if (amount > 0) {
             userRepository.addCoinSafely(playerUser.getId(), amount);
-            playerUser.setCoin((playerUser.getCoin() != null ? playerUser.getCoin() : 0L) + amount);
-            userRepository.save(playerUser);
         }
 
         order.setPayoutStatus("RELEASED");
@@ -107,7 +146,9 @@ public class OrderPayoutService {
     /**
      * Quét và tự động mở khóa các đơn đã quá 24h hoặc đã đánh giá >= 4 sao.
      * Tối ưu hóa: Chỉ truy vấn các đơn có status = COMPLETED và payoutStatus = PENDING (không dùng findAll).
-     * Truy vấn batch review và report để tránh N+1.
+     * Batch fetch review và report để tránh N+1.
+     * Hỗ trợ một đơn có nhiều báo cáo (không crash hay lấy thiếu).
+     * Chặn tuyệt đối nếu có bất kỳ báo cáo nào ở trạng thái PENDING hoặc INVESTIGATING.
      */
     @Scheduled(fixedRate = 60000) // chạy mỗi phút
     @Transactional
@@ -125,20 +166,31 @@ public class OrderPayoutService {
             Map<Long, PlayerReview> reviewMap = playerReviewRepository.findByOrderIdIn(orderIds).stream()
                     .collect(Collectors.toMap(r -> r.getOrder().getId(), r -> r, (a, b) -> a));
 
-            // Batch fetch reports để giải quyết vấn đề N+1
-            Map<Long, Report> reportMap = reportRepository.findByOrderIdIn(orderIds).stream()
-                    .filter(r -> r.getOrder() != null)
-                    .collect(Collectors.toMap(r -> r.getOrder().getId(), r -> r, (a, b) -> a));
+            // Batch fetch reports: Group theo orderId -> List<Report> để hỗ trợ 1 đơn có nhiều report
+            Map<Long, List<Report>> reportsByOrderId = reportRepository.findByOrderIdIn(orderIds).stream()
+                    .filter(r -> r.getOrder() != null && r.getOrder().getId() != null)
+                    .collect(Collectors.groupingBy(r -> r.getOrder().getId()));
 
             for (Order order : pendingOrders) {
-                // Điều kiện 1: Đã được đánh giá từ 4 sao trở lên
+                List<Report> reports = reportsByOrderId.getOrDefault(order.getId(), List.of());
+
+                // Kiểm tra xem đơn có báo cáo nào đang PENDING hoặc INVESTIGATING không
+                boolean hasActiveDispute = reports.stream().anyMatch(r ->
+                        "PENDING".equalsIgnoreCase(r.getStatus()) || "INVESTIGATING".equalsIgnoreCase(r.getStatus()));
+
+                if (hasActiveDispute) {
+                    // Đang có tranh chấp chưa xử lý: CHẶN MỞ KHÓA
+                    continue;
+                }
+
+                // Điều kiện 1: Đã được đánh giá từ 4 sao trở lên VÀ không có khiếu nại chưa xử lý
                 PlayerReview review = reviewMap.get(order.getId());
                 if (review != null && review.getRating() != null && review.getRating() >= 4.0) {
                     releaseOrderPayout(order, "Được đánh giá " + review.getRating() + " sao");
                     continue;
                 }
 
-                // Điều kiện 2: Đã quá 24h sau khi đơn kết thúc và không có tố cáo nào đang PENDING/INVESTIGATING
+                // Điều kiện 2: Đã quá 24h sau khi đơn kết thúc VÀ không có tố cáo nào chưa xử lý
                 LocalDateTime endTime = order.getEndTime();
                 if (endTime == null) {
                     endTime = order.getStartTime();
@@ -148,8 +200,10 @@ public class OrderPayoutService {
                 }
 
                 if (endTime != null && now.isAfter(endTime.plusHours(24))) {
-                    Report report = reportMap.get(order.getId());
-                    if (report == null || "REJECTED".equalsIgnoreCase(report.getStatus())) {
+                    // Nếu không có báo cáo nào, hoặc TẤT CẢ các báo cáo của đơn này đều bị REJECTED
+                    boolean allRejectedOrNone = reports.isEmpty() ||
+                            reports.stream().allMatch(r -> "REJECTED".equalsIgnoreCase(r.getStatus()));
+                    if (allRejectedOrNone) {
                         releaseOrderPayout(order, "Đã qua 24h sau khi đơn thuê kết thúc");
                     }
                 }
@@ -181,9 +235,12 @@ public class OrderPayoutService {
             for (Order order : orders) {
                 PlayerReview review = reviewMap.get(order.getId());
                 if (review == null || review.getRating() == null || review.getRating() < 4.0) {
+                    double rate = order.getDiscountRate() != null 
+                            ? order.getDiscountRate() 
+                            : commissionService.getCommissionRateForPlayer(order.getPlayer());
                     long amount = order.getPlayerReceived() != null 
                             ? order.getPlayerReceived() 
-                            : Math.round((order.getPrice() != null ? order.getPrice() : 0L) * 0.85);
+                            : commissionService.calculatePlayerReceived(order.getPrice() != null ? order.getPrice() : 0L, rate);
                     total += amount;
                 }
             }

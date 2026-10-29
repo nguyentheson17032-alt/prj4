@@ -71,6 +71,7 @@ export const StatusBadge = ({ status, order }) => {
     CONFIRMED: { label: 'Đã xác nhận', bg: 'rgba(6,182,212,0.15)', color: '#06b6d4' },
     CANCELLED: { label: 'Đã hủy', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
     CANCELED: { label: 'Đã hủy', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    EXPIRED: { label: 'Hết hạn xác nhận', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
     REFUNDED: { label: 'Đã hoàn tiền', bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
     processed: { label: 'Đã xử lý', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
     pending: { label: 'Chờ xử lý', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },

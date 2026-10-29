@@ -19,19 +19,27 @@ public class MessageServiceImpl implements MessageService {
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
     private final NotificationService notificationService;
+    private final com.example.backend.repository.UserBlockRepository userBlockRepository;
 
     @Autowired
     public MessageServiceImpl(MessageRepository messageRepository,
                              ConversationRepository conversationRepository,
-                             NotificationService notificationService) {
+                             NotificationService notificationService,
+                             com.example.backend.repository.UserBlockRepository userBlockRepository) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.notificationService = notificationService;
+        this.userBlockRepository = userBlockRepository;
     }
 
     @Override
     @Transactional
     public Message sendMessage(User sender, User receiver, String content) {
+        if (sender != null && receiver != null && userBlockRepository != null) {
+            if (userBlockRepository.isBlocked(sender.getId(), receiver.getId())) {
+                throw new IllegalStateException("Không thể gửi tin nhắn do hai người dùng đã chặn nhau");
+            }
+        }
         System.out.println("[MessageServiceImpl] BẮT ĐẦU sendMessage: sender=" + sender.getId() + ", receiver=" + receiver.getId());
         
         Message message = new Message();

@@ -44,6 +44,44 @@ public class OrderService {
     private RevenueRepository revenueRepository;
     @Autowired(required = false)
     private OrderPayoutService orderPayoutService;
+    @Autowired
+    private CommissionService commissionService;
+    @Autowired(required = false)
+    private OrderExpirationProcessor orderExpirationProcessor;
+
+    @org.springframework.beans.factory.annotation.Value("${app.order.pending-timeout-minutes:15}")
+    private int pendingTimeoutMinutes;
+
+    private OrderExpirationProcessor getExpirationProcessor() {
+        if (orderExpirationProcessor == null) {
+            orderExpirationProcessor = new OrderExpirationProcessor(orderRepository, userRepository, paymentRepository, gamePlayerService, notificationService);
+        }
+        return orderExpirationProcessor;
+    }
+
+    // Chạy mỗi 1 phút để tự động hủy đơn PENDING quá hạn (quá X phút mà player chưa xác nhận)
+    // Tách transaction độc lập cho từng đơn (REQUIRES_NEW) để lỗi 1 đơn không rollback cả batch
+    // Dùng atomic update markOrderExpiredIfPending để chống hoàn tiền 2 lần
+    @Scheduled(fixedRate = 60000)
+    public void autoCancelExpiredPendingOrders() {
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(pendingTimeoutMinutes);
+        List<Order> expiredPendingOrders = orderRepository.findPendingOrdersCreatedBefore(threshold);
+        if (expiredPendingOrders == null || expiredPendingOrders.isEmpty()) {
+            return;
+        }
+
+        logger.info("Found {} pending orders that exceeded timeout of {} minutes to auto-cancel",
+                expiredPendingOrders.size(), pendingTimeoutMinutes);
+
+        OrderExpirationProcessor processor = getExpirationProcessor();
+        for (Order order : expiredPendingOrders) {
+            try {
+                processor.processSingleExpiredPendingOrder(order, pendingTimeoutMinutes);
+            } catch (Exception e) {
+                logger.error("Error auto-cancelling expired pending order #{}: {}", order.getId(), e.getMessage());
+            }
+        }
+    }
 
     // Chạy mỗi 5 phút để nhắc nhở đơn sắp bắt đầu / sắp kết thúc
     // Có cờ upcomingReminderSent và endingReminderSent trên Order để chống gửi trùng lặp
@@ -134,8 +172,12 @@ public class OrderService {
                 }
 
                 long totalCoin = order.getPrice() != null ? order.getPrice() : 0L;
-                long platformFee = Math.round(totalCoin * 0.15); // 15% chiết khấu hệ thống
-                long playerTotalReceived = totalCoin - platformFee; // 85% tổng nhận
+                double commissionRate = order.getDiscountRate() != null 
+                        ? order.getDiscountRate() 
+                        : (order.getPlayer() != null ? commissionService.getCommissionRateForPlayer(order.getPlayer()) : commissionService.getDefaultCommissionRate());
+                long platformFee = commissionService.calculatePlatformFee(totalCoin, commissionRate);
+                long playerTotalReceived = commissionService.calculatePlayerReceived(totalCoin, commissionRate);
+                order.setDiscountRate(commissionRate);
                 order.setPlatformFee(platformFee);
                 order.setPlayerReceived(playerTotalReceived);
                 orderRepository.save(order);
@@ -151,7 +193,7 @@ public class OrderService {
                     }
                 }
 
-                // Lưu Payment & Revenue 15% cho hệ thống
+                // Lưu Payment & Revenue cho hệ thống
                 try {
                     Payment appPayment = new Payment();
                     appPayment.setUser(order.getRenter());
@@ -161,7 +203,7 @@ public class OrderService {
                     }
                     appPayment.setCoin(platformFee);
                     appPayment.setOriginalAmount(totalCoin);
-                    appPayment.setDiscountRate(0.15);
+                    appPayment.setDiscountRate(commissionRate);
                     appPayment.setPlatformFee(platformFee);
                     appPayment.setPlayerReceived(playerTotalReceived);
                     appPayment.setStatus(Payment.PaymentStatus.COMPLETED);
@@ -172,7 +214,7 @@ public class OrderService {
                     appPayment.setCompletedAt(LocalDateTime.now());
                     appPayment.setStartTime(order.getStartTime());
                     appPayment.setEndTime(order.getEndTime());
-                    appPayment.setDescription("Phí chiết khấu hệ thống 15% từ đơn hoàn thành tự động #" + order.getId());
+                    appPayment.setDescription("Phí chiết khấu hệ thống (" + (int)(commissionRate * 100) + "%) từ đơn hoàn thành tự động #" + order.getId());
                     paymentRepository.save(appPayment);
 
                     Revenue revenue = new Revenue();

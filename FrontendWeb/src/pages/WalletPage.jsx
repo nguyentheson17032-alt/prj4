@@ -191,13 +191,13 @@ const renderStatusBadge = (tx) => {
       </span>
     );
   }
-  if (tx.status === 'CANCELED' || tx.status === 'CANCELLED' || tx.status === 'REJECTED') {
+  if (tx.status === 'CANCELED' || tx.status === 'CANCELLED' || tx.status === 'REJECTED' || tx.status === 'EXPIRED') {
     return (
       <span
         className="badge"
         style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}
       >
-        Đã Hủy
+        {tx.status === 'EXPIRED' ? 'Hết Hạn (Đã Hoàn Xu)' : 'Đã Hủy'}
       </span>
     );
   }
@@ -357,9 +357,9 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 txStatus = 'FROZEN';
                 stageText = ' (Đang đóng băng)';
                 feeDetail = `Tạm giữ 85%: ${playerFinal.toLocaleString('vi-VN')} đ (Tự động vào số dư khả dụng sau 24h hoặc khi khách đánh giá ≥4★)`;
-              } else if (o.status === 'CANCELED' || o.status === 'REJECTED') {
+              } else if (o.status === 'CANCELED' || o.status === 'REJECTED' || o.status === 'EXPIRED') {
                 earnedAmount = 0;
-                txStatus = 'CANCELED';
+                txStatus = o.status === 'EXPIRED' ? 'EXPIRED' : 'CANCELED';
               } else if (isReleased) {
                 txStatus = 'COMPLETED';
                 stageText = ' (Đã vào số dư khả dụng)';

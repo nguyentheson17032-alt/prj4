@@ -26,8 +26,11 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByReportedPlayerIdAndStatus(Long reportedPlayerId, String status);
     List<Report> findByReporterIdAndReportedPlayerId(Long reporterId, Long reportedPlayerId);
     boolean existsByOrderId(Long orderId);
-    Report findByOrderId(Long orderId);
+    List<Report> findByOrderId(Long orderId);
+    Report findFirstByOrderIdOrderByCreatedAtDesc(Long orderId);
     List<Report> findByOrderIdIn(Collection<Long> orderIds);
+    boolean existsByOrderIdAndStatusIn(Long orderId, Collection<String> statuses);
+    List<Report> findByOrderIdAndStatusIn(Long orderId, Collection<String> statuses);
     boolean existsByReporterIdAndReportedPlayerId(Long reporterId, Long reportedPlayerId);
     long countByStatus(String status);
     

@@ -35,7 +35,7 @@ export const OverviewTab = ({ ordersList, usersList, playersList, reportsList, c
       if (commissionTransactions && commissionTransactions.length > 0) {
         commissionTransactions.forEach(t => {
           const st = (t.status || '').toUpperCase();
-          if (st === 'CANCELLED' || st === 'CANCELED' || st === 'REJECTED') return;
+          if (st === 'CANCELLED' || st === 'CANCELED' || st === 'REJECTED' || st === 'EXPIRED') return;
           const dateObj = parseDateToDateObj(t.createdAt);
           if (!dateObj) return;
           if (dateObj.getDate() === targetDay && dateObj.getMonth() === targetMonth && dateObj.getFullYear() === targetYear) {
@@ -48,7 +48,7 @@ export const OverviewTab = ({ ordersList, usersList, playersList, reportsList, c
       } else {
         ordersList.forEach(o => {
           const st = (o.status || '').toUpperCase();
-          if (st === 'CANCELLED' || st === 'CANCELED' || st === 'REJECTED') return;
+          if (st === 'CANCELLED' || st === 'CANCELED' || st === 'REJECTED' || st === 'EXPIRED') return;
           const dateObj = parseDateToDateObj(o.startTime || o.createdAt || o.hireTime);
           if (!dateObj) return;
           if (dateObj.getDate() === targetDay && dateObj.getMonth() === targetMonth && dateObj.getFullYear() === targetYear) {
@@ -142,7 +142,7 @@ export const OverviewTab = ({ ordersList, usersList, playersList, reportsList, c
             { key: 'COMPLETED', label: 'Hoàn thành', color: '#10b981', matches: ['COMPLETED'] },
             { key: 'CONFIRMED', label: 'Đã xác nhận', color: '#06b6d4', matches: ['CONFIRMED', 'IN_PROGRESS'] },
             { key: 'PENDING', label: 'Chờ duyệt', color: '#f59e0b', matches: ['PENDING'] },
-            { key: 'CANCELLED', label: 'Đã hủy', color: '#ef4444', matches: ['CANCELLED', 'CANCELED', 'REJECTED'] },
+            { key: 'CANCELLED', label: 'Đã hủy', color: '#ef4444', matches: ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED'] },
             { key: 'REFUNDED', label: 'Đã hoàn tiền', color: '#a855f7', matches: ['REFUNDED'] },
           ].map(item => {
             const cnt = ordersList.filter(o => item.matches.includes(o.status?.toUpperCase())).length;

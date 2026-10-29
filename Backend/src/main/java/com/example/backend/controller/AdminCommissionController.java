@@ -12,21 +12,29 @@ import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.backend.dto.ApiResponse;
 import com.example.backend.dto.CommissionStatsDTO;
 import com.example.backend.dto.CommissionTransactionDTO;
+import com.example.backend.entity.GamePlayer;
 import com.example.backend.entity.Order;
 import com.example.backend.entity.Payment;
 import com.example.backend.entity.User;
+import com.example.backend.repository.GamePlayerRepository;
 import com.example.backend.repository.OrderRepository;
 import com.example.backend.repository.PaymentRepository;
 import com.example.backend.repository.PlayerImageRepository;
+import com.example.backend.repository.UserRepository;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -42,6 +50,9 @@ public class AdminCommissionController {
     private final PaymentRepository paymentRepository;
     private final PlayerImageRepository playerImageRepository;
     private final com.example.backend.repository.ReportRepository reportRepository;
+    private final com.example.backend.service.CommissionService commissionService;
+    private final UserRepository userRepository;
+    private final GamePlayerRepository gamePlayerRepository;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
 
@@ -72,7 +83,10 @@ public class AdminCommissionController {
 
             for (Order o : validOrders) {
                 long price = o.getPrice() != null ? o.getPrice() : 0L;
-                long fee = o.getPlatformFee() != null ? o.getPlatformFee() : Math.round(price * 0.15);
+                double rate = o.getDiscountRate() != null 
+                        ? o.getDiscountRate() 
+                        : (commissionService != null ? commissionService.getCommissionRateForPlayer(o.getPlayer()) : 0.15);
+                long fee = o.getPlatformFee() != null ? o.getPlatformFee() : Math.round(price * rate);
 
                 if ("REFUNDED".equalsIgnoreCase(o.getStatus())) {
                     int refundPercent = 100;
@@ -108,7 +122,10 @@ public class AdminCommissionController {
             long donateCommission = 0L;
             for (Payment p : completedDonates) {
                 long coin = p.getOriginalAmount() != null ? p.getOriginalAmount() : (p.getCoin() != null ? p.getCoin() : 0L);
-                long fee = p.getPlatformFee() != null ? p.getPlatformFee() : Math.round(coin * 0.15);
+                double rate = p.getDiscountRate() != null 
+                        ? p.getDiscountRate() 
+                        : (commissionService != null ? commissionService.getDefaultCommissionRate() : 0.15);
+                long fee = p.getPlatformFee() != null ? p.getPlatformFee() : Math.round(coin * rate);
                 donateGmv += coin;
                 donateCommission += fee;
             }
@@ -173,7 +190,10 @@ public class AdminCommissionController {
                 for (Order o : orders) {
                     try {
                         long price = o.getPrice() != null ? o.getPrice() : 0L;
-                        long fee = o.getPlatformFee() != null ? o.getPlatformFee() : Math.round(price * 0.15);
+                        double rate = o.getDiscountRate() != null 
+                                ? o.getDiscountRate() 
+                                : (commissionService != null ? commissionService.getCommissionRateForPlayer(o.getPlayer()) : 0.15);
+                        long fee = o.getPlatformFee() != null ? o.getPlatformFee() : Math.round(price * rate);
                         long recv = o.getPlayerReceived() != null ? o.getPlayerReceived() : (price - fee);
 
                         String dateStr = "";
@@ -254,7 +274,7 @@ public class AdminCommissionController {
                                 .receiverAvatar(playerAvatar)
                                 .gameName(gameName)
                                 .originalAmount(price)
-                                .discountRate(0.15)
+                                .discountRate(rate)
                                 .platformFee(fee)
                                 .playerReceived(recv)
                                 .status(status)
@@ -281,7 +301,10 @@ public class AdminCommissionController {
                         }
 
                         long originalCoin = p.getOriginalAmount() != null ? p.getOriginalAmount() : (p.getCoin() != null ? p.getCoin() : 0L);
-                        long fee = p.getPlatformFee() != null ? p.getPlatformFee() : Math.round(originalCoin * 0.15);
+                        double donateRate = p.getDiscountRate() != null 
+                                ? p.getDiscountRate() 
+                                : (commissionService != null ? commissionService.getDefaultCommissionRate() : 0.15);
+                        long fee = p.getPlatformFee() != null ? p.getPlatformFee() : Math.round(originalCoin * donateRate);
                         long recv = p.getPlayerReceived() != null ? p.getPlayerReceived() : (originalCoin - fee);
 
                         String dateStr = p.getCreatedAt() != null ? p.getCreatedAt().format(FORMATTER) : "";
@@ -332,7 +355,7 @@ public class AdminCommissionController {
                                 .receiverAvatar(receiverAvatar)
                                 .gameName("Donate")
                                 .originalAmount(originalCoin)
-                                .discountRate(0.15)
+                                .discountRate(donateRate)
                                 .platformFee(fee)
                                 .playerReceived(recv)
                                 .status(p.getStatus() != null ? p.getStatus().name() : "COMPLETED")
@@ -366,5 +389,130 @@ public class AdminCommissionController {
         }
 
         return ResponseEntity.ok(result);
+    }
+
+    @Data
+    public static class UpdateUserCommissionRequest {
+        private String vipTier; // STANDARD, SILVER, GOLD, DIAMOND
+        private Double customCommissionRate; // ví dụ 0.10 cho 10%
+    }
+
+    @Data
+    public static class UpdatePlayerCommissionRequest {
+        private Double commissionRate; // ví dụ 0.08 cho 8%
+    }
+
+    @PutMapping("/users/{userId}")
+    @Operation(summary = "Admin cấu hình hạng VIP (vipTier) và tỷ lệ hoa hồng tùy chỉnh (customCommissionRate) cho User")
+    public ResponseEntity<ApiResponse<?>> updateUserCommission(
+            @PathVariable Long userId,
+            @RequestBody UpdateUserCommissionRequest request) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Người dùng không tồn tại", null));
+        }
+
+        if (request.getVipTier() != null) {
+            String tier = request.getVipTier().trim().toUpperCase();
+            if (!List.of("STANDARD", "SILVER", "GOLD", "DIAMOND").contains(tier)) {
+                return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Hạng VIP không hợp lệ (hỗ trợ: STANDARD, SILVER, GOLD, DIAMOND)", null));
+            }
+            user.setVipTier(tier);
+        }
+
+        if (request.getCustomCommissionRate() != null) {
+            if (request.getCustomCommissionRate() < 0.0 || request.getCustomCommissionRate() > 1.0) {
+                return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Tỷ lệ hoa hồng phải từ 0.0 đến 1.0 (ví dụ 0.10 cho 10%)", null));
+            }
+            user.setCustomCommissionRate(request.getCustomCommissionRate());
+        }
+
+        userRepository.save(user);
+
+        double effectiveRate = commissionService.getCommissionRateForUser(user);
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", user.getId());
+        data.put("username", user.getUsername());
+        data.put("vipTier", user.getVipTier());
+        data.put("customCommissionRate", user.getCustomCommissionRate());
+        data.put("effectiveCommissionRate", effectiveRate);
+        data.put("effectiveCommissionPercent", (int) Math.round(effectiveRate * 100) + "%");
+
+        log.info("[AdminCommissionController] Admin updated commission for User #{}: vipTier={}, customRate={}, effectiveRate={}",
+                user.getId(), user.getVipTier(), user.getCustomCommissionRate(), effectiveRate);
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cập nhật hoa hồng người dùng thành công", data));
+    }
+
+    @PutMapping("/players/{playerId}")
+    @Operation(summary = "Admin cấu hình tỷ lệ hoa hồng riêng (commissionRate) cho GamePlayer")
+    public ResponseEntity<ApiResponse<?>> updatePlayerCommission(
+            @PathVariable Long playerId,
+            @RequestBody UpdatePlayerCommissionRequest request) {
+        GamePlayer player = gamePlayerRepository.findById(playerId).orElse(null);
+        if (player == null) {
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, "GamePlayer không tồn tại", null));
+        }
+
+        if (request.getCommissionRate() != null) {
+            if (request.getCommissionRate() < 0.0 || request.getCommissionRate() > 1.0) {
+                return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Tỷ lệ hoa hồng phải từ 0.0 đến 1.0 (ví dụ 0.08 cho 8%)", null));
+            }
+            player.setCommissionRate(request.getCommissionRate());
+        }
+
+        gamePlayerRepository.save(player);
+
+        double effectiveRate = commissionService.getCommissionRateForPlayer(player);
+        Map<String, Object> data = new HashMap<>();
+        data.put("playerId", player.getId());
+        data.put("playerUsername", player.getUsername());
+        data.put("playerCommissionRate", player.getCommissionRate());
+        data.put("effectiveCommissionRate", effectiveRate);
+        data.put("effectiveCommissionPercent", (int) Math.round(effectiveRate * 100) + "%");
+
+        log.info("[AdminCommissionController] Admin updated commission for GamePlayer #{}: commissionRate={}, effectiveRate={}",
+                player.getId(), player.getCommissionRate(), effectiveRate);
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cập nhật hoa hồng GamePlayer thành công", data));
+    }
+
+    @GetMapping("/configs/users/{userId}")
+    @Operation(summary = "Lấy thông tin cấu hình hoa hồng hiệu lực của User")
+    public ResponseEntity<ApiResponse<?>> getUserCommissionConfig(@PathVariable Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Người dùng không tồn tại", null));
+        }
+
+        double effectiveRate = commissionService.getCommissionRateForUser(user);
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", user.getId());
+        data.put("username", user.getUsername());
+        data.put("vipTier", user.getVipTier());
+        data.put("customCommissionRate", user.getCustomCommissionRate());
+        data.put("effectiveCommissionRate", effectiveRate);
+        data.put("effectiveCommissionPercent", (int) Math.round(effectiveRate * 100) + "%");
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Lấy thông tin hoa hồng thành công", data));
+    }
+
+    @GetMapping("/configs/players/{playerId}")
+    @Operation(summary = "Lấy thông tin cấu hình hoa hồng hiệu lực của GamePlayer")
+    public ResponseEntity<ApiResponse<?>> getPlayerCommissionConfig(@PathVariable Long playerId) {
+        GamePlayer player = gamePlayerRepository.findById(playerId).orElse(null);
+        if (player == null) {
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, "GamePlayer không tồn tại", null));
+        }
+
+        double effectiveRate = commissionService.getCommissionRateForPlayer(player);
+        Map<String, Object> data = new HashMap<>();
+        data.put("playerId", player.getId());
+        data.put("playerUsername", player.getUsername());
+        data.put("playerCommissionRate", player.getCommissionRate());
+        data.put("effectiveCommissionRate", effectiveRate);
+        data.put("effectiveCommissionPercent", (int) Math.round(effectiveRate * 100) + "%");
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Lấy thông tin hoa hồng thành công", data));
     }
 }

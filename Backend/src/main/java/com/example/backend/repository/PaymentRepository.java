@@ -77,4 +77,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("newStatus") Payment.PaymentStatus newStatus,
             @Param("completedAt") LocalDateTime completedAt,
             @Param("expectedStatus") Payment.PaymentStatus expectedStatus);
+
+    @Query("SELECT COALESCE(SUM(p.coin), 0) FROM Payment p WHERE p.user.id = :userId AND p.type = com.example.backend.entity.Payment$PaymentType.WITHDRAW AND p.status IN (com.example.backend.entity.Payment$PaymentStatus.COMPLETED, com.example.backend.entity.Payment$PaymentStatus.PENDING) AND p.createdAt BETWEEN :start AND :end")
+    long sumTodayWithdrawalsByUserId(@Param("userId") Long userId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

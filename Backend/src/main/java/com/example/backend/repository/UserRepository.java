@@ -42,12 +42,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllAdminsWithRole();
 
     // Khấu trừ coin an toàn chống race condition / double-spending
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("UPDATE User u SET u.coin = u.coin - :amount WHERE u.id = :userId AND u.coin >= :amount")
     int deductCoinSafely(@Param("userId") Long userId, @Param("amount") Long amount);
 
     // Cộng coin an toàn chống ghi đè số dư đồng thời
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("UPDATE User u SET u.coin = COALESCE(u.coin, 0) + :amount WHERE u.id = :userId")
     int addCoinSafely(@Param("userId") Long userId, @Param("amount") Long amount);
 
@@ -58,4 +58,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT COUNT(DISTINCT u) FROM User u JOIN u.roles r WHERE r IN ('GAMER', 'ROLE_GAMER', 'PLAYER', 'ROLE_PLAYER')")
     long countGamers();
+
+    List<User> findByKycStatusIgnoreCase(String kycStatus);
 }

@@ -64,6 +64,8 @@ const getStatusBadge = (status, refundPercentage) => {
     case 'CANCELED':
     case 'REJECTED':
       return { label: 'Đã hủy', bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' };
+    case 'EXPIRED':
+      return { label: 'Hết hạn xác nhận', bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' };
     case 'REFUNDED':
       return { 
         label: refundPercentage ? `Đã hoàn tiền ${refundPercentage}%` : 'Đã hoàn tiền', 

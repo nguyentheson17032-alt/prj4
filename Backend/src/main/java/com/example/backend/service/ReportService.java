@@ -37,6 +37,7 @@ public class ReportService {
     private final com.example.backend.repository.PlayerReviewRepository playerReviewRepository;
     private final com.example.backend.repository.RevenueRepository revenueRepository;
     private OrderPayoutService orderPayoutService;
+    private final CommissionService commissionService;
 
     @org.springframework.beans.factory.annotation.Autowired
     public ReportService(ReportRepository reportRepository,
@@ -47,7 +48,8 @@ public class ReportService {
                          NotificationService notificationService,
                          com.example.backend.repository.PlayerReviewRepository playerReviewRepository,
                          com.example.backend.repository.RevenueRepository revenueRepository,
-                         @org.springframework.beans.factory.annotation.Autowired(required = false) OrderPayoutService orderPayoutService) {
+                         @org.springframework.beans.factory.annotation.Autowired(required = false) OrderPayoutService orderPayoutService,
+                         CommissionService commissionService) {
         this.reportRepository = reportRepository;
         this.gamePlayerRepository = gamePlayerRepository;
         this.userRepository = userRepository;
@@ -57,6 +59,7 @@ public class ReportService {
         this.playerReviewRepository = playerReviewRepository;
         this.revenueRepository = revenueRepository;
         this.orderPayoutService = orderPayoutService;
+        this.commissionService = commissionService;
     }
 
     public Report createReport(Long reportedPlayerId, Long reporterId, Long orderId, String reason, String description, String video, String imageUrls) {
@@ -138,9 +141,12 @@ public class ReportService {
                 if (orderPayoutService != null) {
                     orderPayoutService.releaseOrderPayout(order, "Admin đã từ chối khiếu nại");
                 } else if (!"RELEASED".equalsIgnoreCase(order.getPayoutStatus()) && !"REFUNDED".equalsIgnoreCase(order.getPayoutStatus())) {
+                    double rate = order.getDiscountRate() != null 
+                            ? order.getDiscountRate() 
+                            : commissionService.getCommissionRateForPlayer(order.getPlayer());
                     long amount = order.getPlayerReceived() != null 
                             ? order.getPlayerReceived() 
-                            : Math.round((order.getPrice() != null ? order.getPrice() : 0L) * 0.85);
+                            : commissionService.calculatePlayerReceived(order.getPrice() != null ? order.getPrice() : 0L, rate);
                     if (order.getPlayer() != null && order.getPlayer().getUser() != null && amount > 0) {
                         User playerUser = order.getPlayer().getUser();
                         long oldCoin = playerUser.getCoin() != null ? playerUser.getCoin() : 0L;
@@ -156,7 +162,7 @@ public class ReportService {
 
         // Khi đơn tố cáo được chấp nhận (RESOLVED): Hoàn tiền cho người thuê & Thu hồi tiền từ người được thuê theo %
         if ("RESOLVED".equals(status) && !"RESOLVED".equals(previousStatus)) {
-            int percent = (refundPercentage != null && refundPercentage > 0 && refundPercentage <= 100) 
+            int percent = (refundPercentage != null && refundPercentage >= 0 && refundPercentage <= 100) 
                     ? refundPercentage 
                     : 100;
             report.setRefundPercentage(percent);
@@ -209,13 +215,23 @@ public class ReportService {
             }
         }
 
-        // 2. Thu hồi số tiền mà idol/người được thuê đã nhận được từ đơn hàng đó theo tỷ lệ %
+        // 2. Phân chia số tiền còn lại sau khi hoàn tiền cho renter:
+        // Renter đã nhận: renterRefundCoin.
+        // Giá trị đơn còn lại: remainingOrderValue = totalCoin - renterRefundCoin.
+        // Phí sàn điều chỉnh theo giá trị đơn còn lại: adjustedPlatformFee
+        // Phần còn lại sau cùng thuộc về Player: playerRemainingCoin
+        double commissionRate = order.getDiscountRate() != null 
+                ? order.getDiscountRate() 
+                : commissionService.getCommissionRateForPlayer(order.getPlayer());
+        long remainingOrderValue = Math.max(0L, totalCoin - renterRefundCoin);
+        long adjustedPlatformFee = commissionService.calculatePlatformFee(remainingOrderValue, commissionRate);
+        long playerRemainingCoin = Math.max(0L, remainingOrderValue - adjustedPlatformFee);
+
         User playerUser = order.getPlayer() != null ? order.getPlayer().getUser() : null;
-        long playerReceivedCoin = order.getPlayerReceived() != null 
+        long originalPlayerExpected = order.getPlayerReceived() != null 
                 ? order.getPlayerReceived() 
-                : Math.round(totalCoin * 0.85);
-        long playerDeductedCoin = Math.round(playerReceivedCoin * (percent / 100.0));
-        long playerRemainingCoin = Math.max(0L, playerReceivedCoin - playerDeductedCoin);
+                : commissionService.calculatePlayerReceived(totalCoin, commissionRate);
+        long playerDeductedCoin = Math.max(0L, originalPlayerExpected - playerRemainingCoin);
 
         if (playerUser != null) {
             if ("RELEASED".equalsIgnoreCase(order.getPayoutStatus())) {
@@ -234,10 +250,11 @@ public class ReportService {
                 }
             }
 
-            // Cập nhật lại số tiền player thực nhận từ đơn này sau khi trừ tiền phạt
+            // Cập nhật lại số tiền player thực nhận và phí sàn từ đơn này sau khi xử lý khiếu nại
             order.setPlayerReceived(playerRemainingCoin);
-            // Đánh dấu payoutStatus là REFUNDED để đơn này được gỡ hoàn toàn khỏi số dư đang đóng băng
-            order.setPayoutStatus("REFUNDED");
+            order.setPlatformFee(adjustedPlatformFee);
+            // Đánh dấu payoutStatus: 100% -> REFUNDED, 0% -> RELEASED, một phần -> RESOLVED_PARTIALLY_REFUNDED
+            order.setPayoutStatus(percent == 100 ? "REFUNDED" : (percent == 0 ? "RELEASED" : "RESOLVED_PARTIALLY_REFUNDED"));
             order.setPayoutReleasedAt(LocalDateTime.now());
             orderRepository.save(order);
 
@@ -286,8 +303,12 @@ public class ReportService {
             }
         }
 
-        // 3. Đánh dấu trạng thái đơn hàng là REFUNDED
-        order.setStatus("REFUNDED");
+        // 3. Đánh dấu trạng thái đơn hàng (100% -> REFUNDED, hoàn 1 phần -> COMPLETED với trạng thái payout là RESOLVED_PARTIALLY_REFUNDED)
+        if (percent == 100) {
+            order.setStatus("REFUNDED");
+        } else if ("PENDING".equalsIgnoreCase(order.getStatus()) || "CONFIRMED".equalsIgnoreCase(order.getStatus())) {
+            order.setStatus("COMPLETED");
+        }
         orderRepository.save(order);
 
         // 4. Lưu lịch sử giao dịch hoàn tiền Payment
@@ -313,8 +334,8 @@ public class ReportService {
         // 5. Khấu trừ doanh thu sàn (Platform Fee) tương ứng với % hoàn tiền
         long totalFee = order.getPlatformFee() != null 
                 ? order.getPlatformFee() 
-                : Math.round(totalCoin * 0.15);
-        long platformFeeDeduct = Math.round(totalFee * (percent / 100.0));
+                : commissionService.calculatePlatformFee(totalCoin, commissionRate);
+        long platformFeeDeduct = Math.max(0L, totalFee - adjustedPlatformFee);
 
         if (revenueRepository != null && platformFeeDeduct > 0) {
             try {

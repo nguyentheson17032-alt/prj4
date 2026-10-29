@@ -208,20 +208,6 @@ public class PaymentService {
                 gamePlayer.setHoursHired(null);
                 gamePlayerRepository.save(gamePlayer);
             }
-
-            // Gửi thông báo nhắc đánh giá cho renter
-            if (notificationService != null && payment.getUser() != null) {
-                try {
-                    notificationService.createNotification(
-                            payment.getUser().getId(),
-                            "Đánh giá người chơi",
-                            "Đơn thuê của bạn đã kết thúc. Vui lòng để lại đánh giá cho Player nhé!",
-                            "review_reminder",
-                            null,
-                            payment.getId() != null ? String.valueOf(payment.getId()) : null
-                    );
-                } catch (Exception ignored) {}
-            }
         }
     }
 

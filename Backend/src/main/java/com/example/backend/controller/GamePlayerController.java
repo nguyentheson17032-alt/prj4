@@ -67,6 +67,17 @@ public class GamePlayerController {
     private final OrderService orderService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.backend.service.OrderPayoutService orderPayoutService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.backend.repository.UserBlockRepository userBlockRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.backend.service.CommissionService commissionService;
+
+    @org.springframework.beans.factory.annotation.Value("${app.order.cancellation-free-hours:2}")
+    private int cancellationFreeHours;
+
+    @org.springframework.beans.factory.annotation.Value("${app.order.late-cancellation-fee-rate:0.30}")
+    private double lateCancellationFeeRate;
+
     private static final Logger log = LoggerFactory.getLogger(GamePlayerController.class);
     private static final Set<String> VALID_STATUSES = Set.of("AVAILABLE", "HIRED", "OFFLINE", "BUSY", "PENDING", "REJECTED", "BANNED", "APPROVED");
 
@@ -130,6 +141,14 @@ public class GamePlayerController {
         private LocalDateTime endTime;
 
         private String specialRequest;
+    }
+
+    @Data
+    public static class WorkingHoursRequest {
+        private String workStartTime;
+        private String workEndTime;
+        private String workingDays;
+        private Boolean acceptingOrders;
     }
 
     @PostMapping
@@ -370,6 +389,54 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Bạn không thể tự thuê chính mình", null));
             }
 
+            // 1. Kiểm tra quan hệ chặn (UserBlock): nếu 1 trong 2 đã chặn nhau thì không cho thuê
+            if (userBlockRepository != null && gamePlayer.getUser() != null) {
+                if (userBlockRepository.isBlocked(user.getId(), gamePlayer.getUser().getId())) {
+                    return ResponseEntity.badRequest()
+                        .body(new ApiResponse<>(false, "Không thể thuê người chơi này do bạn hoặc người chơi đã chặn nhau", null));
+                }
+            }
+
+            // 2. Kiểm tra player có đang bật nhận đơn hay không
+            if (Boolean.FALSE.equals(gamePlayer.getAcceptingOrders())) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Player hiện đang tạm ngưng nhận đơn thuê mới", null));
+            }
+
+            // 3. Kiểm tra ngày làm việc trong tuần của player
+            if (gamePlayer.getWorkingDays() != null && !gamePlayer.getWorkingDays().trim().isEmpty()) {
+                String dayOfWeek = request.getStartTime().getDayOfWeek().name();
+                if (!gamePlayer.getWorkingDays().toUpperCase().contains(dayOfWeek)) {
+                    return ResponseEntity.badRequest()
+                        .body(new ApiResponse<>(false, "Player không nhận đơn vào ngày " + dayOfWeek + ". Lịch làm việc: " + gamePlayer.getWorkingDays(), null));
+                }
+            }
+
+            // 4. Kiểm tra khung giờ làm việc của player
+            if (gamePlayer.getWorkStartTime() != null && gamePlayer.getWorkEndTime() != null &&
+                !gamePlayer.getWorkStartTime().trim().isEmpty() && !gamePlayer.getWorkEndTime().trim().isEmpty()) {
+                try {
+                    java.time.LocalTime workStart = java.time.LocalTime.parse(gamePlayer.getWorkStartTime().trim());
+                    java.time.LocalTime workEnd = java.time.LocalTime.parse(gamePlayer.getWorkEndTime().trim());
+                    java.time.LocalTime rentStart = request.getStartTime().toLocalTime();
+                    java.time.LocalTime rentEnd = request.getEndTime().toLocalTime();
+
+                    boolean withinWorkHours;
+                    if (workStart.isBefore(workEnd)) {
+                        withinWorkHours = !rentStart.isBefore(workStart) && !rentEnd.isAfter(workEnd);
+                    } else {
+                        withinWorkHours = !rentStart.isBefore(workStart) || !rentEnd.isAfter(workEnd);
+                    }
+                    if (!withinWorkHours) {
+                        return ResponseEntity.badRequest()
+                            .body(new ApiResponse<>(false, "Thời gian thuê nằm ngoài khung giờ làm việc của Player (" + 
+                                    gamePlayer.getWorkStartTime() + " - " + gamePlayer.getWorkEndTime() + ")", null));
+                    }
+                } catch (Exception ex) {
+                    log.warn("Could not parse player working hours: {}", ex.getMessage());
+                }
+            }
+
             // Calculate hours from start and end time
             long hours = java.time.Duration.between(request.getStartTime(), request.getEndTime()).toHours();
             if (hours < 1) {
@@ -391,7 +458,14 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Số coin trong ví không đủ. Cần " + originalCoin + " xu để thuê.", null));
             }
 
-            // Check if player is already hired in the requested time period
+            // 5. Kiểm tra trùng lịch: kiểm tra cả đơn CONFIRMED lẫn PENDING trong bảng orders
+            List<Order> overlappingOrders = orderRepository.findOverlappingOrders(gamePlayer.getId(), request.getStartTime(), request.getEndTime());
+            if (overlappingOrders != null && !overlappingOrders.isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Player đã có đơn thuê khác trong khoảng thời gian này", null));
+            }
+
+            // Check if player is already hired in the requested time period via active payments
             List<Payment> activeHires = paymentRepository.findByPlayerIdAndStatusAndEndTimeAfter(
                 gamePlayer.getUser().getId(), Payment.PaymentStatus.PENDING, LocalDateTime.now());
             boolean isOverlapping = activeHires.stream().anyMatch(payment ->
@@ -403,9 +477,14 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Player đang được thuê trong khoảng thời gian này", null));
             }
 
-            // Trừ coin ngay khi tạo đơn thuê
-            long platformFee = Math.round(originalCoin * 0.15); // 15% chiết khấu nền tảng
-            long playerReceivedTotal = originalCoin - platformFee; // 85% Idol thực nhận
+            // 6. Tính toán chiết khấu nền tảng linh hoạt theo cấu hình / VIP / Player
+            double commissionRate = commissionService != null 
+                    ? commissionService.getCommissionRateForPlayer(gamePlayer) 
+                    : 0.15;
+            long platformFee = commissionService != null 
+                    ? commissionService.calculatePlatformFee(originalCoin, commissionRate) 
+                    : Math.round(originalCoin * 0.15);
+            long playerReceivedTotal = originalCoin - platformFee;
 
             boolean deducted = userService.deductCoin(user.getId(), originalCoin);
             if (!deducted) {
@@ -422,7 +501,7 @@ public class GamePlayerController {
             order.setEndTime(request.getEndTime());
             order.setPrice(originalCoin);
             order.setStatus("PENDING");
-            order.setDiscountRate(0.15);
+            order.setDiscountRate(commissionRate);
             order.setPlatformFee(platformFee);
             order.setPlayerReceived(playerReceivedTotal);
             orderRepository.save(order);
@@ -434,7 +513,7 @@ public class GamePlayerController {
             payment.setGamePlayer(gamePlayer);
             payment.setCoin(originalCoin);
             payment.setOriginalAmount(originalCoin);
-            payment.setDiscountRate(0.15);
+            payment.setDiscountRate(commissionRate);
             payment.setPlatformFee(platformFee);
             payment.setPlayerReceived(playerReceivedTotal);
             payment.setCurrency("COIN");
@@ -507,10 +586,16 @@ public class GamePlayerController {
 
             // Số tiền người được thuê nhận được sẽ ở trạng thái đóng băng (PENDING) cho đến khi đơn hoàn thành + đánh giá >= 4 sao hoặc qua 24h
             User user = order.getRenter();
-            long totalCoin = order.getPrice();
-            long totalPlatformFee = Math.round(totalCoin * 0.15);
+            long totalCoin = order.getPrice() != null ? order.getPrice() : 0L;
+            double commissionRate = order.getDiscountRate() != null 
+                    ? order.getDiscountRate() 
+                    : (commissionService != null ? commissionService.getCommissionRateForPlayer(gamePlayer) : 0.15);
+            long totalPlatformFee = commissionService != null 
+                    ? commissionService.calculatePlatformFee(totalCoin, commissionRate) 
+                    : Math.round(totalCoin * 0.15);
             long totalPlayerReceived = totalCoin - totalPlatformFee;
 
+            order.setDiscountRate(commissionRate);
             order.setPlatformFee(totalPlatformFee);
             order.setPlayerReceived(totalPlayerReceived);
             order.setPayoutStatus("PENDING");
@@ -791,17 +876,115 @@ public class GamePlayerController {
                     .body(new ApiResponse<>(false, "Bạn không có quyền hủy đơn này", null));
             }
 
-            // Chỉ cho phép hủy khi đơn đang chờ xác nhận
-            if (!"PENDING".equals(order.getStatus())) {
+            // Chỉ cho phép hủy khi đơn đang ở trạng thái PENDING hoặc CONFIRMED
+            String orderStatus = order.getStatus() != null ? order.getStatus().toUpperCase() : "";
+            if (!"PENDING".equals(orderStatus) && !"CONFIRMED".equals(orderStatus)) {
                 return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Chỉ có thể hủy đơn khi đang chờ xác nhận", null));
+                    .body(new ApiResponse<>(false, "Không thể hủy đơn hàng ở trạng thái " + order.getStatus(), null));
             }
 
-            // Hoàn lại coin an toàn cho người thuê (vì đã trừ khi tạo đơn)
+            LocalDateTime now = LocalDateTime.now();
+            long totalOrderPrice = order.getPrice() != null ? order.getPrice() : 0L;
+            long cancellationFee = 0L;
+            long refundedCoin = totalOrderPrice;
+            String cancelReason;
+
+            if (isAdmin && !isRenter && !isPlayer) {
+                // Quản trị viên (Admin) can thiệp hủy đơn của người khác: hoàn 100%, không tính phí phạt
+                cancellationFee = 0L;
+                refundedCoin = totalOrderPrice;
+                cancelReason = "Quản trị viên (Admin) can thiệp hủy đơn hàng #" + order.getId();
+            } else if ("PENDING".equals(orderStatus)) {
+                // Đơn PENDING: Hủy tự do, hoàn tiền 100%, không phạt
+                cancellationFee = 0L;
+                refundedCoin = totalOrderPrice;
+                cancelReason = isPlayer ? "Player hủy yêu cầu thuê khi đang chờ xác nhận" : "Khách hàng hủy yêu cầu thuê khi đang chờ xác nhận";
+            } else {
+                // Đơn CONFIRMED: Áp dụng chính sách hủy
+                if (isPlayer) {
+                    // Nếu chính Player hủy đơn đã cam kết: Hoàn 100% cho renter, không phạt renter
+                    cancellationFee = 0L;
+                    refundedCoin = totalOrderPrice;
+                    cancelReason = "Player chủ động hủy đơn thuê đã xác nhận";
+                } else {
+                    // Người thuê (Renter) hủy đơn đã CONFIRMED:
+                    if (order.getStartTime() != null && now.isAfter(order.getStartTime())) {
+                        return ResponseEntity.badRequest().body(new ApiResponse<>(false,
+                            "Đơn thuê đã bắt đầu lúc " + order.getStartTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")) +
+                            ". Không thể tự ý hủy đơn, vui lòng gửi khiếu nại (Report) nếu có sự cố.", null));
+                    }
+
+                    long minutesBeforeStart = order.getStartTime() != null 
+                            ? java.time.Duration.between(now, order.getStartTime()).toMinutes() 
+                            : 0L;
+
+                    if (minutesBeforeStart >= cancellationFreeHours * 60) {
+                        // Hủy sớm (>= 2h trước giờ bắt đầu): Hoàn 100%
+                        cancellationFee = 0L;
+                        refundedCoin = totalOrderPrice;
+                        cancelReason = "Khách hàng hủy sớm trước giờ bắt đầu (" + minutesBeforeStart + " phút). Hoàn tiền 100%.";
+                    } else {
+                        // Hủy muộn sát giờ (< 2h trước giờ bắt đầu): Phạt 30% phí hủy
+                        cancellationFee = Math.round(totalOrderPrice * lateCancellationFeeRate);
+                        refundedCoin = Math.max(0L, totalOrderPrice - cancellationFee);
+                        cancelReason = "Khách hàng hủy sát giờ (" + minutesBeforeStart + " phút trước khi bắt đầu). Áp dụng phí hủy " +
+                                (int)(lateCancellationFeeRate * 100) + "% (" + cancellationFee + " xu).";
+
+                        // Bồi thường khoản phí hủy 30% cho Player
+                        if (gamePlayer != null && gamePlayer.getUser() != null && cancellationFee > 0) {
+                            User playerUser = gamePlayer.getUser();
+                            userService.addCoin(playerUser.getId(), cancellationFee);
+                            playerUser.setCoin((playerUser.getCoin() != null ? playerUser.getCoin() : 0L) + cancellationFee);
+
+                            try {
+                                Payment compPayment = new Payment();
+                                if (order.getRenter() != null) compPayment.setUser(order.getRenter());
+                                compPayment.setPlayer(playerUser);
+                                compPayment.setGamePlayer(gamePlayer);
+                                compPayment.setCoin(cancellationFee);
+                                compPayment.setCurrency("COIN");
+                                compPayment.setStatus(Payment.PaymentStatus.COMPLETED);
+                                compPayment.setType(Payment.PaymentType.HIRE);
+                                compPayment.setPaymentMethod(Payment.PaymentMethod.HIRE);
+                                compPayment.setCreatedAt(now);
+                                compPayment.setCompletedAt(now);
+                                compPayment.setDescription("Bồi thường phí hủy muộn đơn #" + order.getId() + " từ khách hàng");
+                                paymentRepository.save(compPayment);
+                            } catch (Exception ex) {
+                                log.error("Failed to save compensation payment: {}", ex.getMessage());
+                            }
+
+                            try {
+                                notificationService.createNotification(
+                                    playerUser.getId(),
+                                    "Nhận bồi thường phí hủy đơn",
+                                    "Đơn thuê #" + order.getId() + " bị hủy sát giờ. Bạn nhận được " +
+                                            String.format("%,d", cancellationFee) + " xu phí bồi thường.",
+                                    "rent_cancel_compensation",
+                                    "/wallet",
+                                    order.getId().toString()
+                                );
+                            } catch (Exception ex) {
+                                log.error("Failed to notify player about compensation: {}", ex.getMessage());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Hoàn lại coin an toàn cho người thuê
             User renter = order.getRenter();
-            if (renter != null && order.getPrice() != null && order.getPrice() > 0) {
-                userService.addCoin(renter.getId(), order.getPrice());
-                renter.setCoin((renter.getCoin() != null ? renter.getCoin() : 0L) + order.getPrice());
+            if (renter != null && refundedCoin > 0) {
+                userService.addCoin(renter.getId(), refundedCoin);
+                renter.setCoin((renter.getCoin() != null ? renter.getCoin() : 0L) + refundedCoin);
+            }
+
+            // Cập nhật trạng thái payment gốc
+            if (order.getPayment() != null) {
+                Payment origPayment = order.getPayment();
+                origPayment.setStatus(Payment.PaymentStatus.CANCELED);
+                origPayment.setDescription("Đã hủy đơn: " + cancelReason);
+                paymentRepository.save(origPayment);
             }
 
             // Cập nhật trạng thái player
@@ -814,35 +997,60 @@ public class GamePlayerController {
 
             // Cập nhật trạng thái đơn
             order.setStatus("CANCELED");
+            order.setPayoutStatus("REFUNDED");
+            order.setCancellationFee(cancellationFee);
+            order.setCancellationReason(cancelReason);
+            order.setCancelledBy(user);
             orderRepository.save(order);
 
             // Gửi notification phù hợp
             if (isPlayer) {
                 // Player hủy đơn: gửi cho renter
-                notificationService.createNotification(
-                    order.getRenter().getId(),
-                    "Đơn thuê bị từ chối",
-                    "Đơn thuê của bạn đã bị từ chối bởi player.",
-                    "rent_reject",
-                    null,
-                    order.getId().toString()
-                );
-            } else if (isRenter) {
-                // Người thuê tự hủy: gửi cho chính họ
-                notificationService.createNotification(
-                    user.getId(),
-                    "Hủy đơn thuê thành công",
-                    "Bạn đã hủy đơn thuê thành công. Coin đã được hoàn lại.",
-                    "rent_cancel",
-                    null,
-                    order.getId().toString()
-                );
+                if (renter != null) {
+                    notificationService.createNotification(
+                        renter.getId(),
+                        "Đơn thuê đã bị hủy bởi Player",
+                        "Đơn thuê #" + order.getId() + " đã bị hủy bởi player " + gamePlayer.getUsername() +
+                        ". Số tiền " + String.format("%,d", refundedCoin) + " xu đã được hoàn lại đầy đủ vào ví.",
+                        "rent_reject",
+                        "/orders",
+                        order.getId().toString()
+                    );
+                }
+            } else {
+                // Khách hàng hủy: gửi cho renter và player
+                if (renter != null) {
+                    notificationService.createNotification(
+                        renter.getId(),
+                        "Hủy đơn thuê thành công",
+                        "Bạn đã hủy đơn thuê #" + order.getId() + ". " +
+                        (cancellationFee > 0 
+                            ? "Khấu trừ phí hủy sát giờ " + String.format("%,d", cancellationFee) + " xu (30%). Hoàn lại " + String.format("%,d", refundedCoin) + " xu vào ví."
+                            : "Hoàn lại đầy đủ 100% (" + String.format("%,d", refundedCoin) + " xu) vào ví của bạn."),
+                        "rent_cancel",
+                        "/orders",
+                        order.getId().toString()
+                    );
+                }
+                if (gamePlayer.getUser() != null) {
+                    notificationService.createNotification(
+                        gamePlayer.getUser().getId(),
+                        "Khách hàng đã hủy đơn thuê",
+                        "Khách hàng " + (renter != null ? renter.getUsername() : "") + " đã hủy đơn thuê #" + order.getId() + ". " +
+                        (cancellationFee > 0 ? "Bạn được cộng bồi thường " + String.format("%,d", cancellationFee) + " xu." : ""),
+                        "rent_cancel",
+                        "/orders",
+                        order.getId().toString()
+                    );
+                }
             }
 
             Map<String, Object> response = new HashMap<>();
             response.put("gamePlayer", gamePlayer);
             response.put("order", order);
-            response.put("refundedCoin", order.getPrice());
+            response.put("refundedCoin", refundedCoin);
+            response.put("cancellationFee", cancellationFee);
+            response.put("reason", cancelReason);
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Hủy đơn thuê thành công", response));
         } catch (Exception e) {
@@ -850,6 +1058,64 @@ public class GamePlayerController {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse<>(false, "Error canceling order: " + e.getMessage(), null));
         }
+    }
+
+    @PutMapping("/{id}/working-hours")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Player hoặc Admin thiết lập khung giờ làm việc và trạng thái nhận đơn")
+    public ResponseEntity<ApiResponse<?>> updateWorkingHours(
+            @PathVariable Long id,
+            @RequestBody WorkingHoursRequest request,
+            Authentication authentication) {
+        GamePlayer player = gamePlayerService.findById(id);
+        if (player == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse<>(false, "Không tìm thấy hồ sơ người chơi", null));
+        }
+
+        User currentUser = userService.findByUsername(authentication.getName());
+        boolean isAdmin = currentUser.getRoles() != null && currentUser.getRoles().contains("ROLE_ADMIN");
+        boolean isOwner = player.getUser() != null && player.getUser().getId().equals(currentUser.getId());
+
+        if (!isAdmin && !isOwner) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponse<>(false, "Bạn không có quyền cập nhật lịch làm việc của người chơi này", null));
+        }
+
+        if (request.getWorkStartTime() != null) player.setWorkStartTime(request.getWorkStartTime().trim());
+        if (request.getWorkEndTime() != null) player.setWorkEndTime(request.getWorkEndTime().trim());
+        if (request.getWorkingDays() != null) player.setWorkingDays(request.getWorkingDays().trim());
+        if (request.getAcceptingOrders() != null) player.setAcceptingOrders(request.getAcceptingOrders());
+
+        gamePlayerService.save(player);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", player.getId());
+        data.put("workStartTime", player.getWorkStartTime());
+        data.put("workEndTime", player.getWorkEndTime());
+        data.put("workingDays", player.getWorkingDays());
+        data.put("acceptingOrders", player.getAcceptingOrders());
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cập nhật khung giờ làm việc thành công", data));
+    }
+
+    @GetMapping("/{id}/working-hours")
+    @Operation(summary = "Xem khung giờ làm việc và trạng thái nhận đơn của player")
+    public ResponseEntity<ApiResponse<?>> getWorkingHours(@PathVariable Long id) {
+        GamePlayer player = gamePlayerService.findById(id);
+        if (player == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse<>(false, "Không tìm thấy hồ sơ người chơi", null));
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", player.getId());
+        data.put("workStartTime", player.getWorkStartTime() != null ? player.getWorkStartTime() : "00:00");
+        data.put("workEndTime", player.getWorkEndTime() != null ? player.getWorkEndTime() : "23:59");
+        data.put("workingDays", player.getWorkingDays() != null ? player.getWorkingDays() : "MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY");
+        data.put("acceptingOrders", player.getAcceptingOrders() != null ? player.getAcceptingOrders() : true);
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Lấy khung giờ làm việc thành công", data));
     }
 
     @GetMapping("/hired")

@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -75,6 +76,24 @@ public class PaymentController {
     private final AdminNotificationService adminNotificationService;
     private final RevenueRepository revenueRepository;
     private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
+
+    @org.springframework.beans.factory.annotation.Value("${app.withdraw.min-amount:50000}")
+    private long minWithdrawAmount;
+
+    @org.springframework.beans.factory.annotation.Value("${app.withdraw.max-per-request:20000000}")
+    private long maxWithdrawPerRequest;
+
+    @org.springframework.beans.factory.annotation.Value("${app.withdraw.max-per-day:50000000}")
+    private long maxWithdrawPerDay;
+
+    @org.springframework.beans.factory.annotation.Value("${app.withdraw.require-kyc:true}")
+    private boolean requireKyc;
+
+    @Autowired(required = false)
+    private com.example.backend.service.WalletReconciliationService walletReconciliationService;
+
+    @Autowired(required = false)
+    private com.example.backend.service.CommissionService commissionService;
 
     public PaymentController(PaymentService paymentService, UserService userService,
             PaymentRepository paymentRepository, QRCodeService qrCodeService,
@@ -390,6 +409,40 @@ public class PaymentController {
                 return ResponseEntity.badRequest().body("Số tiền rút không hợp lệ");
             }
 
+            // 1. Kiểm tra hạn mức rút tối thiểu và tối đa trên mỗi giao dịch
+            if (coin < minWithdrawAmount) {
+                return ResponseEntity.badRequest().body("Số tiền rút tối thiểu là " + String.format("%,d", minWithdrawAmount) + " đ");
+            }
+            if (coin > maxWithdrawPerRequest) {
+                return ResponseEntity.badRequest().body("Số tiền rút tối đa cho một giao dịch là " + String.format("%,d", maxWithdrawPerRequest) + " đ");
+            }
+
+            // 2. Kiểm tra hạn mức rút tiền tối đa trong ngày
+            java.time.LocalDateTime startOfDay = java.time.LocalDate.now().atStartOfDay();
+            java.time.LocalDateTime endOfDay = java.time.LocalDate.now().atTime(java.time.LocalTime.MAX);
+            long todayWithdrawn = paymentRepository.sumTodayWithdrawalsByUserId(player.getId(), startOfDay, endOfDay);
+            if (todayWithdrawn + coin > maxWithdrawPerDay) {
+                return ResponseEntity.badRequest().body("Vượt quá hạn mức rút tiền trong ngày (" +
+                        String.format("%,d", maxWithdrawPerDay) + " đ/ngày). Bạn đã yêu cầu rút " +
+                        String.format("%,d", todayWithdrawn) + " đ hôm nay.");
+            }
+
+            // 3. Kiểm tra xác minh danh tính (KYC) cho player
+            if (requireKyc && !"VERIFIED".equalsIgnoreCase(player.getKycStatus())) {
+                return ResponseEntity.badRequest().body("Tài khoản chưa hoàn tất xác minh danh tính (KYC). Vui lòng xác thực KYC trước khi thực hiện rút tiền.");
+            }
+
+            // 4. Kiểm tra đối soát giữa số dư ví và tổng giao dịch
+            String auditTag = "";
+            if (walletReconciliationService != null) {
+                com.example.backend.dto.WalletReconciliationDTO reconciliation = walletReconciliationService.reconcile(player);
+                if (reconciliation != null && Boolean.TRUE.equals(reconciliation.getIsAnomalous())) {
+                    log.warn("[PaymentController] CẢNH BÁO ĐỐI SOÁT khi user #{} tạo yêu cầu rút: chênh lệch ví +{} xu",
+                            player.getId(), reconciliation.getDiscrepancy());
+                    auditTag = " [CẢNH BÁO ĐỐI SOÁT: Chênh lệch +" + reconciliation.getDiscrepancy() + " xu]";
+                }
+            }
+
             long currentCoin = player.getCoin() != null ? player.getCoin() : 0L;
             if (currentCoin < coin) {
                 // Gửi thông báo lỗi cho người rút tiền
@@ -442,6 +495,9 @@ public class PaymentController {
             payment.setBankAccountNumber(request.getBankAccountNumber().trim());
             payment.setBankAccountName(request.getBankAccountName().trim());
             payment.setBankName(request.getBankName().trim());
+            if (!auditTag.isEmpty()) {
+                payment.setDescription("Yêu cầu rút tiền" + auditTag);
+            }
             
             Payment savedPayment = paymentRepository.save(payment);
 
@@ -665,6 +721,21 @@ public class PaymentController {
             return dto;
         }).collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/admin/reconcile/{userId}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('ROLE_ADMIN')")
+    @Operation(summary = "Kiểm tra đối soát giữa số dư ví và tổng giao dịch của người dùng")
+    public ResponseEntity<?> reconcileUserWallet(@PathVariable Long userId) {
+        User user = userService.findById(userId);
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (walletReconciliationService == null) {
+            return ResponseEntity.badRequest().body("Dịch vụ đối soát chưa được khởi tạo");
+        }
+        com.example.backend.dto.WalletReconciliationDTO report = walletReconciliationService.reconcile(user);
+        return ResponseEntity.ok(report);
     }
 
     @PostMapping("/vnpay/create")
@@ -908,16 +979,21 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(Map.of("message", "Số dư ví không đủ để tặng quà. Vui lòng nạp thêm!"));
         }
         
-        // Tính toán chiết khấu hệ thống 15%
+        // Tính toán chiết khấu hệ thống (VIP/Custom/Default)
         long originalCoin = request.getCoin();
-        long platformFee = Math.round(originalCoin * 0.15); // 15% phí sàn
-        long playerReceive = originalCoin - platformFee;     // 85% Idol thực nhận
+        double commissionRate = commissionService != null 
+                ? (gamePlayer != null ? commissionService.getCommissionRateForPlayer(gamePlayer) : commissionService.getCommissionRateForUser(player)) 
+                : 0.15;
+        long platformFee = commissionService != null 
+                ? commissionService.calculatePlatformFee(originalCoin, commissionRate) 
+                : Math.round(originalCoin * 0.15);
+        long playerReceive = originalCoin - platformFee;
 
         // Trừ 100% xu người donate
         user.setCoin(user.getCoin() - originalCoin);
         User savedUser = userService.save(user);
         
-        // Cộng 85% xu cho player (Idol)
+        // Cộng xu thực nhận cho player (Idol)
         player.setCoin(player.getCoin() + playerReceive);
         User savedPlayer = userService.save(player);
 
@@ -928,7 +1004,7 @@ public class PaymentController {
         paymentFrom.setGamePlayer(gamePlayer);
         paymentFrom.setCoin(originalCoin);
         paymentFrom.setOriginalAmount(originalCoin);
-        paymentFrom.setDiscountRate(0.15);
+        paymentFrom.setDiscountRate(commissionRate);
         paymentFrom.setPlatformFee(platformFee);
         paymentFrom.setPlayerReceived(playerReceive);
         paymentFrom.setCurrency("COIN");
@@ -940,14 +1016,14 @@ public class PaymentController {
         paymentFrom.setDescription("Tặng quà cho " + recipientDisplayName + ": " + (request.getMessage() != null ? request.getMessage() : ""));
         Payment savedPaymentFrom = paymentRepository.save(paymentFrom);
 
-        // Lưu Payment DONATE cho người nhận (cộng 85% xu)
+        // Lưu Payment DONATE cho người nhận (cộng xu thực nhận)
         Payment paymentTo = new Payment();
         paymentTo.setUser(player);
         paymentTo.setPlayer(user);
         paymentTo.setGamePlayer(gamePlayer);
         paymentTo.setCoin(playerReceive);
         paymentTo.setOriginalAmount(originalCoin);
-        paymentTo.setDiscountRate(0.15);
+        paymentTo.setDiscountRate(commissionRate);
         paymentTo.setPlatformFee(platformFee);
         paymentTo.setPlayerReceived(playerReceive);
         paymentTo.setCurrency("COIN");
@@ -956,10 +1032,10 @@ public class PaymentController {
         paymentTo.setType(Payment.PaymentType.DONATE);
         paymentTo.setCreatedAt(java.time.LocalDateTime.now());
         paymentTo.setCompletedAt(java.time.LocalDateTime.now());
-        paymentTo.setDescription("Nhận quà từ " + (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " (Đã khấu trừ 15% phí hệ thống): " + (request.getMessage() != null ? request.getMessage() : ""));
+        paymentTo.setDescription("Nhận quà từ " + (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " (Đã khấu trừ phí sàn " + (int)(commissionRate * 100) + "%): " + (request.getMessage() != null ? request.getMessage() : ""));
         Payment savedPaymentTo = paymentRepository.save(paymentTo);
 
-        // Lưu doanh thu nền tảng (Revenue) 15%
+        // Lưu doanh thu nền tảng (Revenue)
         try {
             Revenue revenue = new Revenue();
             revenue.setAmount(platformFee);
@@ -1110,7 +1186,7 @@ public class PaymentController {
 
         for (Order o : allOrders) {
             String status = o.getStatus() != null ? o.getStatus().toUpperCase() : "";
-            boolean isCanceledOrRejected = "CANCELED".equals(status) || "REJECTED".equals(status);
+            boolean isCanceledOrRejected = "CANCELED".equals(status) || "REJECTED".equals(status) || "EXPIRED".equals(status);
             Long price = o.getPrice() != null ? o.getPrice() : 0L;
 
             // 1. Tiền thuê mà Renter đã chi: tính các đơn hợp lệ đã thanh toán (không bị hủy/từ chối)
@@ -1367,6 +1443,22 @@ public class PaymentController {
             e.printStackTrace();
         }
     }
+
+    @Data
+    public static class WithdrawRequest {
+        @NotNull
+        @Positive
+        private Long coin;
+
+        @NotBlank(message = "Số tài khoản ngân hàng là bắt buộc")
+        private String bankAccountNumber;
+
+        @NotBlank(message = "Tên chủ tài khoản là bắt buộc")
+        private String bankAccountName;
+
+        @NotBlank(message = "Tên ngân hàng là bắt buộc")
+        private String bankName;
+    }
 }
 
 @Data
@@ -1399,22 +1491,6 @@ class TopUpRequest {
     @NotNull
     @Positive
     private Long coin;
-}
-
-@Data
-class WithdrawRequest {
-    @NotNull
-    @Positive
-    private Long coin;
-    
-    @NotBlank(message = "Số tài khoản ngân hàng là bắt buộc")
-    private String bankAccountNumber;
-    
-    @NotBlank(message = "Tên chủ tài khoản là bắt buộc")
-    private String bankAccountName;
-    
-    @NotBlank(message = "Tên ngân hàng là bắt buộc")
-    private String bankName;
 }
 
 @Data

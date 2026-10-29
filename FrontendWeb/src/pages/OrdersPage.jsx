@@ -214,7 +214,7 @@ export const OrdersPage = () => {
     if (activeFilter === 'ALL') return true;
     if (activeFilter === 'IN_PROGRESS') return s === 'IN_PROGRESS' || s === 'PENDING' || s === 'CONFIRMED';
     if (activeFilter === 'COMPLETED') return s === 'COMPLETED' || s === 'REFUNDED';
-    if (activeFilter === 'CANCELLED') return s === 'CANCELLED' || s === 'CANCELED' || s === 'REJECTED';
+    if (activeFilter === 'CANCELLED') return s === 'CANCELLED' || s === 'CANCELED' || s === 'REJECTED' || s === 'EXPIRED';
     return true;
   });
 
@@ -247,6 +247,8 @@ export const OrdersPage = () => {
         return <span className="badge badge-offline">❌ Đã Hủy</span>;
       case 'REJECTED':
         return <span className="badge badge-offline">🚫 Bị Từ Chối</span>;
+      case 'EXPIRED':
+        return <span className="badge badge-offline">⌛ Hết Hạn Xác Nhận</span>;
       default:
         return <span className="badge badge-offline">{order.status || 'Chờ Xử Lý'}</span>;
     }
@@ -288,7 +290,7 @@ export const OrdersPage = () => {
           className={`order-tab-btn ${activeFilter === 'CANCELLED' ? 'active' : ''}`}
           onClick={() => setActiveFilter('CANCELLED')}
         >
-          Đã Hủy ({orders.filter(o => ['CANCELLED', 'CANCELED', 'REJECTED'].includes(o.status?.toUpperCase())).length})
+          Đã Hủy ({orders.filter(o => ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(o.status?.toUpperCase())).length})
         </button>
       </div>
 

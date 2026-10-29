@@ -31,7 +31,7 @@ export const OrdersTab = ({ ordersList, loading }) => {
         if (statusFilter !== 'ALL') {
           const st = (o.status || '').toUpperCase();
           if (statusFilter === 'CANCELLED') {
-            if (st !== 'CANCELLED' && st !== 'CANCELED' && st !== 'REJECTED') return false;
+            if (st !== 'CANCELLED' && st !== 'CANCELED' && st !== 'REJECTED' && st !== 'EXPIRED') return false;
           } else if (statusFilter === 'REFUNDED') {
             if (st !== 'REFUNDED') return false;
           } else if (st !== statusFilter) {

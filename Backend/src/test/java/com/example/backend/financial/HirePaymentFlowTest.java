@@ -143,14 +143,14 @@ class HirePaymentFlowTest {
         assertNull(gamePlayer.getHoursHired());
         verify(gamePlayerRepository, times(1)).save(gamePlayer);
 
-        // Assert: Gửi thông báo nhắc đánh giá cho renter
-        verify(notificationService, times(1)).createNotification(
-                eq(renter.getId()),
-                contains("Đánh giá"),
+        // Assert: Không gửi trùng thông báo nhắc đánh giá từ PaymentService (đã do OrderService đảm nhiệm)
+        verify(notificationService, never()).createNotification(
+                anyLong(),
+                anyString(),
                 anyString(),
                 eq("review_reminder"),
-                isNull(),
-                eq("100")
+                any(),
+                any()
         );
     }
 
@@ -192,12 +192,11 @@ class HirePaymentFlowTest {
         // Act: Scheduler kiểm tra và mở khóa
         orderPayoutService.checkAndReleasePendingPayouts();
 
-        // Assert: Tiền được cộng vào số dư khả dụng của idol (100k + 170k = 270k)
-        assertEquals(initialCoin + 170000L, playerUser.getCoin());
+        // Assert: Tiền được cộng vào số dư khả dụng của idol an toàn qua addCoinSafely (tránh ghi đè stale balance)
+        verify(userRepository, times(1)).addCoinSafely(eq(playerUser.getId()), eq(170000L));
         assertEquals("RELEASED", order.getPayoutStatus());
         assertNotNull(order.getPayoutReleasedAt());
 
-        verify(userRepository, times(1)).save(playerUser);
         verify(orderRepository, times(1)).save(order);
         verify(notificationService, times(1)).createNotification(
                 eq(playerUser.getId()),

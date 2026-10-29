@@ -49,4 +49,27 @@ public class Order {
     @OneToOne
     @JoinColumn(name = "payment_id")
     private Payment payment;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "cancellation_fee")
+    private Long cancellationFee = 0L;
+
+    @Column(name = "cancellation_reason")
+    private String cancellationReason;
+
+    @ManyToOne
+    @JoinColumn(name = "cancelled_by_id")
+    private User cancelledBy;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.cancellationFee == null) {
+            this.cancellationFee = 0L;
+        }
+    }
 }
