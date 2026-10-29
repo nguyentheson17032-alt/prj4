@@ -4,12 +4,14 @@ import { X, Clock, Gamepad2, Tag, Check, Sparkles, AlertCircle, ArrowRight, Shie
 import confetti from 'canvas-confetti';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import '../../styles/modals.css';
 
 export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
   const { user, deductBalance, refreshUser } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
   
   const [selectedGame, setSelectedGame] = useState(player?.games?.[0]?.name || player?.primaryGame || 'Liên Quân Mobile');
   const [hours, setHours] = useState(2);
@@ -22,15 +24,14 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
   const [createdOrder, setCreatedOrder] = useState(null);
 
   useEffect(() => {
-    if (player) {
-      setSelectedGame(player.games?.[0]?.name || player.primaryGame || 'Liên Quân Mobile');
-    }
+    if (!isOpen || !player) return;
+    setSelectedGame(player.games?.[0]?.name || player.primaryGame || 'Liên Quân Mobile');
     const loadVouchers = async () => {
       const data = await api.getVouchers();
       setVouchers(data || []);
     };
     loadVouchers();
-  }, [player]);
+  }, [isOpen, player]);
 
   if (!isOpen || !player) return null;
 
@@ -104,7 +105,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
       // Deduct balance locally after successful backend call
       deductBalance(finalTotal);
       if (typeof refreshUser === 'function') {
-        refreshUser();
+        try { await refreshUser(); } catch (e) {}
       }
 
       setIsSuccess(true);
@@ -115,7 +116,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
         origin: { y: 0.6 }
       });
 
-      addToast(`Thuê thành công Player ${player.fullName}!`, 'success');
+      addToast(t('booking.hireSuccessToast', 'Thuê thành công Player {name}!').replace('{name}', player.fullName), 'success');
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data || err.message || 'Có lỗi xảy ra khi tạo đơn thuê!';
       addToast(typeof msg === 'string' ? msg : 'Có lỗi xảy ra khi tạo đơn thuê!', 'error');
@@ -137,7 +138,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
         <div className="modal-header">
           <div className="modal-title">
             <Sparkles className="gradient-text" size={22} />
-            <span>{isSuccess ? 'Đặt Thuê Thành Công!' : 'Thuê Player & Duo Game'}</span>
+            <span>{isSuccess ? t('booking.successTitle', 'Đặt Thuê Thành Công!') : t('booking.title', 'Thuê Player & Duo Game')}</span>
           </div>
           <button className="modal-close-btn" onClick={handleClose}>
             <X size={18} />
@@ -163,10 +164,10 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
             </div>
 
             <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>
-              Bạn Đã Thuê {player.fullName} Thành Công!
+              {t('booking.successHired', 'Bạn Đã Thuê {name} Thành Công!').replace('{name}', player.fullName)}
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Mã đơn hàng: <strong style={{ color: 'var(--primary)' }}>{createdOrder?.id || 'ORD-9999'}</strong>. Player đã nhận được thông báo và sẽ liên hệ ngay trong vòng 2 phút.
+              {t('booking.orderCode', 'Mã đơn hàng:')} <strong style={{ color: 'var(--primary)' }}>{createdOrder?.id || 'ORD-9999'}</strong>. {t('booking.orderDesc', 'Player đã nhận được thông báo và sẽ liên hệ ngay trong vòng 2 phút.')}
             </p>
 
             <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '24px', textAlign: 'left' }}>
@@ -175,21 +176,21 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                 <span style={{ fontWeight: 700 }}>{selectedGame}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Thời lượng:</span>
-                <span style={{ fontWeight: 700 }}>{hours} Giờ</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{t('booking.durationLabel', 'Thời lượng:')}</span>
+                <span style={{ fontWeight: 700 }}>{hours} {hours === 1 ? t('booking.hour', 'Giờ') : t('booking.hours', 'Giờ')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Tổng thanh toán:</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{t('booking.totalPayment', 'Tổng thanh toán:')}</span>
                 <span style={{ fontWeight: 800, color: 'var(--accent-pink)' }}>{finalTotal.toLocaleString('vi-VN')} đ</span>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={handleClose}>
-                Đóng
+                {t('common.close', 'Đóng')}
               </button>
               <Link to={`/chat?player=${player.id}`} className="btn btn-primary" style={{ flex: 1 }}>
-                <span>Nhắn Tin Ngay</span>
+                <span>{t('booking.chatNow', 'Nhắn Tin Ngay')}</span>
                 <ArrowRight size={16} />
               </Link>
             </div>
@@ -212,12 +213,12 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                 <div style={{ color: 'var(--accent-amber)', fontSize: '0.82rem', fontWeight: 600 }}>
                   {((player.reviewCount || player.ratingCount || player.totalReviews) > 0 && player.rating > 0)
                     ? `⭐ ${Number(player.rating).toFixed(1)} (${player.reviewCount || player.ratingCount || player.totalReviews})`
-                    : '⭐ Chưa có (0)'} • {player.orderCount || 0} đơn
+                    : t('player.noReviews', '⭐ Chưa có (0)')} • {player.orderCount || 0} {(player.orderCount === 1) ? t('player.orderSingular', 'đơn') : t('player.ordersPlural', 'đơn')}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ color: 'var(--accent-pink)', fontWeight: 800, fontSize: '1.05rem' }}>{basePrice.toLocaleString('vi-VN')} đ</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>/ giờ</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('player.perHour', '/ giờ')}</div>
               </div>
             </div>
 
@@ -225,7 +226,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Gamepad2 size={16} />
-                <span>Chọn Game Muốn Duo:</span>
+                <span>{t('booking.chooseGame', 'Chọn Game Muốn Duo:')}</span>
               </label>
               <select
                 className="form-control"
@@ -242,7 +243,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Clock size={16} />
-                <span>Thời Lượng Thuê:</span>
+                <span>{t('booking.duration', 'Thời Lượng Thuê:')}</span>
               </label>
               <div className="preset-grid">
                 {[1, 2, 3, 4, 5, 8].map(h => (
@@ -252,7 +253,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                     className={`preset-chip ${hours === h ? 'active' : ''}`}
                     onClick={() => setHours(h)}
                   >
-                    {h} Giờ
+                    {h} {h === 1 ? t('booking.hour', 'Giờ') : t('booking.hours', 'Giờ')}
                   </button>
                 ))}
               </div>
@@ -262,14 +263,14 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Tag size={16} />
-                <span>Mã Giảm Giá / Voucher:</span>
+                <span>{t('booking.voucher', 'Mã Giảm Giá / Voucher:')}</span>
               </label>
               <select
                 className="form-control"
                 value={selectedVoucher}
                 onChange={(e) => setSelectedVoucher(e.target.value)}
               >
-                <option value="">Không áp dụng voucher</option>
+                <option value="">{t('booking.noVoucher', 'Không áp dụng voucher')}</option>
                 {vouchers.map(v => (
                   <option key={v.code} value={v.code}>{v.code} - {v.description}</option>
                 ))}
@@ -278,11 +279,11 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
 
             {/* Special Note */}
             <div className="form-group">
-              <label className="form-label">Ghi Chú Cho Player (Tùy chọn):</label>
+              <label className="form-label">{t('booking.note', 'Ghi Chú Cho Player (Tùy chọn):')}</label>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Ví dụ: Đánh rank Cao Thủ, cần bật mic Discord..."
+                placeholder={t('booking.notePlaceholder', 'Ví dụ: Đánh rank Cao Thủ, cần bật mic Discord...')}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
@@ -297,12 +298,12 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
               border: '1px solid var(--border-color)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                <span>Tạm tính ({hours} giờ x {basePrice.toLocaleString('vi-VN')} đ):</span>
+                <span>{t('booking.subtotal', 'Tạm tính')} ({hours} {hours === 1 ? t('booking.hourSingular', 'giờ') : t('booking.hoursShort', 'giờ')} x {basePrice.toLocaleString('vi-VN')} đ):</span>
                 <span>{subtotal.toLocaleString('vi-VN')} đ</span>
               </div>
               {discountAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.88rem', color: 'var(--accent-green)' }}>
-                  <span>Voucher giảm giá:</span>
+                  <span>{t('booking.voucherDiscount', 'Voucher giảm giá:')}</span>
                   <span>-{discountAmount.toLocaleString('vi-VN')} đ</span>
                 </div>
               )}
@@ -315,7 +316,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                 fontSize: '1.1rem',
                 fontWeight: 800
               }}>
-                <span>Tổng Thanh Toán:</span>
+                <span>{t('booking.totalPayment', 'Tổng Thanh Toán:')}</span>
                 <span className="gradient-text">{finalTotal.toLocaleString('vi-VN')} đ</span>
               </div>
 
@@ -332,7 +333,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                 fontSize: '0.85rem'
               }}>
                 <span style={{ color: hasEnoughBalance ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                  Số dư ví: <strong>{userBalance.toLocaleString('vi-VN')} đ</strong>
+                  {t('booking.walletBalance', 'Số dư ví:')} <strong>{userBalance.toLocaleString('vi-VN')} đ</strong>
                 </span>
                 {!hasEnoughBalance && (
                   <button
@@ -340,7 +341,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                     onClick={onOpenDeposit}
                     style={{ padding: '4px 10px', fontSize: '0.78rem' }}
                   >
-                    + Nạp Thêm
+                    {t('booking.topupMore', '+ Nạp Thêm')}
                   </button>
                 )}
               </div>
@@ -352,7 +353,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
         {!isSuccess && (
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={handleClose}>
-              Hủy
+              {t('common.cancel', 'Hủy')}
             </button>
             <button
               className="btn btn-primary"
@@ -360,7 +361,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
               onClick={handleConfirmBooking}
             >
               <ShieldCheck size={18} />
-              <span>{isSubmitting ? 'Đang Xử Lý...' : 'Xác Nhận Đặt Thuê'}</span>
+              <span>{isSubmitting ? t('common.processing', 'Đang Xử Lý...') : t('booking.confirmHire', 'Xác Nhận Đặt Thuê')}</span>
             </button>
           </div>
         )}

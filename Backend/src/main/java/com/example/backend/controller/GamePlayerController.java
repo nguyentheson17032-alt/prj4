@@ -455,7 +455,7 @@ public class GamePlayerController {
             // Check user's coin balance
             if (user.getCoin() == null || user.getCoin() < originalCoin) {
                 return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Số coin trong ví không đủ. Cần " + originalCoin + " xu để thuê.", null));
+                    .body(new ApiResponse<>(false, "Số dư trong ví không đủ. Cần " + String.format("%,d", originalCoin) + " đ để thuê.", null));
             }
 
             // 5. Kiểm tra trùng lịch: kiểm tra cả đơn CONFIRMED lẫn PENDING trong bảng orders
@@ -489,7 +489,7 @@ public class GamePlayerController {
             boolean deducted = userService.deductCoin(user.getId(), originalCoin);
             if (!deducted) {
                 return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Số coin trong ví không đủ hoặc tài khoản đang có giao dịch khác. Cần " + originalCoin + " xu để thuê.", null));
+                    .body(new ApiResponse<>(false, "Số dư trong ví không đủ hoặc tài khoản đang có giao dịch khác. Cần " + String.format("%,d", originalCoin) + " đ để thuê.", null));
             }
             user.setCoin(user.getCoin() - originalCoin);
 
@@ -549,8 +549,12 @@ public class GamePlayerController {
                 order.getId().toString()
             );
 
+            Map<String, Object> orderMap = toSimpleOrderMap(order);
             Map<String, Object> response = new HashMap<>();
-            response.put("order", order);
+            response.put("order", orderMap);
+            response.put("id", order.getId());
+            response.put("orderId", order.getId());
+            response.put("status", order.getStatus());
             response.put("coin", order.getPrice());
             response.put("startTime", order.getStartTime());
             response.put("endTime", order.getEndTime());
@@ -619,8 +623,12 @@ public class GamePlayerController {
                 order.getId().toString()
             );
 
+            Map<String, Object> orderMap = toSimpleOrderMap(order);
             Map<String, Object> response = new HashMap<>();
-            response.put("order", order);
+            response.put("order", orderMap);
+            response.put("id", order.getId());
+            response.put("orderId", order.getId());
+            response.put("status", order.getStatus());
             response.put("coin", order.getPrice());
             response.put("startTime", order.getStartTime());
             response.put("endTime", order.getEndTime());
@@ -841,9 +849,13 @@ public class GamePlayerController {
                 order.getId().toString()
             );
 
+            Map<String, Object> orderMap = toSimpleOrderMap(order);
             Map<String, Object> response = new HashMap<>();
-            response.put("gamePlayer", gamePlayer);
-            response.put("order", order);
+            response.put("gamePlayer", toSimpleGamePlayerMap(gamePlayer));
+            response.put("order", orderMap);
+            response.put("id", order.getId());
+            response.put("orderId", order.getId());
+            response.put("status", order.getStatus());
             response.put("refundedCoin", order.getPrice());
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Từ chối đơn thuê thành công", response));
@@ -928,7 +940,7 @@ public class GamePlayerController {
                         cancellationFee = Math.round(totalOrderPrice * lateCancellationFeeRate);
                         refundedCoin = Math.max(0L, totalOrderPrice - cancellationFee);
                         cancelReason = "Khách hàng hủy sát giờ (" + minutesBeforeStart + " phút trước khi bắt đầu). Áp dụng phí hủy " +
-                                (int)(lateCancellationFeeRate * 100) + "% (" + cancellationFee + " xu).";
+                                (int)(lateCancellationFeeRate * 100) + "% (" + String.format("%,d", cancellationFee) + " đ).";
 
                         // Bồi thường khoản phí hủy 30% cho Player
                         if (gamePlayer != null && gamePlayer.getUser() != null && cancellationFee > 0) {
@@ -959,7 +971,7 @@ public class GamePlayerController {
                                     playerUser.getId(),
                                     "Nhận bồi thường phí hủy đơn",
                                     "Đơn thuê #" + order.getId() + " bị hủy sát giờ. Bạn nhận được " +
-                                            String.format("%,d", cancellationFee) + " xu phí bồi thường.",
+                                            String.format("%,d", cancellationFee) + " đ phí bồi thường.",
                                     "rent_cancel_compensation",
                                     "/wallet",
                                     order.getId().toString()
@@ -1011,7 +1023,7 @@ public class GamePlayerController {
                         renter.getId(),
                         "Đơn thuê đã bị hủy bởi Player",
                         "Đơn thuê #" + order.getId() + " đã bị hủy bởi player " + gamePlayer.getUsername() +
-                        ". Số tiền " + String.format("%,d", refundedCoin) + " xu đã được hoàn lại đầy đủ vào ví.",
+                        ". Số tiền " + String.format("%,d", refundedCoin) + " đ đã được hoàn lại đầy đủ vào ví.",
                         "rent_reject",
                         "/orders",
                         order.getId().toString()
@@ -1025,8 +1037,8 @@ public class GamePlayerController {
                         "Hủy đơn thuê thành công",
                         "Bạn đã hủy đơn thuê #" + order.getId() + ". " +
                         (cancellationFee > 0 
-                            ? "Khấu trừ phí hủy sát giờ " + String.format("%,d", cancellationFee) + " xu (30%). Hoàn lại " + String.format("%,d", refundedCoin) + " xu vào ví."
-                            : "Hoàn lại đầy đủ 100% (" + String.format("%,d", refundedCoin) + " xu) vào ví của bạn."),
+                            ? "Khấu trừ phí hủy sát giờ " + String.format("%,d", cancellationFee) + " đ (30%). Hoàn lại " + String.format("%,d", refundedCoin) + " đ vào ví."
+                            : "Hoàn lại đầy đủ 100% (" + String.format("%,d", refundedCoin) + " đ) vào ví của bạn."),
                         "rent_cancel",
                         "/orders",
                         order.getId().toString()
@@ -1037,7 +1049,7 @@ public class GamePlayerController {
                         gamePlayer.getUser().getId(),
                         "Khách hàng đã hủy đơn thuê",
                         "Khách hàng " + (renter != null ? renter.getUsername() : "") + " đã hủy đơn thuê #" + order.getId() + ". " +
-                        (cancellationFee > 0 ? "Bạn được cộng bồi thường " + String.format("%,d", cancellationFee) + " xu." : ""),
+                        (cancellationFee > 0 ? "Bạn được cộng bồi thường " + String.format("%,d", cancellationFee) + " đ." : ""),
                         "rent_cancel",
                         "/orders",
                         order.getId().toString()
@@ -1045,9 +1057,13 @@ public class GamePlayerController {
                 }
             }
 
+            Map<String, Object> orderMap = toSimpleOrderMap(order);
             Map<String, Object> response = new HashMap<>();
-            response.put("gamePlayer", gamePlayer);
-            response.put("order", order);
+            response.put("gamePlayer", toSimpleGamePlayerMap(gamePlayer));
+            response.put("order", orderMap);
+            response.put("id", order.getId());
+            response.put("orderId", order.getId());
+            response.put("status", order.getStatus());
             response.put("refundedCoin", refundedCoin);
             response.put("cancellationFee", cancellationFee);
             response.put("reason", cancelReason);
@@ -1422,9 +1438,13 @@ public class GamePlayerController {
             // Gửi thông báo đánh giá cho người thuê
             orderService.sendReviewNotificationForCompletedOrder(order);
 
+            Map<String, Object> orderMap = toSimpleOrderMap(order);
             Map<String, Object> response = new HashMap<>();
-            response.put("order", order);
-            response.put("gamePlayer", gamePlayer);
+            response.put("order", orderMap);
+            response.put("id", order.getId());
+            response.put("orderId", order.getId());
+            response.put("status", order.getStatus());
+            response.put("gamePlayer", toSimpleGamePlayerMap(gamePlayer));
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Đơn thuê đã hoàn thành", response));
         } catch (Exception e) {
@@ -1495,7 +1515,19 @@ public class GamePlayerController {
                 }
             }
 
-            return ResponseEntity.ok(new ApiResponse<>(true, "Đánh giá thành công!", review));
+            Map<String, Object> reviewMap = new HashMap<>();
+
+            reviewMap.put("id", review.getId());
+
+            reviewMap.put("rating", review.getRating());
+
+            reviewMap.put("comment", review.getComment());
+
+            reviewMap.put("orderId", order.getId());
+
+            reviewMap.put("createdAt", review.getCreatedAt());
+
+            return ResponseEntity.ok(new ApiResponse<>(true, "Đánh giá thành công!", reviewMap));
         } catch (Exception e) {
             log.error("Error review order: {}", e.getMessage());
             return ResponseEntity.badRequest()
@@ -1538,7 +1570,7 @@ public class GamePlayerController {
                     notificationService.createNotification(
                         order.getRenter().getId(),
                         "Đơn thuê bị hủy do player vi phạm",
-                        "Đơn thuê với player này đã bị hủy và bạn đã được hoàn coin.",
+                        "Đơn thuê với player này đã bị hủy và bạn đã được hoàn tiền đầy đủ vào ví.",
                         "order_cancel_ban",
                         null,
                         order.getId().toString()
@@ -1840,4 +1872,56 @@ public class GamePlayerController {
         }
         return ResponseEntity.ok(new ApiResponse<>(true, "Game player summary", result));
     }
-} 
+
+    private Map<String, Object> toSimpleOrderMap(Order order) {
+        Map<String, Object> map = new HashMap<>();
+        if (order == null) return map;
+        map.put("id", order.getId());
+        map.put("status", order.getStatus());
+        map.put("price", order.getPrice());
+        map.put("coin", order.getPrice());
+        map.put("startTime", order.getStartTime());
+        map.put("endTime", order.getEndTime());
+        map.put("payoutStatus", order.getPayoutStatus());
+        map.put("discountRate", order.getDiscountRate());
+        map.put("platformFee", order.getPlatformFee());
+        map.put("playerReceived", order.getPlayerReceived());
+        map.put("cancellationFee", order.getCancellationFee());
+        map.put("cancellationReason", order.getCancellationReason());
+        if (order.getPlayer() != null) {
+            map.put("playerId", order.getPlayer().getId());
+            map.put("playerName", order.getPlayer().getUsername());
+            if (order.getPlayer().getGame() != null) {
+                map.put("gameName", order.getPlayer().getGame().getName());
+            }
+        }
+        if (order.getRenter() != null) {
+            map.put("renterId", order.getRenter().getId());
+            map.put("renterName", order.getRenter().getUsername());
+        }
+        return map;
+    }
+
+    private Map<String, Object> toSimpleGamePlayerMap(GamePlayer gp) {
+        Map<String, Object> map = new HashMap<>();
+        if (gp == null) return map;
+        map.put("id", gp.getId());
+        map.put("username", gp.getUsername());
+        map.put("status", gp.getStatus());
+        map.put("rank", gp.getRank());
+        map.put("role", gp.getRole());
+        map.put("server", gp.getServer());
+        map.put("pricePerHour", gp.getPricePerHour());
+        map.put("rating", gp.getRating());
+        map.put("totalGames", gp.getTotalGames());
+        if (gp.getGame() != null) {
+            map.put("gameId", gp.getGame().getId());
+            map.put("gameName", gp.getGame().getName());
+        }
+        if (gp.getUser() != null) {
+            map.put("userId", gp.getUser().getId());
+        }
+        return map;
+    }
+
+}

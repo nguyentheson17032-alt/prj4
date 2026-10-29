@@ -310,8 +310,8 @@ public class PaymentController {
             // Gửi notification khi nạp tiền thành công
             notificationService.createNotification(
                     user.getId(),
-                    "Nạp xu thành công!",
-                    "Bạn vừa nạp thành công " + request.getCoin() + " xu vào tài khoản.",
+                    "Nạp tiền thành công!",
+                    "Bạn vừa nạp thành công " + String.format("%,d", request.getCoin()) + " đ vào tài khoản.",
                     "topup",
                     null,
                     payment.getId().toString());
@@ -839,7 +839,7 @@ public class PaymentController {
                 long vnd = Long.parseLong(amount) / 100;
                 amountDisplay = String.format("%,d VND", vnd).replace(",", ".");
                 amountRaw = String.valueOf(vnd);
-                coinDisplay = String.format("%,d xu", vnd).replace(",", ".");
+                coinDisplay = String.format("%,d đ", vnd).replace(",", ".");
             } catch (Exception ignore) {}
         }
         // Chuyển đổi thời gian thanh toán sang định dạng dễ đọc nếu có
@@ -1045,8 +1045,8 @@ public class PaymentController {
 
             notificationService.createNotification(
                     user.getId(),
-                    "Nạp xu MoMo thành công!",
-                    "Bạn vừa nạp thành công " + payment.getCoin() + " xu qua Ví MoMo.",
+                    "Nạp tiền MoMo thành công!",
+                    "Bạn vừa nạp thành công " + String.format("%,d", payment.getCoin()) + " đ qua Ví MoMo.",
                     "topup",
                     "/wallet",
                     payment.getId().toString()
@@ -1061,7 +1061,7 @@ public class PaymentController {
                 + "<h1 style='color:#ec4899;font-size:2.5em;'>Nạp Tiền Qua MoMo Thành Công!</h1>"
                 + "<div style='margin: 30px auto; max-width:480px; text-align:left; font-size:1.1em; background:#fdf2f8; border-radius:12px; padding:24px 32px; border:1px solid #fbcfe8;'>"
                 + "<p><b>Mã giao dịch:</b> " + transId + "</p>"
-                + "<p><b>Số xu nhận được:</b> <span style='color:#db2777;font-weight:bold;'>" + String.format("%,d xu", payment.getCoin()).replace(',', '.') + "</span></p>"
+                + "<p><b>Số xu nhận được:</b> <span style='color:#db2777;font-weight:bold;'>" + String.format("%,d đ", payment.getCoin()).replace(',', '.') + "</span></p>"
                 + "<p><b>Phương thức:</b> Ví điện tử MoMo</p>"
                 + "</div>"
                 + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 28px;background:#ec4899;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:1.05rem;'>Quay Lại Ví PlayZone</a>"
@@ -1229,8 +1229,8 @@ public class PaymentController {
 
             notificationService.createNotification(
                     user.getId(),
-                    "Nạp xu ZaloPay thành công!",
-                    "Bạn vừa nạp thành công " + payment.getCoin() + " xu qua Ví ZaloPay.",
+                    "Nạp tiền ZaloPay thành công!",
+                    "Bạn vừa nạp thành công " + String.format("%,d", payment.getCoin()) + " đ qua Ví ZaloPay.",
                     "topup",
                     "/wallet",
                     payment.getId().toString()
@@ -1245,7 +1245,7 @@ public class PaymentController {
                 + "<h1 style='color:#0068ff;font-size:2.5em;'>Nạp Tiền Qua ZaloPay Thành Công!</h1>"
                 + "<div style='margin: 30px auto; max-width:480px; text-align:left; font-size:1.1em; background:#eff6ff; border-radius:12px; padding:24px 32px; border:1px solid #bfdbfe;'>"
                 + "<p><b>Mã giao dịch:</b> " + (params.getOrDefault("apptransid", "-")) + "</p>"
-                + "<p><b>Số xu nhận được:</b> <span style='color:#1d4ed8;font-weight:bold;'>" + String.format("%,d xu", payment.getCoin()).replace(',', '.') + "</span></p>"
+                + "<p><b>Số xu nhận được:</b> <span style='color:#1d4ed8;font-weight:bold;'>" + String.format("%,d đ", payment.getCoin()).replace(',', '.') + "</span></p>"
                 + "<p><b>Phương thức:</b> Ví điện tử ZaloPay</p>"
                 + "</div>"
                 + "<a href='http://localhost:5173/wallet' style='display:inline-block;margin-top:20px;padding:12px 28px;background:#0068ff;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:1.05rem;'>Quay Lại Ví PlayZone</a>"
@@ -1303,7 +1303,7 @@ public class PaymentController {
                 notificationService.createNotification(
                     user.getId(),
                     "Donate thất bại",
-                    "Số dư không đủ để tặng " + request.getCoin() + " xu cho " + recipientDisplayName + ". Số dư hiện tại: " + user.getCoin() + " xu.",
+                    "Số dư không đủ để tặng " + String.format("%,d", request.getCoin()) + " đ cho " + recipientDisplayName + ". Số dư hiện tại: " + String.format("%,d", user.getCoin()) + " đ.",
                     "donate_failed",
                     null,
                     null
@@ -1387,7 +1387,7 @@ public class PaymentController {
             notificationService.createNotification(
                 user.getId(),
                 "✅ Tặng quà thành công",
-                "Bạn đã tặng quà trị giá " + originalCoin + " xu cho " + recipientDisplayName + " thành công. Số dư còn lại: " + savedUser.getCoin() + " xu.",
+                "Bạn đã tặng quà trị giá " + String.format("%,d", originalCoin) + " đ cho " + recipientDisplayName + " thành công. Số dư còn lại: " + String.format("%,d", savedUser.getCoin()) + " đ.",
                 "donate_sent",
                 "/donate-history",
                 savedPaymentFrom.getId().toString()
@@ -1401,7 +1401,7 @@ public class PaymentController {
             notificationService.createNotification(
                 player.getId(),
                 "🎁 Bạn nhận được quà tặng mới!",
-                (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " đã tặng quà trị giá " + originalCoin + " xu cho bạn (Thực nhận: " + playerReceive + " xu sau khi trừ 15% phí hệ thống). Lời nhắn: " + (request.getMessage() != null ? request.getMessage() : ""),
+                (user.getFullName() != null ? user.getFullName() : user.getUsername()) + " đã tặng quà trị giá " + String.format("%,d", originalCoin) + " đ cho bạn (Thực nhận: " + String.format("%,d", playerReceive) + " đ sau khi trừ 15% phí hệ thống). Lời nhắn: " + (request.getMessage() != null ? request.getMessage() : ""),
                 "donate_received",
                 "/donate-history",
                 savedPaymentTo.getId().toString()
@@ -1734,7 +1734,7 @@ public class PaymentController {
         try {
             if (recipient.getDeviceToken() != null && !recipient.getDeviceToken().isEmpty()) {
                 String title = "🎁 Bạn có donate mới!";
-                String body = donor.getUsername() + " đã donate " + coinAmount + " xu cho bạn";
+                String body = donor.getUsername() + " đã donate " + String.format("%,d", coinAmount) + " đ cho bạn";
                 
                 // Luôn hiển thị tin nhắn trong push notification nếu có
                 if (message != null && !message.trim().isEmpty()) {

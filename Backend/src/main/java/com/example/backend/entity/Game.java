@@ -46,12 +46,15 @@ public class Game {
     @ElementCollection(fetch = FetchType.EAGER)
     private List<String> availableRanks; // Danh sách rank cho từng game
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @ManyToMany(mappedBy = "applicableGames")
     private Set<Promotion> promotions;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "game")
     private Set<GamePlayer> gamePlayers;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "game")
     private Set<Schedule> schedules;
 } 

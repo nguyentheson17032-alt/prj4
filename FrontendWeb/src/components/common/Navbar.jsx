@@ -28,6 +28,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { Globe } from 'lucide-react';
 import { NotificationDropdown } from './NotificationDropdown';
+import { localizeNotification } from '../../utils/notificationLocalization';
 import '../../styles/navbar.css';
 
 export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
@@ -59,7 +60,8 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
       setUnreadNotifCount(prev => prev + 1);
       setBellBadgeCount(prev => prev + 1);
       if (notif?.title) {
-        addToast(`${notif.title}: ${notif.message || ''}`, 'info');
+        const localized = localizeNotification(notif, language);
+        addToast(`${localized.title}: ${localized.message || ''}`, 'info');
       }
     });
 
@@ -73,7 +75,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
       unsubNotif();
       unsubCounts();
     };
-  }, [user]);
+  }, [user, language]);
 
   // Poll unread messages and notifications count
   useEffect(() => {
@@ -116,7 +118,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
     fetchCounts();
     const interval = setInterval(fetchCounts, 5000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, language]);
 
   const handleToggleNotifications = () => {
     const nextState = !showNotifications;
@@ -171,7 +173,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
           <input
             type="text"
             className="nav-search-input"
-            placeholder="Tìm game, player, rank, idol..."
+            placeholder={t('nav.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleSearch}
@@ -238,7 +240,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
           <button
             onClick={toggleTheme}
             className="nav-icon-btn"
-            title={isDark ? 'Chuyển sang sáng' : 'Chuyển sang tối'}
+            title={isDark ? t('nav.switchToLight') : t('nav.switchToDark')}
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -254,7 +256,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
               >
                 <Wallet size={16} color="var(--primary-light, #06b6d4)" />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
-                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Khả dụng</span>
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>{t('nav.availableBalance')}</span>
                   <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ</span>
                 </div>
                 {user?.frozenBalance > 0 && (
@@ -279,7 +281,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
               </div>
 
               {/* Chat Icon */}
-              <Link to="/chat" className="nav-icon-btn" title="Tin nhắn" style={{ position: 'relative' }}>
+              <Link to="/chat" className="nav-icon-btn" title={t('nav.messages')} style={{ position: 'relative' }}>
                 <MessageSquare size={18} />
                 {unreadMsgCount > 0 && (
                   <span style={{
@@ -310,7 +312,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
                 <button
                   className="nav-icon-btn"
                   onClick={handleToggleNotifications}
-                  title="Thông báo"
+                  title={t('nav.notifications')}
                 >
                   <Bell size={18} />
                   {bellBadgeCount > 0 && (
@@ -365,7 +367,6 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
                     <div style={{ padding: '8px 12px' }}>
                       <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{user.fullName}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>@{user.username}</div>
-
                     </div>
                     <div className="dropdown-divider" />
                     {isAdmin && (
@@ -376,20 +377,20 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
                         style={{ color: '#f43f5e', fontWeight: 700, background: 'rgba(244, 63, 94, 0.1)' }}
                       >
                         <ShieldCheck size={16} />
-                        <span>Bảng Quản Trị (Admin)</span>
+                        <span>{t('nav.adminPanel')}</span>
                       </Link>
                     )}
                     <Link to="/profile" className="dropdown-item" onClick={() => setShowDropdown(false)}>
                       <User size={16} />
-                      <span>Hồ Sơ Cá Nhân</span>
+                      <span>{t('nav.profile')}</span>
                     </Link>
                     <Link to="/orders" className="dropdown-item" onClick={() => setShowDropdown(false)}>
                       <ShoppingBag size={16} />
-                      <span>Đơn Thuê Của Tôi</span>
+                      <span>{t('nav.myOrders')}</span>
                     </Link>
                     <Link to="/wallet" className="dropdown-item" onClick={() => setShowDropdown(false)}>
                       <Wallet size={16} />
-                      <span>Ví & Lịch Sử Giao Dịch</span>
+                      <span>{t('nav.walletHistory')}</span>
                     </Link>
                     <button
                       type="button"
@@ -401,15 +402,15 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
                       style={{ color: '#f59e0b', width: '100%', textAlign: 'left', background: 'transparent', border: 'none' }}
                     >
                       <Landmark size={16} />
-                      <span>Rút Tiền Về Ngân Hàng</span>
+                      <span>{t('nav.withdrawToBank')}</span>
                     </button>
                     <Link to="/register-player" className="dropdown-item" onClick={() => setShowDropdown(false)} style={{ color: 'var(--secondary)' }}>
                       <PlusCircle size={16} />
-                      <span>Đăng Ký Làm Player</span>
+                      <span>{t('nav.becomePlayer')}</span>
                     </Link>
                     <Link to="/policy" className="dropdown-item" onClick={() => setShowDropdown(false)}>
                       <ShieldCheck size={16} />
-                      <span>Chính Sách & Điều Khoản</span>
+                      <span>{t('nav.policy')}</span>
                     </Link>
                     <div className="dropdown-divider" />
                     <button
@@ -421,7 +422,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
                       }}
                     >
                       <LogOut size={16} />
-                      <span>Đăng Xuất</span>
+                      <span>{t('nav.logout')}</span>
                     </button>
                   </div>
                 )}
@@ -429,7 +430,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
             </>
           ) : (
             <button className="btn btn-primary" onClick={onOpenAuth}>
-              <span>Đăng Nhập / Đăng Ký</span>
+              <span>{t('nav.loginRegister')}</span>
             </button>
           )}
         </div>

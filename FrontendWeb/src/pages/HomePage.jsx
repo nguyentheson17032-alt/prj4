@@ -15,30 +15,29 @@ import {
 } from 'lucide-react';
 import PlayerCard from '../components/player/PlayerCard';
 import api from '../api/apiService';
+import { useLanguage } from '../context/LanguageContext';
 import '../styles/home.css';
 
 export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
   const [players, setPlayers] = useState([]);
   const [games, setGames] = useState([]);
-  const [users, setUsers] = useState([]);
   const [leaderboard, setLeaderboard] = useState({ topPlayers: [], topDonators: [] });
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [playersData, gamesData, usersData, lbData] = await Promise.allSettled([
+        const [playersData, gamesData, lbData] = await Promise.allSettled([
           api.getPlayers(),
           api.getGames(),
-          api.getUsers(),
           api.getLeaderboard()
         ]);
         setPlayers(playersData.status === 'fulfilled' ? playersData.value || [] : []);
         setGames(gamesData.status === 'fulfilled' ? gamesData.value || [] : []);
-        setUsers(usersData.status === 'fulfilled' ? usersData.value || [] : []);
         if (lbData.status === 'fulfilled' && lbData.value) {
           setLeaderboard({
             topPlayers: Array.isArray(lbData.value.topPlayers) ? lbData.value.topPlayers : [],
@@ -94,23 +93,23 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
           <div className="hero-content">
             <div className="hero-tag">
               <Sparkles size={16} />
-              <span>Nền Tảng Thuê Duo Số 1 Việt Nam</span>
+              <span>{t('home.heroTag', 'Nền Tảng Thuê Duo Số 1 Việt Nam')}</span>
             </div>
             <h1 className="hero-title">
-              Tìm Bạn Chơi Cùng & <br />
-              <span className="gradient-text">Leo Rank Đỉnh Cao</span>
+              {t('home.heroTitle', 'Tìm Bạn Chơi Cùng &')} <br />
+              <span className="gradient-text">{t('home.heroTitleHighlight', 'Leo Rank Đỉnh Cao')}</span>
             </h1>
             <p className="hero-subtitle">
-              Kết nối hơn 5,000+ Idol, Player chuyên nghiệp kỹ năng cao, giọng nói ngọt ngào, hỗ trợ mic Discord 24/7.
+              {t('home.heroSubtitle', 'Kết nối hơn 5,000+ Idol, Player chuyên nghiệp kỹ năng cao, giọng nói ngọt ngào, hỗ trợ mic Discord 24/7.')}
             </p>
             <div className="hero-actions">
               <Link to="/explore" className="btn btn-primary btn-lg">
                 <Gamepad2 size={20} />
-                <span>Khám Phá Player Ngay</span>
+                <span>{t('home.exploreNow', 'Khám Phá Player Ngay')}</span>
               </Link>
               <Link to="/register-player" className="btn btn-secondary btn-lg">
                 <Crown size={18} color="#fbbf24" />
-                <span>Đăng Ký Làm Duo</span>
+                <span>{t('home.becomeDuo', 'Đăng Ký Làm Duo')}</span>
               </Link>
             </div>
           </div>
@@ -121,10 +120,10 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
       <div className="section-header" style={{ marginBottom: '14px' }}>
         <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Sparkles size={18} color="#ec4899" />
-          <span>Khoảnh Khắc Đang Hoạt Động</span>
+          <span>{t('home.momentsActive', 'Khoảnh Khắc Đang Hoạt Động')}</span>
         </h3>
         <Link to="/moments" style={{ fontSize: '0.88rem', color: 'var(--primary)', fontWeight: 600 }}>
-          Xem tất cả ›
+          {t('home.viewAll', 'Xem tất cả ›')}
         </Link>
       </div>
 
@@ -145,7 +144,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
           className={`category-pill ${selectedCategory === 'ALL' ? 'active' : ''}`}
           onClick={() => setSelectedCategory('ALL')}
         >
-          <span>🔥 Tất Cả Game</span>
+          <span>{t('home.allGames', '🔥 Tất Cả Game')}</span>
         </button>
         {games.map((g) => (
           <button
@@ -165,12 +164,12 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
           <div>
             <h2 className="section-title">
               <Crown size={24} color="#fbbf24" />
-              <span>Idol & Duo Nổi Bật Tuần Này</span>
+              <span>{t('home.featuredIdols', 'Idol & Duo Nổi Bật Tuần Này')}</span>
             </h2>
-            <div className="section-subtitle">Top game thủ được đánh giá 5 sao cao nhất và nhiều lượt thuê nhất</div>
+            <div className="section-subtitle">{t('home.featuredSubtitle', 'Top game thủ được đánh giá 5 sao cao nhất và nhiều lượt thuê nhất')}</div>
           </div>
           <Link to="/explore" className="btn btn-outline btn-sm">
-            <span>Xem thêm</span>
+            <span>{t('home.seeMore', 'Xem thêm')}</span>
             <ArrowRight size={14} />
           </Link>
         </div>
@@ -194,7 +193,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
               border: '1px dashed var(--border-color)',
               color: 'var(--text-muted)'
             }}>
-              Chưa có Idol / Duo nổi bật nào
+              {t('home.noFeatured', 'Chưa có Idol / Duo nổi bật nào')}
             </div>
           )}
         </div>
@@ -206,9 +205,9 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
           <div>
             <h2 className="section-title">
               <Flame size={24} color="#ef4444" />
-              <span>Đang Online Sẵn Sàng Chơi</span>
+              <span>{t('home.onlinePlayers', 'Đang Online Sẵn Sàng Chơi')}</span>
             </h2>
-            <div className="section-subtitle">Nhận đơn ngay sau 30 giây, kết nối mic discord trực tiếp</div>
+            <div className="section-subtitle">{t('home.onlineSubtitle', 'Nhận đơn ngay sau 30 giây, kết nối mic discord trực tiếp')}</div>
           </div>
         </div>
 
@@ -231,7 +230,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
               border: '1px dashed var(--border-color)',
               color: 'var(--text-muted)'
             }}>
-              Không tìm thấy người chơi nào trong danh mục này
+              {t('home.noPlayersInCategory', 'Không tìm thấy người chơi nào trong danh mục này')}
             </div>
           )}
         </div>
@@ -243,9 +242,9 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
           <div>
             <h2 className="section-title">
               <Trophy size={24} color="#f59e0b" />
-              <span>Bảng Xếp Hạng Tháng</span>
+              <span>{t('home.monthlyLeaderboard', 'Bảng Xếp Hạng Tháng')}</span>
             </h2>
-            <div className="section-subtitle">Vinh danh các Player xuất sắc và Đại Gia Donate tích cực nhất</div>
+            <div className="section-subtitle">{t('home.leaderboardSubtitle', 'Vinh danh các Player xuất sắc và Đại Gia Donate tích cực nhất')}</div>
           </div>
         </div>
 
@@ -254,7 +253,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
           <div className="leaderboard-card">
             <h3 style={{ fontSize: '1.15rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Crown size={20} color="#fbbf24" />
-              <span>Top Player Yêu Thích</span>
+              <span>{t('home.topPlayers', 'Top Player Yêu Thích')}</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {(() => {
@@ -271,7 +270,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
                 if (list.length === 0) {
                   return (
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '12px 0' }}>
-                      Chưa có player nào
+                      {t('home.noPlayers', 'Chưa có player nào')}
                     </div>
                   );
                 }
@@ -311,7 +310,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
                           {p.fullName || p.username}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          {realHours > 0 ? `${realHours}h chơi • ` : ''}{realOrders} đơn • {hasReview ? `⭐ ${numRating.toFixed(1)} (${revCount})` : '⭐ Chưa có (0)'}
+                          {realHours > 0 ? `${realHours}${t('home.hoursPlayed', 'h chơi')} • ` : ''}{realOrders} {t('home.orders', 'đơn')} • {hasReview ? `⭐ ${numRating.toFixed(1)} (${revCount})` : t('player.noReviews', '⭐ Chưa có (0)')}
                         </div>
                       </div>
                       <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-pink)' }}>
@@ -328,15 +327,11 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
           <div className="leaderboard-card">
             <h3 style={{ fontSize: '1.15rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Star size={20} color="#ec4899" fill="#ec4899" />
-              <span>Top Phú Hộ Donate</span>
+              <span>{t('home.topDonators', 'Top Phú Hộ Donate')}</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {(() => {
-                const rawList = leaderboard.topDonators.length > 0
-                  ? leaderboard.topDonators
-                  : users
-                      .slice()
-                      .sort((a, b) => Number(b.totalSpent || 0) - Number(a.totalSpent || 0));
+                const rawList = leaderboard.topDonators || [];
 
                 // Ưu tiên hiển thị những phú hộ thực sự đã ủng hộ donate hoặc thuê player
                 const withSpending = rawList.filter(u => Number(u.totalSpent || 0) > 0);
@@ -345,7 +340,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
                 if (list.length === 0 || (withSpending.length === 0 && Number(list[0]?.totalSpent || 0) === 0)) {
                   return (
                     <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                      Chưa có dữ liệu đóng góp donate / thuê player
+                      {t('home.noDonators', 'Chưa có dữ liệu đóng góp donate / thuê player')}
                     </div>
                   );
                 }
@@ -353,7 +348,7 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
                 return list.slice(0, 4).map((u, idx) => {
                   const spentVal = Number(u.totalSpent || 0);
                   const avatarUrl = u.avatar || u.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.username || 'User')}&background=random`;
-                  const roleLabel = (u.roles?.includes('ROLE_ADMIN') || u.role === 'ADMIN') ? 'Quản Trị Viên' : 'Thành Viên';
+                  const roleLabel = (u.roles?.includes('ROLE_ADMIN') || u.role === 'ADMIN') ? t('auth.quickAdmin', 'Quản Trị Viên') : t('auth.quickUser', 'Thành Viên');
 
                   return (
                     <div key={u.id || idx} className="leaderboard-item">
@@ -388,8 +383,8 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
             <ShieldCheck size={26} />
           </div>
           <div>
-            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '4px' }}>Bảo Vệ Người Dùng 100%</h4>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Tiền chỉ chuyển cho player sau khi bạn bấm hoàn thành đơn hàng.</p>
+            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '4px' }}>{t('home.guarantee1Title', 'Bảo Vệ Người Dùng 100%')}</h4>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t('home.guarantee1Desc', 'Tiền chỉ chuyển cho player sau khi bạn bấm hoàn thành đơn hàng.')}</p>
           </div>
         </div>
 
@@ -398,8 +393,8 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
             <HeartHandshake size={26} />
           </div>
           <div>
-            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '4px' }}>Hài Lòng Hoặc Hoàn Tiền</h4>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Hỗ trợ đổi player hoặc hoàn 100% tiền nếu player có thái độ không tốt.</p>
+            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '4px' }}>{t('home.guarantee2Title', 'Hài Lòng Hoặc Hoàn Tiền')}</h4>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t('home.guarantee2Desc', 'Hỗ trợ đổi player hoặc hoàn 100% tiền nếu player có thái độ không tốt.')}</p>
           </div>
         </div>
 
@@ -408,8 +403,8 @@ export const HomePage = ({ onHirePlayer, onOpenDeposit }) => {
             <Headphones size={26} />
           </div>
           <div>
-            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '4px' }}>Hỗ Trợ Nhanh 24/7</h4>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Đội ngũ admin túc trực hỗ trợ giải quyết mọi thắc mắc trong 2 phút.</p>
+            <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '4px' }}>{t('home.guarantee3Title', 'Hỗ Trợ Nhanh 24/7')}</h4>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t('home.guarantee3Desc', 'Đội ngũ admin túc trực hỗ trợ giải quyết mọi thắc mắc trong 2 phút.')}</p>
           </div>
         </div>
       </div>

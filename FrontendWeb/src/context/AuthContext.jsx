@@ -56,6 +56,16 @@ export const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       try {
         const storedUser = localStorage.getItem('current_user');
+        const legacyToken = localStorage.getItem('jwt_token') || localStorage.getItem('token');
+
+        // Neu chua dang nhap (khong co stored user va khong co token), bo qua de tranh goi /api/auth/me gay loi 401 thua
+        if (!storedUser && !legacyToken) {
+          setUser(null);
+          setToken(null);
+          setLoading(false);
+          return;
+        }
+
         if (storedUser) {
           try {
             const parsed = JSON.parse(storedUser);
@@ -71,7 +81,6 @@ export const AuthProvider = ({ children }) => {
         }
 
         // Clean up legacy tokens from localStorage if any, keeping only in memory during migration
-        const legacyToken = localStorage.getItem('jwt_token') || localStorage.getItem('token');
         if (legacyToken) {
           api.setAuthToken(legacyToken);
           setToken(legacyToken);
@@ -79,7 +88,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('token');
         }
 
-        // Validate session with backend using HttpOnly cookie
+        // Validate session with backend using HttpOnly cookie khi truoc do da co session
         try {
           const freshUser = await api.getCurrentUser();
           if (freshUser) {
@@ -212,10 +221,26 @@ export const AuthProvider = ({ children }) => {
   };
 
   const deductBalance = (amount) => {
-    const current = Number(user?.balance || 0);
+    const current = Number(user?.balance != null ? user.balance : (user?.coin != null ? user.coin : 0));
     const cost = Number(amount);
     if (!user || current < cost) return false;
     const newBalance = current - cost;
+    const updated = {
+      ...user,
+      balance: newBalance,
+      walletBalance: newBalance,
+      coin: newBalance
+    };
+    setUser(updated);
+    localStorage.setItem('current_user', JSON.stringify(updated));
+    return true;
+  };
+
+  const addBalance = (amount) => {
+    if (!user) return false;
+    const current = Number(user?.balance != null ? user.balance : (user?.coin != null ? user.coin : 0));
+    const added = Number(amount || 0);
+    const newBalance = current + added;
     const updated = {
       ...user,
       balance: newBalance,
@@ -285,6 +310,7 @@ export const AuthProvider = ({ children }) => {
         deposit,
         withdrawMoney,
         deductBalance,
+        addBalance,
         refreshUser,
         updateProfile
       }}

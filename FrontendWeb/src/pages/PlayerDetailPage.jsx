@@ -26,6 +26,7 @@ import AudioWave from '../components/common/AudioWave';
 import api from '../api/apiService';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getUserAvatar } from '../utils/avatarUtils';
 import '../styles/player.css';
 
@@ -34,6 +35,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { t } = useLanguage();
 
   const [player, setPlayer] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -329,7 +331,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
       <div className="container" style={{ textAlign: 'center', padding: '100px 0' }}>
         <h2>Không tìm thấy thông tin Player</h2>
         <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => navigate('/explore')}>
-          Quay lại danh sách
+          {t('player.backToList', 'Quay lại danh sách')}
         </button>
       </div>
     );
@@ -344,7 +346,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
         style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}
       >
         <ArrowLeft size={16} />
-        <span>Quay lại</span>
+        <span>{t('player.back', 'Quay lại')}</span>
       </button>
 
       {/* 1. Header Banner & Profile Info */}
@@ -428,12 +430,12 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   <span>•</span>
                   <span>Server: {player.server || 'VN'}</span>
                   <span>•</span>
-                  <span>Đơn hoàn tất: <strong style={{ color: 'var(--accent-green)' }}>{player.orderCount || 0} đơn</strong></span>
+                  <span>{t('player.completedOrders', 'Đơn hoàn tất')}: <strong style={{ color: 'var(--accent-green)' }}>{player.orderCount || 0} {(player.orderCount === 1) ? t('player.orderSingular', 'đơn') : t('player.ordersPlural', 'đơn')}</strong></span>
                   <span>•</span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontWeight: 700 }}>
                     <Star size={16} fill="#f59e0b" color="#f59e0b" />
-                    <span>{player.rating > 0 ? Number(player.rating).toFixed(1) : (reviews.length > 0 ? '5.0' : 'Chưa có')}</span>
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({reviews.length || player.reviewCount || 0} đánh giá)</span>
+                    <span>{player.rating > 0 ? Number(player.rating).toFixed(1) : (reviews.length > 0 ? '5.0' : t('player.noRating', 'Chưa có'))}</span>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({reviews.length || player.reviewCount || 0} {((reviews.length || player.reviewCount || 0) === 1) ? t('player.reviewSingular', 'đánh giá') : t('player.reviewsPlural', 'đánh giá')})</span>
                   </span>
                 </div>
               </div>
@@ -455,7 +457,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   gap: '6px'
                 }}>
                   <UserCheck size={16} color="var(--primary)" />
-                  <span>Hồ Sơ Của Bạn</span>
+                  <span>{t('player.yourProfile', 'Hồ Sơ Của Bạn')}</span>
                 </span>
                 <button
                   className="btn btn-primary"
@@ -463,7 +465,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', borderRadius: '12px', fontWeight: 700 }}
                 >
                   <Pencil size={16} />
-                  <span>Chỉnh Sửa Hồ Sơ</span>
+                  <span>{t('player.editProfile', 'Chỉnh Sửa Hồ Sơ')}</span>
                 </button>
               </div>
             ) : (
@@ -485,21 +487,21 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   }}
                 >
                   <MessageSquare size={18} />
-                  <span>Nhắn Tin</span>
+                  <span>{t('player.sendMessage', 'Nhắn Tin')}</span>
                 </button>
                 <button
                   className="btn btn-accent"
                   onClick={() => onDonatePlayer(player)}
                 >
                   <Gift size={18} />
-                  <span>Tặng Quà</span>
+                  <span>{t('player.donate', 'Tặng Quà')}</span>
                 </button>
                 <button
                   className="btn btn-primary"
                   onClick={() => onHirePlayer(player)}
                 >
                   <Gamepad2 size={18} />
-                  <span>Thuê Ngay</span>
+                  <span>{t('player.hireNow', 'Thuê Ngay')}</span>
                 </button>
               </div>
             )}
@@ -517,7 +519,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               border: '1px solid var(--border-color)',
               width: 'fit-content'
             }}>
-              <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Giọng nói giới thiệu:</span>
+              <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('player.voiceIntro', 'Giọng nói giới thiệu:')}</span>
               <AudioWave playerId={player.id} audioUrl={player.voiceIntroUrl} duration={player.voiceDuration || '0:15'} />
             </div>
           )}
@@ -540,21 +542,21 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               style={{ fontSize: '1rem', padding: '10px 18px' }}
               onClick={() => setActiveTab('SERVICES')}
             >
-              🎮 Dịch Vụ & Kỹ Năng
+              {t('player.tabServices', '🎮 Dịch Vụ & Kỹ Năng')}
             </button>
             <button
               className={`nav-link ${activeTab === 'ALBUM' ? 'active' : ''}`}
               style={{ fontSize: '1rem', padding: '10px 18px' }}
               onClick={() => setActiveTab('ALBUM')}
             >
-              📸 Album Ảnh ({player.album?.length || 0})
+              {t('player.tabAlbum', '📸 Album Ảnh')} ({player.album?.length || 0})
             </button>
             <button
               className={`nav-link ${activeTab === 'REVIEWS' ? 'active' : ''}`}
               style={{ fontSize: '1rem', padding: '10px 18px' }}
               onClick={() => setActiveTab('REVIEWS')}
             >
-              ⭐ Đánh Giá ({reviews.length || player.reviewCount || 0})
+              {t('player.tabReviews', '⭐ Đánh Giá')} ({reviews.length || player.reviewCount || 0})
             </button>
           </div>
 
@@ -563,7 +565,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
             <div className="animate-fade-in">
               {/* Bio Card */}
               <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '12px' }}>Giới Thiệu Bản Thân</h3>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '12px' }}>{t('player.aboutMe', 'Giới Thiệu Bản Thân')}</h3>
                 <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: '0.95rem', whiteSpace: 'pre-line' }}>
                   {player.bio}
                 </p>
@@ -580,7 +582,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
 
               {/* Games List */}
               <div className="glass-panel" style={{ padding: '24px' }}>
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>Các Game Nhận Duo & Bảng Giá</h3>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>{t('player.gamesAndRates', 'Các Game Nhận Duo & Bảng Giá')}</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {player.games?.map((game, idx) => {
                     const isSelected = selectedGame?.name === game.name;
@@ -616,7 +618,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                           <div>
                             <div style={{ fontWeight: 700, fontSize: '1rem' }}>{game.name}</div>
                             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                              Rank: <strong style={{ color: 'var(--secondary)' }}>{game.rank}</strong> • Vị trí: {game.role}
+                              Rank: <strong style={{ color: 'var(--secondary)' }}>{game.rank}</strong> • {t('player.role', 'Vị trí')}: {game.role}
                             </div>
                           </div>
                         </div>
@@ -626,7 +628,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                             <div style={{ fontWeight: 800, color: 'var(--accent-pink)', fontSize: '1.1rem' }}>
                               {game.price.toLocaleString('vi-VN')} đ
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 1 giờ</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('player.perOneHour', '/ 1 giờ')}</div>
                           </div>
                           {isOwner ? (
                             <button
@@ -635,14 +637,14 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                             >
                               <Pencil size={13} />
-                              <span>Chỉnh sửa game</span>
+                              <span>{t('player.editGame', 'Chỉnh sửa game')}</span>
                             </button>
                           ) : (
                             <button
                               className="btn btn-sm btn-primary"
                               onClick={(e) => { e.stopPropagation(); setSelectedGame(game); onHirePlayer({ ...player, pricePerHour: game.price, primaryGame: game.name }); }}
                             >
-                              Thuê Game Này
+                              {t('player.hireThisGame', 'Thuê Game Này')}
                             </button>
                           )}
                         </div>
@@ -670,10 +672,10 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 4px 0', color: '#fff' }}>
-                    📸 Album Khoảnh Khắc &amp; Highlight
+                    📸 {t('player.albumTitle', 'Album Khoảnh Khắc & Highlight')}
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    Tất cả hình ảnh highlight, chiến tích leo rank Idol đã đăng tải trong "Khoảnh Khắc"
+                    {t('player.albumSubtitle', 'Tất cả hình ảnh highlight, chiến tích leo rank Idol đã đăng tải trong "Khoảnh Khắc"')}
                   </p>
                 </div>
                 <span style={{
@@ -685,7 +687,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   fontSize: '0.82rem',
                   border: '1px solid rgba(99, 102, 241, 0.3)'
                 }}>
-                  {player.album?.length || 0} Ảnh
+                  {player.album?.length || 0} {t('player.photos', 'Ảnh')}
                 </span>
               </div>
 
@@ -699,9 +701,9 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)'
                 }}>
                   <ImageIcon size={48} color="var(--text-muted)" style={{ margin: '0 auto 16px auto' }} />
-                  <h4 style={{ fontSize: '1.15rem', color: '#fff', marginBottom: '8px' }}>Chưa Có Ảnh Nào Trong Album</h4>
+                  <h4 style={{ fontSize: '1.15rem', color: '#fff', marginBottom: '8px' }}>{t('player.emptyAlbumTitle', 'Chưa Có Ảnh Nào Trong Album')}</h4>
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: '420px', margin: '0 auto', lineHeight: 1.6 }}>
-                    Idol chưa chia sẻ hình ảnh khoảnh khắc nào. Khi Idol đăng bài viết mới kèm ảnh từ mục "Khoảnh Khắc", tất cả ảnh sẽ tự động hiển thị trong Album này!
+                    {t('player.emptyAlbumDesc', 'Idol chưa chia sẻ hình ảnh khoảnh khắc nào. Khi Idol đăng bài viết mới kèm ảnh từ mục "Khoảnh Khắc", tất cả ảnh sẽ tự động hiển thị trong Album này!')}
                   </p>
                 </div>
               ) : (
@@ -799,7 +801,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                             color: '#fff',
                             fontWeight: 700
                           }}>
-                            Phóng to
+                            {t('player.zoom', 'Phóng to')}
                           </div>
                         </div>
                       </div>
@@ -825,14 +827,14 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                     ))}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    {reviews.length || player.reviewCount || 0} lượt đánh giá
+                    {reviews.length || player.reviewCount || 0} {((reviews.length || player.reviewCount || 0) === 1) ? t('player.reviewSingular', 'lượt đánh giá') : t('player.reviewsPlural', 'lượt đánh giá')}
                   </div>
                 </div>
 
                 <div style={{ flex: 1, borderLeft: '1px solid var(--border-color)', paddingLeft: '28px' }}>
                   {reviews.length === 0 ? (
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                      Idol chưa có lượt đánh giá nào từ khách hàng thuê.
+                      {t('player.noReviewsYet', 'Idol chưa có lượt đánh giá nào từ khách hàng thuê.')}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -857,7 +859,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               {/* Reviews List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {reviews.map((rev) => {
-                  const revName = rev.user?.name || rev.reviewerName || 'Khách Hàng';
+                  const revName = rev.user?.name || rev.reviewerName || t('player.customer', 'Khách Hàng');
                   const revAvatar = rev.user?.avatar || rev.reviewerAvatar || getUserAvatar({ username: revName });
                   return (
                     <div key={rev.id} className="glass-panel" style={{ padding: '20px' }}>
@@ -867,7 +869,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                           <div>
                             <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{revName}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              {rev.createdAt} • Đã thuê {rev.hours || 1}h ({rev.gameName || player.primaryGame || 'Game Duo'})
+                              {rev.createdAt} • {t('player.rented', 'Đã thuê')} {rev.hours || 1}h ({rev.gameName || player.primaryGame || 'Game Duo'})
                             </div>
                           </div>
                         </div>
@@ -901,7 +903,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
             boxShadow: 'var(--shadow-md)'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Mức giá thuê</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('player.rentalPrice', 'Mức giá thuê')}</span>
               {selectedGame && (
                 <div style={{ fontSize: '0.8rem', color: '#a5b4fc', fontWeight: 600, marginTop: '4px' }}>
                   {selectedGame.name}
@@ -910,21 +912,21 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--accent-pink)', marginTop: '2px' }}>
                 {(selectedGame?.price || player.pricePerHour || 50000).toLocaleString('vi-VN')} đ
               </div>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>trên 1 giờ trải nghiệm</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('player.perHourExperience', 'trên 1 giờ trải nghiệm')}</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
                 <CheckCircle2 size={16} color="var(--accent-green)" />
-                <span>Bật mic giao tiếp qua Discord / In-game</span>
+                <span>{t('player.featureMic', 'Bật mic giao tiếp qua Discord / In-game')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
                 <CheckCircle2 size={16} color="var(--accent-green)" />
-                <span>Phản hồi trong vòng {player.responseSpeed || '< 1 phút'}</span>
+                <span>{t('player.featureSpeed', 'Phản hồi trong vòng')} {(!player.responseSpeed || player.responseSpeed === '< 1 phút') ? t('player.underOneMin', '< 1 phút') : player.responseSpeed}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
                 <CheckCircle2 size={16} color="var(--accent-green)" />
-                <span>Cam kết không toxic, đúng giờ 100%</span>
+                <span>{t('player.featureNonToxic', 'Cam kết không toxic, đúng giờ 100%')}</span>
               </div>
             </div>
 
@@ -946,7 +948,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   gap: '8px'
                 }}>
                   <UserCheck size={18} />
-                  <span>Bạn đang xem hồ sơ Idol của chính mình</span>
+                  <span>{t('player.viewingOwnProfile', 'Bạn đang xem hồ sơ Idol của chính mình')}</span>
                 </div>
                 <button
                   className="btn btn-primary btn-lg"
@@ -954,7 +956,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   onClick={() => navigate('/profile')}
                 >
                   <Pencil size={18} />
-                  <span>Quản Lý & Chỉnh Sửa Hồ Sơ</span>
+                  <span>{t('player.manageAndEditProfile', 'Quản Lý & Chỉnh Sửa Hồ Sơ')}</span>
                 </button>
               </div>
             ) : (
@@ -965,7 +967,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   onClick={() => onHirePlayer(selectedGame ? { ...player, pricePerHour: selectedGame.price, primaryGame: selectedGame.name } : player)}
                 >
                   <Gamepad2 size={20} />
-                  <span>Thuê Ngay Bây Giờ</span>
+                  <span>{t('player.hireNowDirect', 'Thuê Ngay Bây Giờ')}</span>
                 </button>
 
                 <button
@@ -986,7 +988,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   }}
                 >
                   <MessageSquare size={18} />
-                  <span>Trò Chuyện Trước Khi Thuê</span>
+                  <span>{t('player.chatBeforeHire', 'Trò Chuyện Trước Khi Thuê')}</span>
                 </button>
               </div>
             )}

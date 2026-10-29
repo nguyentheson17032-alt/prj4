@@ -4,11 +4,13 @@ import { Star, Crown, MessageSquare, Gamepad2, Heart, UserCheck } from 'lucide-r
 import StatusBadge from '../common/StatusBadge';
 import AudioWave from '../common/AudioWave';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import '../../styles/player.css';
 
 export const PlayerCard = ({ player, onHire, onDonate }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const isOwner = Boolean(
     user?.id != null &&
@@ -62,38 +64,40 @@ export const PlayerCard = ({ player, onHire, onDonate }) => {
             </div>
           )}
 
+          {/* Hot Badge */}
+          {player.isHot && !player.isVip && (
+            <div className="player-vip-badge">
+              <span className="badge badge-hot">
+                HOT IDOL
+              </span>
+            </div>
+          )}
+
           {/* Status Badge */}
           <div className="player-status-badge">
             <StatusBadge status={player.status} />
           </div>
 
-          {/* Avatar with offset */}
-          <div className="player-avatar-wrap">
-            <img src={player.avatar} alt={player.fullName} className="player-avatar-img" />
+          {/* Rating */}
+          <div className="player-rating-badge">
+            <Star size={12} fill="#eab308" color="#eab308" />
+            <span>{(player.rating || 5.0).toFixed(1)}</span>
+            <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>({player.reviewCount || 0})</span>
           </div>
         </div>
 
         {/* Card Body */}
         <div className="player-card-body">
-          {/* Name & Rating */}
-          <div className="player-name-row">
-            <h3 className="player-name">{player.fullName || player.username}</h3>
-            <div className="player-rating">
-              <Star size={14} fill={player.rating > 0 ? "#f59e0b" : "none"} color="#f59e0b" />
-              <span>{player.rating > 0 ? Number(player.rating).toFixed(1) : 'Chưa có'}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 400 }}>({player.reviewCount || 0})</span>
+          {/* Avatar & Online status */}
+          <div className="player-avatar-row">
+            <div className="player-avatar-wrap">
+              <img src={player.avatar} alt={player.fullName} className="player-avatar" />
             </div>
-          </div>
 
-          {/* Main Game & Rank */}
-          <div className="player-game-tag">
-            <Gamepad2 size={14} />
-            <span>{player.primaryGame}</span>
-            {player.rank && (
-              <span style={{ fontSize: '0.7rem', padding: '1px 6px', background: 'rgba(6,182,212,0.15)', borderRadius: '4px', border: '1px solid rgba(6,182,212,0.3)' }}>
-                {player.rank}
-              </span>
-            )}
+            <div className="player-meta-info">
+              <h3 className="player-name">{player.fullName}</h3>
+              <p className="player-game-tag">{player.primaryGame || t('player.versatile', 'Đa Năng')}</p>
+            </div>
           </div>
 
           {/* Bio snippet */}
@@ -108,7 +112,7 @@ export const PlayerCard = ({ player, onHire, onDonate }) => {
           <div className="player-card-footer">
             <div>
               <div className="player-price">{(player.pricePerHour || 50000).toLocaleString('vi-VN')} đ</div>
-              <span className="player-price-unit">/ giờ</span>
+              <span className="player-price-unit">{t('player.perHour', '/ giờ')}</span>
             </div>
 
             {isOwner ? (
@@ -130,17 +134,17 @@ export const PlayerCard = ({ player, onHire, onDonate }) => {
                   padding: '6px 12px',
                   borderRadius: '8px'
                 }}
-                title="Hồ sơ Idol của bạn - Bấm để quản lý & chỉnh sửa"
+                title={t('player.manageProfile', 'Hồ sơ Idol của bạn - Bấm để quản lý & chỉnh sửa')}
               >
                 <UserCheck size={14} />
-                <span>Hồ Sơ Của Bạn</span>
+                <span>{t('player.yourProfile', 'Hồ Sơ Của Bạn')}</span>
               </button>
             ) : (
               <div className="player-actions-row">
                 <button
                   className="btn-icon nav-icon-btn"
                   onClick={handleChat}
-                  title="Nhắn tin với player"
+                  title={t('player.chatWithPlayer', 'Nhắn tin với player')}
                 >
                   <MessageSquare size={16} />
                 </button>
@@ -149,7 +153,7 @@ export const PlayerCard = ({ player, onHire, onDonate }) => {
                   className="btn btn-sm btn-primary"
                   onClick={handleHireClick}
                 >
-                  <span>Thuê Ngay</span>
+                  <span>{t('player.hireNow', 'Thuê Ngay')}</span>
                 </button>
               </div>
             )}

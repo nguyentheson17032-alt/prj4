@@ -18,12 +18,13 @@ import ReportModal from '../components/modals/ReportModal';
 import AuthModal from '../components/modals/AuthModal';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getUserAvatar } from '../utils/avatarUtils';
 import { getRefundPercentage } from '../components/modals/OrderDetailModal';
 import '../styles/orders.css';
 
 export const OrdersPage = () => {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, addBalance } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('ALL'); // ALL, IN_PROGRESS, COMPLETED, CANCELLED
@@ -34,6 +35,7 @@ export const OrdersPage = () => {
   const [, setTick] = useState(0);
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleChatWithPartner = (order, isPlayer) => {
     const params = new URLSearchParams();
@@ -110,12 +112,12 @@ export const OrdersPage = () => {
       if (isNaN(end.getTime())) return null;
       const now = new Date();
       const diffMs = end - now;
-      if (diffMs <= 0) return 'Đã hết giờ chơi';
+      if (diffMs <= 0) return t('orders.timeOver', 'Đã hết giờ chơi');
       const totalMins = Math.ceil(diffMs / (1000 * 60));
       const hours = Math.floor(totalMins / 60);
       const mins = totalMins % 60;
-      if (hours > 0) return `Còn ${hours}h ${mins}m`;
-      return `Còn ${mins} phút`;
+      if (hours > 0) return t('orders.timeRemainingHours', 'Còn {h}h {m}m').replace('{h}', hours).replace('{m}', mins);
+      return t('orders.timeRemainingMins', 'Còn {m} phút').replace('{m}', mins);
     } catch (e) {
       return null;
     }
@@ -125,7 +127,7 @@ export const OrdersPage = () => {
     try {
       await api.confirmOrder(orderId);
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'CONFIRMED' } : o));
-      addToast('Đã xác nhận đơn thuê thành công!', 'success');
+      addToast(t('orders.confirmSuccess', 'Đã xác nhận đơn thuê thành công!'), 'success');
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi xác nhận đơn!';
       addToast(typeof msg === 'string' ? msg : 'Lỗi khi xác nhận đơn!', 'error');
@@ -133,11 +135,18 @@ export const OrdersPage = () => {
   };
 
   const handleCancelOrder = async (orderId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không? Tiền sẽ được hoàn lại vào ví 100%.')) return;
+    if (!window.confirm(t('orders.confirmCancelPrompt', 'Bạn có chắc chắn muốn hủy đơn hàng này không? Tiền sẽ được hoàn lại vào ví 100%.'))) return;
     try {
-      await api.cancelOrder(orderId);
+      const res = await api.cancelOrder(orderId);
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'CANCELED' } : o));
-      addToast('Đã hủy đơn hàng thành công và hoàn tiền vào ví!', 'success');
+      const refunded = res?.data?.refundedCoin || res?.refundedCoin;
+      if (refunded && typeof addBalance === 'function') {
+        addBalance(refunded);
+      }
+      if (typeof refreshUser === 'function') {
+        try { await refreshUser(); } catch (e) {}
+      }
+      addToast(t('orders.cancelSuccess', 'Đã hủy đơn hàng thành công và hoàn tiền vào ví!'), 'success');
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi hủy đơn hàng!';
       addToast(typeof msg === 'string' ? msg : 'Lỗi khi hủy đơn hàng!', 'error');
@@ -152,12 +161,12 @@ export const OrdersPage = () => {
       return;
     }
 
-    if (!window.confirm('Xác nhận hoàn tất đơn thuê này? Idol sẽ nhận nốt phần tiền còn lại.')) return;
+    if (!window.confirm(t('orders.confirmCompletePrompt', 'Xác nhận hoàn tất đơn thuê này? Idol sẽ nhận nốt phần tiền còn lại.'))) return;
 
     try {
       await api.completeOrder(order.id);
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'COMPLETED' } : o));
-      addToast('Đơn hàng đã được đánh dấu hoàn tất thành công!', 'success');
+      addToast(t('orders.completeSuccess', 'Đơn hàng đã được đánh dấu hoàn tất thành công!'), 'success');
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi hoàn thành đơn!';
       addToast(typeof msg === 'string' ? msg : 'Lỗi khi hoàn thành đơn!', 'error');
@@ -225,32 +234,32 @@ export const OrdersPage = () => {
       case 'CONFIRMED': {
         const finished = isOrderFinished(order);
         if (finished) {
-          return <span className="badge badge-busy">⏰ Đã Hết Giờ (Chờ Hoàn Tất)</span>;
+          return <span className="badge badge-busy">⏰ {t('orders.statusTimeOver', 'Đã Hết Giờ (Chờ Hoàn Tất)')}</span>;
         }
         const remaining = getRemainingTimeText(order.endTime);
-        return <span className="badge badge-online">🎮 Đang Trong Trận ({remaining || 'Đang chơi'})</span>;
+        return <span className="badge badge-online">🎮 {t('orders.statusInProgress', 'Đang Trong Trận')} ({remaining || t('orders.playing', 'Đang chơi')})</span>;
       }
       case 'PENDING':
-        return <span className="badge badge-busy">⏳ Chờ Bắt Đầu</span>;
+        return <span className="badge badge-busy">⏳ {t('orders.statusPending', 'Chờ Bắt Đầu')}</span>;
       case 'COMPLETED':
-        return <span className="badge badge-primary">✅ Đã Hoàn Tất</span>;
+        return <span className="badge badge-primary">✅ {t('orders.statusCompleted', 'Đã Hoàn Tất')}</span>;
       case 'REFUNDED': {
         const refundPct = getRefundPercentage(order);
         return (
           <span className="badge" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)', fontWeight: 700 }}>
-            💰 {refundPct ? `Đã Hoàn Tiền ${refundPct}%` : 'Đã Hoàn Tiền'}
+            💰 {refundPct ? `${t('orders.statusRefunded', 'Đã Hoàn Tiền')} ${refundPct}%` : t('orders.statusRefunded', 'Đã Hoàn Tiền')}
           </span>
         );
       }
       case 'CANCELLED':
       case 'CANCELED':
-        return <span className="badge badge-offline">❌ Đã Hủy</span>;
+        return <span className="badge badge-offline">❌ {t('orders.statusCancelled', 'Đã Hủy')}</span>;
       case 'REJECTED':
-        return <span className="badge badge-offline">🚫 Bị Từ Chối</span>;
+        return <span className="badge badge-offline">🚫 {t('orders.statusRejected', 'Bị Từ Chối')}</span>;
       case 'EXPIRED':
-        return <span className="badge badge-offline">⌛ Hết Hạn Xác Nhận</span>;
+        return <span className="badge badge-offline">⌛ {t('orders.statusExpired', 'Hết Hạn Xác Nhận')}</span>;
       default:
-        return <span className="badge badge-offline">{order.status || 'Chờ Xử Lý'}</span>;
+        return <span className="badge badge-offline">{order.status || t('orders.statusProcessing', 'Chờ Xử Lý')}</span>;
     }
   };
 
@@ -259,10 +268,10 @@ export const OrdersPage = () => {
       {/* Header */}
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '8px' }}>
-          Quản Lý <span className="gradient-text">Đơn Thuê Của Bạn</span>
+          {t('orders.title', 'Quản Lý')} <span className="gradient-text">{t('orders.titleHighlight', 'Đơn Thuê Của Bạn')}</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Theo dõi tiến độ thuê Duo, trò chuyện, chấm điểm và đánh giá dịch vụ.
+          {t('orders.subtitle', 'Theo dõi tiến độ thuê Duo, trò chuyện, chấm điểm và đánh giá dịch vụ.')}
         </p>
       </div>
 
@@ -272,32 +281,32 @@ export const OrdersPage = () => {
           className={`order-tab-btn ${activeFilter === 'ALL' ? 'active' : ''}`}
           onClick={() => setActiveFilter('ALL')}
         >
-          Tất Cả ({orders.length})
+          {t('orders.tabAll', 'Tất Cả')} ({orders.length})
         </button>
         <button
           className={`order-tab-btn ${activeFilter === 'IN_PROGRESS' ? 'active' : ''}`}
           onClick={() => setActiveFilter('IN_PROGRESS')}
         >
-          Đang Thực Hiện / Chờ ({orders.filter(o => ['IN_PROGRESS', 'PENDING', 'CONFIRMED'].includes(o.status?.toUpperCase())).length})
+          {t('orders.tabInProgress', 'Đang Thực Hiện / Chờ')} ({orders.filter(o => ['IN_PROGRESS', 'PENDING', 'CONFIRMED'].includes(o.status?.toUpperCase())).length})
         </button>
         <button
           className={`order-tab-btn ${activeFilter === 'COMPLETED' ? 'active' : ''}`}
           onClick={() => setActiveFilter('COMPLETED')}
         >
-          Đã Hoàn Tất ({orders.filter(o => o.status?.toUpperCase() === 'COMPLETED').length})
+          {t('orders.tabCompleted', 'Đã Hoàn Tất')} ({orders.filter(o => o.status?.toUpperCase() === 'COMPLETED').length})
         </button>
         <button
           className={`order-tab-btn ${activeFilter === 'CANCELLED' ? 'active' : ''}`}
           onClick={() => setActiveFilter('CANCELLED')}
         >
-          Đã Hủy ({orders.filter(o => ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(o.status?.toUpperCase())).length})
+          {t('orders.tabCancelled', 'Đã Hủy')} ({orders.filter(o => ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(o.status?.toUpperCase())).length})
         </button>
       </div>
 
       {/* Orders List */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
-          Đang tải danh sách đơn thuê...
+          {t('orders.loading', 'Đang tải danh sách đơn thuê...')}
         </div>
       ) : filteredOrders.length > 0 ? (
         <div>
@@ -343,10 +352,10 @@ export const OrdersPage = () => {
                 <div className="order-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>
-                      Mã đơn: #{order.id}
+                      {t('orders.orderId', 'Mã đơn:')} #{order.id}
                     </span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                      • Ngày tạo: {displayTime}
+                      • {t('orders.createdAt', 'Ngày tạo:')} {displayTime}
                     </span>
                   </div>
                   <div>{getStatusBadge(order)}</div>
@@ -379,7 +388,7 @@ export const OrdersPage = () => {
                               color: 'var(--primary)',
                               fontWeight: 700
                             }}>
-                              Khách Hàng Thuê Bạn
+                              {t('orders.clientHiredYou', 'Khách Hàng Thuê Bạn')}
                             </span>
                           </>
                         ) : (
@@ -389,18 +398,18 @@ export const OrdersPage = () => {
                             </Link>
                             {order.renterName && (
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                (Người thuê: <strong style={{ color: 'var(--text-secondary)' }}>{order.renterName}</strong>)
+                                ({t('orders.renter', 'Người thuê:')} <strong style={{ color: 'var(--text-secondary)' }}>{order.renterName}</strong>)
                               </span>
                             )}
                           </>
                         )}
                       </div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Game: <strong style={{ color: 'var(--secondary)' }}>{order.game || 'Duo Game'}</strong> • Thời lượng: <strong>{order.hours || 1} Giờ</strong>
+                        Game: <strong style={{ color: 'var(--secondary)' }}>{order.game || 'Duo Game'}</strong> • {t('orders.duration', 'Thời lượng:')} <strong>{order.hours || 1} {(order.hours || 1) === 1 ? t('booking.hour', 'Giờ') : t('booking.hours', 'Giờ')}</strong>
                       </div>
                       {order.note && (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', fontStyle: 'italic' }}>
-                          Ghi chú: "{order.note}"
+                          {t('orders.note', 'Ghi chú:')} "{order.note}"
                         </div>
                       )}
                     </div>
@@ -414,7 +423,7 @@ export const OrdersPage = () => {
                       </div>
                       {order.discount > 0 && (
                         <div style={{ fontSize: '0.75rem', color: 'var(--accent-green)' }}>
-                          Đã giảm {(order.discount || 0).toLocaleString('vi-VN')} đ
+                          {t('orders.discounted', 'Đã giảm')} {(order.discount || 0).toLocaleString('vi-VN')} đ
                         </div>
                       )}
                     </div>
@@ -426,7 +435,7 @@ export const OrdersPage = () => {
                         title={isCurrentPlayer ? `Nhắn tin cho khách hàng ${renterDisplayName}` : `Nhắn tin cho Idol ${displayName}`}
                       >
                         <MessageSquare size={16} />
-                        <span>Nhắn Tin</span>
+                        <span>{t('orders.sendMessage', 'Nhắn Tin')}</span>
                       </button>
 
                       {/* Trạng thái PENDING: Có nút Đồng Ý / Xác Nhận và nút Hủy Đơn */}
@@ -439,7 +448,7 @@ export const OrdersPage = () => {
                             title="Xác nhận nhận đơn thuê"
                           >
                             <CheckCircle2 size={16} />
-                            <span>Đồng Ý</span>
+                            <span>{t('orders.accept', 'Đồng Ý')}</span>
                           </button>
                           <button
                             className="btn btn-outline btn-sm"
@@ -448,7 +457,7 @@ export const OrdersPage = () => {
                             title="Hủy đơn và hoàn coin"
                           >
                             <XCircle size={16} />
-                            <span>Hủy Đơn</span>
+                            <span>{t('orders.cancelOrder', 'Hủy Đơn')}</span>
                           </button>
                         </>
                       )}
@@ -485,7 +494,7 @@ export const OrdersPage = () => {
                                 }
                               >
                                 <CheckCircle2 size={16} />
-                                <span>{finished ? 'Hoàn Thành' : 'Chưa Hết Giờ'}</span>
+                                <span>{finished ? t('orders.complete', 'Hoàn Thành') : t('orders.notFinishedYet', 'Chưa Hết Giờ')}</span>
                               </button>
 
                               <button
@@ -494,7 +503,7 @@ export const OrdersPage = () => {
                                 onClick={() => handleCancelOrder(order.id)}
                                 title="Hủy đơn"
                               >
-                                <span>Hủy Đơn</span>
+                                <span>{t('orders.cancelOrder', 'Hủy Đơn')}</span>
                               </button>
                             </div>
                           );
@@ -508,7 +517,7 @@ export const OrdersPage = () => {
                             {order.isReviewed ? (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.88rem', fontWeight: 700 }}>
                                 <Star size={16} fill="#f59e0b" color="#f59e0b" />
-                                <span>Đã Đánh Giá {order.reviewRating || 5} ⭐</span>
+                                <span>{t('orders.reviewed', 'Đã Đánh Giá')} {order.reviewRating || 5} ⭐</span>
                               </div>
                             ) : (
                               <button
@@ -517,7 +526,7 @@ export const OrdersPage = () => {
                                 title="Chỉ người thuê mới được đánh giá dịch vụ"
                               >
                                 <Star size={16} />
-                                <span>Đánh Giá Player</span>
+                                <span>{t('orders.ratePlayer', 'Đánh Giá Player')}</span>
                               </button>
                             )}
 
@@ -546,7 +555,7 @@ export const OrdersPage = () => {
                                         title="Khiếu nại về idol này đã bị Admin từ chối"
                                       >
                                         <XCircle size={14} />
-                                        <span>Đã Khiếu Nại & Bị Từ Chối</span>
+                                        <span>{t('orders.reportRejected', 'Đã Khiếu Nại & Bị Từ Chối')}</span>
                                       </div>
                                     );
                                   }
@@ -568,7 +577,7 @@ export const OrdersPage = () => {
                                         title="Khiếu nại đã được Admin chấp thuận"
                                       >
                                         <CheckCircle2 size={14} />
-                                        <span>Đã Khiếu Nại & Hoàn Tiền</span>
+                                        <span>{t('orders.reportApprovedAndRefunded', 'Đã Khiếu Nại & Hoàn Tiền')}</span>
                                       </div>
                                     );
                                   }
@@ -589,7 +598,7 @@ export const OrdersPage = () => {
                                       title="Khiếu nại đang chờ Admin duyệt"
                                     >
                                       <Flag size={14} />
-                                      <span>Đã Khiếu Nại</span>
+                                      <span>{t('orders.reportSubmitted', 'Đã Khiếu Nại')}</span>
                                     </div>
                                   );
                                 }
@@ -609,7 +618,7 @@ export const OrdersPage = () => {
                                 if (isExpired) {
                                   return (
                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }} title="Đã qua 24h sau khi đơn kết thúc, không thể khiếu nại">
-                                      Hết hạn khiếu nại (quá 24h)
+                                      {t('orders.reportExpired', 'Hết hạn khiếu nại (quá 24h)')}
                                     </span>
                                   );
                                 }
@@ -631,7 +640,7 @@ export const OrdersPage = () => {
                                       })}
                                     >
                                       <Flag size={15} />
-                                      <span>Tố Cáo</span>
+                                      <span>{t('orders.reportBtn', 'Tố Cáo')}</span>
                                     </button>
                                   )
                                 );
@@ -644,11 +653,11 @@ export const OrdersPage = () => {
                             {order.isReviewed ? (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-amber)', fontSize: '0.85rem', fontWeight: 600 }}>
                                 <Star size={15} fill="#f59e0b" color="#f59e0b" />
-                                <span>Khách đã đánh giá {order.reviewRating || 5} ⭐</span>
+                                <span>{t('orders.customerReviewed', 'Khách đã đánh giá {rating} ⭐').replace('{rating}', order.reviewRating || 5)}</span>
                               </div>
                             ) : (
                               <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontStyle: 'italic' }}>
-                                Chờ khách đánh giá
+                                {t('orders.waitingReview', 'Chờ khách đánh giá')}
                               </span>
                             )}
 
@@ -670,7 +679,7 @@ export const OrdersPage = () => {
                                 title="Đơn được đánh giá từ 4 sao hoặc đã qua 24h, tiền đã vào số dư khả dụng"
                               >
                                 <CheckCircle2 size={13} />
-                                <span>Đã vào số dư khả dụng (+{Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN')} đ)</span>
+                                <span>{t('orders.payoutAvailable', 'Đã vào số dư khả dụng (+{amount} đ)').replace('{amount}', Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN'))}</span>
                               </div>
                             ) : order.payoutStatus === 'REFUNDED' ? (
                               <div
@@ -688,7 +697,7 @@ export const OrdersPage = () => {
                                 }}
                               >
                                 <XCircle size={13} />
-                                <span>Đã xử lý hoàn tiền</span>
+                                <span>{t('orders.payoutRefunded', 'Đã xử lý hoàn tiền')}</span>
                               </div>
                             ) : (
                               <div
@@ -707,7 +716,7 @@ export const OrdersPage = () => {
                                 title="Số tiền đang tạm đóng băng trong 24h sau khi đơn kết thúc hoặc chờ khách đánh giá 4★ trở lên"
                               >
                                 <Clock size={13} />
-                                <span>Đang đóng băng: {Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN')} đ (chờ 24h hoặc đánh giá ≥4★)</span>
+                                <span>{t('orders.payoutFrozen', 'Đang đóng băng: {amount} đ (chờ 24h hoặc đánh giá ≥4★)').replace('{amount}', Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN'))}</span>
                               </div>
                             )}
                           </div>
@@ -719,16 +728,16 @@ export const OrdersPage = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f43f5e', fontSize: '0.85rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: 'rgba(244,63,94,0.1)' }}>
                             <Flag size={15} />
-                            <span>Đã Khiếu Nại & Hoàn Tiền</span>
+                            <span>{t('orders.reportApprovedAndRefunded', 'Đã Khiếu Nại & Hoàn Tiền')}</span>
                           </div>
                           {!isCurrentRenter && (
                             Number(order.playerReceived || 0) > 0 ? (
                               <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }}>
-                                Đã trừ đóng băng & chuyển +{Number(order.playerReceived).toLocaleString('vi-VN')} đ vào số dư khả dụng
+                                {t('orders.payoutDeductedPartial', 'Đã trừ đóng băng & chuyển +{amount} đ vào số dư khả dụng').replace('{amount}', Number(order.playerReceived).toLocaleString('vi-VN'))}
                               </span>
                             ) : (
                               <span style={{ fontSize: '0.78rem', color: '#f43f5e', fontWeight: 600 }}>
-                                Đã khấu trừ 100% từ số dư đóng băng
+                                {t('orders.payoutDeductedFull', 'Đã khấu trừ 100% từ số dư đóng băng')}
                               </span>
                             )
                           )}
@@ -750,12 +759,12 @@ export const OrdersPage = () => {
           border: '1px solid var(--border-color)'
         }}>
           <ShoppingBag size={48} color="var(--text-muted)" style={{ margin: '0 auto 16px auto' }} />
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Chưa Có Đơn Thuê Nào</h3>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>{t('orders.emptyFilter', 'Chưa có đơn thuê nào')}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '16px' }}>
-            Hãy ghé thăm trang khám phá để tìm idol bạn yêu thích và bắt đầu trải nghiệm!
+            {t('orders.emptySubtitle', 'Hãy ghé thăm trang khám phá để tìm idol bạn yêu thích và bắt đầu trải nghiệm!')}
           </p>
           <Link to="/explore" className="btn btn-primary">
-            Tìm Player Ngay
+            {t('orders.exploreNow', 'Tìm Player Ngay')}
           </Link>
         </div>
       )}

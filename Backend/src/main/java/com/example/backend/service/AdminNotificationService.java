@@ -28,7 +28,7 @@ public class AdminNotificationService {
             notificationService.createNotification(
                 admin.getId(),
                 "Nạp tiền mới",
-                String.format("Người dùng %s đã nạp %d coin vào tài khoản", 
+                String.format("Người dùng %s đã nạp %,d đ vào tài khoản", 
                     user.getUsername(), coinAmount),
                 "TOPUP",
                 "/admin/payments/topup",
@@ -46,7 +46,7 @@ public class AdminNotificationService {
             notificationService.createNotification(
                 admin.getId(),
                 "Yêu cầu rút tiền",
-                String.format("Người dùng %s đã  rút %d coin vào tài khoản %s - %s (%s)",
+                String.format("Người dùng %s đã rút %,d đ về tài khoản %s - %s (%s)",
                     user.getUsername(), coinAmount, bankAccountNumber, bankAccountName, bankName),
                 "WITHDRAW",
                 "/admin/payments/withdraw",
@@ -100,7 +100,7 @@ public class AdminNotificationService {
             notificationService.createNotification(
                 admin.getId(),
                 "Giao dịch donate",
-                String.format("Người dùng %s đã donate %d coin cho %s", 
+                String.format("Người dùng %s đã tặng quà %,d đ cho %s", 
                     donor.getUsername(), coinAmount, playerName),
                 "DONATE",
                 "/admin/payments/donate",

@@ -83,10 +83,10 @@ public class OrderExpirationProcessor {
             try {
                 notificationService.createNotification(
                     renter.getId(),
-                    "Đơn thuê đã tự động hủy & Hoàn xu",
+                    "Đơn thuê đã tự động hủy & Hoàn tiền",
                     "Đơn thuê #" + order.getId() + " với player " + (order.getPlayer() != null ? order.getPlayer().getUsername() : "") +
                     " đã tự động hủy do player không xác nhận trong vòng " + pendingTimeoutMinutes + " phút. " +
-                    String.format("%,d", refundCoin) + " xu đã được hoàn lại vào ví của bạn.",
+                    String.format("%,d", refundCoin) + " đ đã được hoàn lại vào ví của bạn.",
                     "order_expired_refund",
                     "/orders",
                     order.getId().toString()

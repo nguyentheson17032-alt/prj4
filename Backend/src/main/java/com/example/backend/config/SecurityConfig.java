@@ -46,6 +46,8 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/game-players/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/order-reviews/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/promotions").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/promotions/**").permitAll()
                 .requestMatchers("/api/payments/vnpay-return").permitAll()
                 .requestMatchers("/api/payments/momo-return").permitAll()
                 .requestMatchers("/api/payments/momo-ipn").permitAll()

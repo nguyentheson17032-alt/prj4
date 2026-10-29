@@ -121,12 +121,14 @@ const AppContent = ({
 
       {!isAdminRoute && (
         <>
-          <BookingModal
-            player={selectedPlayerForHire}
-            isOpen={!!selectedPlayerForHire}
-            onClose={() => setSelectedPlayerForHire(null)}
-            onOpenDeposit={() => setIsDepositOpen(true)}
-          />
+          {selectedPlayerForHire && (
+            <BookingModal
+              player={selectedPlayerForHire}
+              isOpen={!!selectedPlayerForHire}
+              onClose={() => setSelectedPlayerForHire(null)}
+              onOpenDeposit={() => setIsDepositOpen(true)}
+            />
+          )}
           <DepositModal
             isOpen={isDepositOpen}
             onClose={() => setIsDepositOpen(false)}

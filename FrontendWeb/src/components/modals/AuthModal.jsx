@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Lock, User, Mail, Phone, Gamepad2, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { AccountBannedModal } from './AccountBannedModal';
 import '../../styles/modals.css';
 
@@ -20,7 +21,7 @@ const ErrorBox = ({ message }) =>
   ) : null;
 
 // Reusable password input with eye toggle
-const PasswordInput = ({ value, onChange, placeholder, show, onToggle }) => (
+const PasswordInput = ({ value, onChange, placeholder, show, onToggle, toggleTitle }) => (
   <div style={{ position: 'relative' }}>
     <input
       type={show ? 'text' : 'password'}
@@ -39,7 +40,7 @@ const PasswordInput = ({ value, onChange, placeholder, show, onToggle }) => (
         color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
         transition: 'color 0.15s'
       }}
-      title={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+      title={toggleTitle}
     >
       {show ? <EyeOff size={16} /> : <Eye size={16} />}
     </button>
@@ -49,6 +50,7 @@ const PasswordInput = ({ value, onChange, placeholder, show, onToggle }) => (
 export const AuthModal = ({ isOpen, onClose }) => {
   const { login, register } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('LOGIN'); // LOGIN, REGISTER, FORGOT
@@ -155,7 +157,13 @@ export const AuthModal = ({ isOpen, onClose }) => {
         <div className="modal-header">
           <div className="modal-title">
             <Gamepad2 className="gradient-text" size={24} />
-            <span>{mode === 'LOGIN' ? 'Đăng Nhập PlayZone' : mode === 'REGISTER' ? 'Đăng Ký Tài Khoản' : 'Quên Mật Khẩu'}</span>
+            <span>
+              {mode === 'LOGIN'
+                ? t('auth.loginTitle', 'Đăng Nhập PlayZone')
+                : mode === 'REGISTER'
+                ? t('auth.registerTitle', 'Đăng Ký Tài Khoản')
+                : t('auth.forgotTitle', 'Quên Mật Khẩu')}
+            </span>
           </div>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
@@ -173,7 +181,7 @@ export const AuthModal = ({ isOpen, onClose }) => {
             }}
             onClick={() => switchMode('LOGIN')}
           >
-            Đăng Nhập
+            {t('auth.tabLogin', 'Đăng Nhập')}
           </button>
           <button
             type="button"
@@ -184,7 +192,7 @@ export const AuthModal = ({ isOpen, onClose }) => {
             }}
             onClick={() => switchMode('REGISTER')}
           >
-            Tạo Tài Khoản
+            {t('auth.tabRegister', 'Tạo Tài Khoản')}
           </button>
         </div>
 
@@ -192,12 +200,12 @@ export const AuthModal = ({ isOpen, onClose }) => {
           {mode === 'LOGIN' ? (
             <form onSubmit={handleLoginSubmit}>
               <div className="form-group">
-                <label className="form-label">Tên Đăng Nhập hoặc Email:</label>
+                <label className="form-label">{t('auth.usernameOrEmail', 'Tên Đăng Nhập hoặc Email:')}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Nhập username..."
+                    placeholder={t('auth.usernamePlaceholder', 'Nhập username...')}
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); setLoginError(''); }}
                     style={{ paddingRight: '40px' }}
@@ -207,51 +215,52 @@ export const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Mật Khẩu:</label>
+                <label className="form-label">{t('auth.password', 'Mật Khẩu:')}</label>
                 <PasswordInput
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
-                  placeholder="Nhập mật khẩu..."
+                  placeholder={t('auth.passwordPlaceholder', 'Nhập mật khẩu...')}
                   show={showLoginPassword}
                   onToggle={() => setShowLoginPassword(v => !v)}
+                  toggleTitle={showLoginPassword ? t('auth.hidePassword', 'Ẩn mật khẩu') : t('auth.showPassword', 'Hiện mật khẩu')}
                 />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                 <button type="button" style={{ fontSize: '0.82rem', color: 'var(--secondary)' }} onClick={() => switchMode('FORGOT')}>
-                  Quên mật khẩu?
+                  {t('auth.forgotPassword', 'Quên mật khẩu?')}
                 </button>
               </div>
 
               <ErrorBox message={loginError} />
 
               <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', marginTop: '2px' }} disabled={isLoading}>
-                <span>{isLoading ? 'Đang Đăng Nhập...' : 'Đăng Nhập'}</span>
+                <span>{isLoading ? t('auth.loggingIn', 'Đang Đăng Nhập...') : t('auth.loginBtn', 'Đăng Nhập')}</span>
                 <ArrowRight size={18} />
               </button>
 
               {/* Quick account suggestions */}
               <div style={{ marginTop: '16px', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'center', fontWeight: 600 }}>
-                  ⚡ Gợi ý tài khoản đăng nhập nhanh:
+                  {t('auth.quickSuggestions', '⚡ Gợi ý tài khoản đăng nhập nhanh:')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <button
                     type="button"
                     style={{ padding: '8px 10px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.3)', color: '#f43f5e', cursor: 'pointer', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}
                     onClick={() => { setUsername('admin'); setPassword('Admin@123456'); setLoginError(''); }}
-                    title="Bấm để tự động điền tài khoản Quản Trị Viên"
+                    title={t('auth.quickAdminTooltip', 'Bấm để tự động điền tài khoản Quản Trị Viên')}
                   >
-                    <span>🛡️ Quản Trị Viên (Admin)</span>
+                    <span>{t('auth.quickAdmin', '🛡️ Quản Trị Viên (Admin)')}</span>
                     <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>admin / Admin@123456</span>
                   </button>
                   <button
                     type="button"
                     style={{ padding: '8px 10px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', cursor: 'pointer', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}
                     onClick={() => { setUsername('user123'); setPassword('User@123456'); setLoginError(''); }}
-                    title="Bấm để tự động điền tài khoản Thành Viên"
+                    title={t('auth.quickUserTooltip', 'Bấm để tự động điền tài khoản Thành Viên')}
                   >
-                    <span>🎮 Thành Viên (User)</span>
+                    <span>{t('auth.quickUser', '🎮 Thành Viên (User)')}</span>
                     <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>user123 / User@123456</span>
                   </button>
                 </div>
@@ -261,23 +270,23 @@ export const AuthModal = ({ isOpen, onClose }) => {
           ) : mode === 'REGISTER' ? (
             <form onSubmit={handleRegisterSubmit}>
               <div className="form-group">
-                <label className="form-label">Họ và Tên:</label>
+                <label className="form-label">{t('auth.fullName', 'Họ và Tên:')}</label>
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Ví dụ: Nguyễn Thành Nam"
+                  placeholder={t('auth.fullNamePlaceholder', 'Ví dụ: Nguyễn Thành Nam')}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Tên Đăng Nhập <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label">{t('auth.username', 'Tên Đăng Nhập')} <span style={{ color: '#ef4444' }}>*</span></label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Chọn username (ít nhất 3 ký tự)..."
+                    placeholder={t('auth.usernameRegPlaceholder', 'Chọn username (ít nhất 3 ký tự)...')}
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); setRegisterError(''); }}
                     style={{ paddingRight: '40px' }}
@@ -287,7 +296,7 @@ export const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Email <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label">{t('auth.email', 'Email')} <span style={{ color: '#ef4444' }}>*</span></label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="email"
@@ -302,7 +311,7 @@ export const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Số Điện Thoại:</label>
+                <label className="form-label">{t('auth.phone', 'Số Điện Thoại:')}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="tel"
@@ -317,23 +326,24 @@ export const AuthModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Mật Khẩu <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label">{t('auth.password', 'Mật Khẩu')} <span style={{ color: '#ef4444' }}>*</span></label>
                 <PasswordInput
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setRegisterError(''); }}
-                  placeholder="Ít nhất 8 ký tự, gồm chữ hoa, số, ký tự đặc biệt..."
+                  placeholder={t('auth.passwordRegPlaceholder', 'Ít nhất 8 ký tự, gồm chữ hoa, số, ký tự đặc biệt...')}
                   show={showRegisterPassword}
                   onToggle={() => setShowRegisterPassword(v => !v)}
+                  toggleTitle={showRegisterPassword ? t('auth.hidePassword', 'Ẩn mật khẩu') : t('auth.showPassword', 'Hiện mật khẩu')}
                 />
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '5px' }}>
-                  Mật khẩu phải có ít nhất 8 ký tự, 1 chữ hoa, 1 chữ số và 1 ký tự đặc biệt (@#$%...).
+                  {t('auth.passwordHelp', 'Mật khẩu phải có ít nhất 8 ký tự, 1 chữ hoa, 1 chữ số và 1 ký tự đặc biệt (@#$%...).')}
                 </p>
               </div>
 
               <ErrorBox message={registerError} />
 
               <button type="submit" className="btn btn-cyan" style={{ width: '100%', padding: '12px', marginTop: '4px' }} disabled={isLoading}>
-                <span>{isLoading ? 'Đang Tạo Tài Khoản...' : 'Đăng Ký Ngay'}</span>
+                <span>{isLoading ? t('auth.creatingAccount', 'Đang Tạo Tài Khoản...') : t('auth.registerBtn', 'Đăng Ký Ngay')}</span>
                 <ArrowRight size={18} />
               </button>
             </form>
@@ -341,11 +351,11 @@ export const AuthModal = ({ isOpen, onClose }) => {
           ) : (
             <div>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                Nhập địa chỉ email đăng ký để nhận liên kết đặt lại mật khẩu:
+                {t('auth.forgotDesc', 'Nhập địa chỉ email đăng ký để nhận liên kết đặt lại mật khẩu:')}
               </p>
               <div className="form-group">
-                <label className="form-label">Email:</label>
-                <input type="email" className="form-control" placeholder="Email của bạn..." />
+                <label className="form-label">{t('auth.email', 'Email')}:</label>
+                <input type="email" className="form-control" placeholder={t('auth.emailPlaceholder', 'Email của bạn...')} />
               </div>
               <button
                 type="button"
@@ -356,7 +366,7 @@ export const AuthModal = ({ isOpen, onClose }) => {
                   switchMode('LOGIN');
                 }}
               >
-                Gửi Mã Khôi Phục
+                {t('auth.sendRecovery', 'Gửi Mã Khôi Phục')}
               </button>
             </div>
           )}

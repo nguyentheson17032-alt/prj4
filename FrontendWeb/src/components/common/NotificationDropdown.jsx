@@ -23,12 +23,13 @@ import {
 import api from '../../api/apiService';
 import realtimeService from '../../services/realtimeService';
 import { useLanguage } from '../../context/LanguageContext';
+import { localizeNotification } from '../../utils/notificationLocalization';
 import '../../styles/notificationDropdown.css';
 
 /**
  * Format timestamp to relative human-readable string in Vietnamese
  */
-const formatRelativeTime = (timeStr) => {
+const formatRelativeTime = (timeStr, language = 'vi') => {
   if (!timeStr) return '';
   try {
     const date = new Date(timeStr);
@@ -41,11 +42,11 @@ const formatRelativeTime = (timeStr) => {
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffSecs < 60) return 'Vừa xong';
-    if (diffMins < 60) return `${diffMins} phút trước`;
-    if (diffHours < 24) return `${diffHours} giờ trước`;
-    if (diffDays === 1) return 'Hôm qua';
-    if (diffDays < 7) return `${diffDays} ngày trước`;
+    if (diffSecs < 60) return language === 'en' ? 'Just now' : 'Vừa xong';
+    if (diffMins < 60) return language === 'en' ? `${diffMins}m ago` : `${diffMins} phút trước`;
+    if (diffHours < 24) return language === 'en' ? `${diffHours}h ago` : `${diffHours} giờ trước`;
+    if (diffDays === 1) return language === 'en' ? 'Yesterday' : 'Hôm qua';
+    if (diffDays < 7) return language === 'en' ? `${diffDays}d ago` : `${diffDays} ngày trước`;
 
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -142,7 +143,7 @@ const getNotificationTypeConfig = (type) => {
 };
 
 export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCountChange }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'unread'
@@ -385,14 +386,15 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
             </div>
             <div className="notif-empty-sub">
               {activeTab === 'unread'
-                ? 'Tuyệt vời! Bạn đã xem hết tất cả thông báo của mình.'
-                : 'Các cập nhật đơn thuê, tin nhắn và biến động số dư sẽ hiển thị tại đây.'}
+                ? t('notif.emptyUnreadSub', 'Tuyệt vời! Bạn đã xem hết tất cả thông báo của mình.')
+                : t('notif.emptySub', 'Các cập nhật đơn thuê, tin nhắn và biến động số dư sẽ hiển thị tại đây.')}
             </div>
           </div>
         ) : (
           displayedNotifications.map((item) => {
             const isUnread = isItemUnread(item);
             const config = getNotificationTypeConfig(item.type);
+            const localized = localizeNotification(item, language);
 
             return (
               <div
@@ -407,26 +409,26 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
 
                 {/* Content */}
                 <div className="notif-content">
-                  <div className="notif-item-title" title={item.title}>
-                    {item.title || 'Thông báo hệ thống'}
+                  <div className="notif-item-title" title={localized.title}>
+                    {localized.title || (language === 'en' ? 'System notification' : 'Thông báo hệ thống')}
                   </div>
 
                   <div className="notif-item-message">
-                    {cleanMessageText(item.message)}
+                    {cleanMessageText(localized.message)}
                   </div>
 
                   {/* Metadata Row: Time + Unread indicator / Quick actions */}
                   <div className="notif-item-meta">
                     <span className="notif-item-time">
                       <Clock size={11} />
-                      {formatRelativeTime(item.createdAt)}
+                      {formatRelativeTime(item.createdAt, language)}
                     </span>
 
                     <div className="notif-item-meta-right">
                       {isUnread && (
                         <span className="notif-pill-unread">
                           <span className="notif-pill-dot" />
-                          Mới
+                          {t('notif.newBadge', 'mới')}
                         </span>
                       )}
 
@@ -435,7 +437,7 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
                           <button
                             className="notif-mini-btn mark-read"
                             onClick={(e) => handleMarkAsRead(e, item.id)}
-                            title="Đánh dấu đã đọc"
+                            title={t('notif.markRead', 'Đánh dấu đã đọc')}
                           >
                             <Check size={13} />
                           </button>
@@ -443,7 +445,7 @@ export const NotificationDropdown = ({ isOpen, onClose, unreadCount, onUnreadCou
                         <button
                           className="notif-mini-btn"
                           onClick={(e) => handleDelete(e, item.id)}
-                          title="Xóa thông báo"
+                          title={t('notif.deleteNotif', 'Xóa thông báo')}
                         >
                           <Trash2 size={13} />
                         </button>
