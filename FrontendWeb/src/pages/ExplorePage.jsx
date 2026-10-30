@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, SlidersHorizontal, Gamepad2, Sparkles, RefreshCw } from 'lucide-react';
 import PlayerCard from '../components/player/PlayerCard';
 import api from '../api/apiService';
+import { useLanguage } from '../context/LanguageContext';
 
 export const ExplorePage = ({ onHirePlayer }) => {
+  const { t, language } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [players, setPlayers] = useState([]);
   const [games, setGames] = useState([]);
@@ -105,10 +107,10 @@ export const ExplorePage = ({ onHirePlayer }) => {
       {/* Header */}
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '8px' }}>
-          Khám Phá <span className="gradient-text">Idol & Duo Player</span>
+          {t('explore.title', 'Khám Phá')} <span className="gradient-text">{t('explore.titleHighlight', 'Idol & Duo Player')}</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Tìm kiếm và chọn lọc theo Game, Kỹ năng, Giới tính, Giọng nói và Mức giá phù hợp.
+          {t('explore.subtitle', 'Tìm kiếm và chọn lọc theo Game, Kỹ năng, Giới tính, Giọng nói và Mức giá phù hợp.')}
         </p>
       </div>
 
@@ -135,7 +137,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
               type="text"
               className="form-control"
               style={{ paddingLeft: '36px' }}
-              placeholder="Tìm theo tên, bio..."
+              placeholder={t('explore.searchPlaceholder', 'Tìm theo tên, bio...')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -148,7 +150,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
               value={selectedGame}
               onChange={(e) => setSelectedGame(e.target.value)}
             >
-              <option value="ALL">🎮 Tất Cả Các Game</option>
+              <option value="ALL">{t('explore.allGames', '🎮 Tất Cả Các Game')}</option>
               {games.map((g) => (
                 <option key={g.id} value={g.name}>{g.icon} {g.name}</option>
               ))}
@@ -162,9 +164,9 @@ export const ExplorePage = ({ onHirePlayer }) => {
               value={gender}
               onChange={(e) => setGender(e.target.value)}
             >
-              <option value="ALL">🚻 Giới Tính: Tất Cả</option>
-              <option value="FEMALE">🎀 Nữ (Idol Xinh)</option>
-              <option value="MALE">🔥 Nam (Boy One Champ)</option>
+              <option value="ALL">{t('explore.allGenders', '🚻 Giới Tính: Tất Cả')}</option>
+              <option value="FEMALE">{t('explore.female', '🎀 Nữ (Idol Xinh)')}</option>
+              <option value="MALE">{t('explore.male', '🔥 Nam (Boy One Champ)')}</option>
             </select>
           </div>
 
@@ -175,8 +177,8 @@ export const ExplorePage = ({ onHirePlayer }) => {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
-              <option value="ALL">🟢 Trạng Thái: Tất Cả</option>
-              <option value="ONLINE">⚡ Đang Online Sẵn Sàng</option>
+              <option value="ALL">{t('explore.allStatuses', '🟢 Trạng Thái: Tất Cả')}</option>
+              <option value="ONLINE">{t('explore.onlineStatus', '⚡ Đang Online Sẵn Sàng')}</option>
             </select>
           </div>
 
@@ -187,10 +189,10 @@ export const ExplorePage = ({ onHirePlayer }) => {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
-              <option value="RATING">⭐ Đánh Giá Cao Nhất</option>
-              <option value="POPULAR">🔥 Lượt Thuê Nhiều Nhất</option>
-              <option value="PRICE_ASC">💰 Giá: Thấp Đến Cao</option>
-              <option value="PRICE_DESC">💎 Giá: Cao Đến Thấp</option>
+              <option value="RATING">{t('explore.sortRating', '⭐ Đánh Giá Cao Nhất')}</option>
+              <option value="POPULAR">{t('explore.sortPopular', '🔥 Lượt Thuê Nhiều Nhất')}</option>
+              <option value="PRICE_ASC">{t('explore.sortPriceAsc', '💰 Giá: Thấp Đến Cao')}</option>
+              <option value="PRICE_DESC">{t('explore.sortPriceDesc', '💎 Giá: Cao Đến Thấp')}</option>
             </select>
           </div>
         </div>
@@ -207,7 +209,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
           gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>Mức giá tối đa:</span>
+            <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{t('explore.maxPrice', 'Mức giá tối đa:')}</span>
             <input
               type="range"
               min="30000"
@@ -218,21 +220,21 @@ export const ExplorePage = ({ onHirePlayer }) => {
               style={{ width: '140px', accentColor: 'var(--primary)' }}
             />
             <span style={{ fontWeight: 800, color: 'var(--accent-pink)', fontSize: '0.92rem' }}>
-              ≤ {priceMax.toLocaleString('vi-VN')} đ/h
+              ≤ {priceMax.toLocaleString('vi-VN')} {t('explore.perHour', 'đ/h')}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-              Tìm thấy <strong style={{ color: 'var(--text-primary)' }}>{filteredPlayers.length}</strong> player phù hợp
+              {t('explore.foundPlayers', 'Tìm thấy {count} player phù hợp').replace('{count}', filteredPlayers.length)}
             </span>
             <button
               className="btn btn-outline btn-sm"
               onClick={handleResetFilters}
-              title="Đặt lại bộ lọc"
+              title={t('explore.resetFiltersTooltip', 'Đặt lại bộ lọc')}
             >
               <RefreshCw size={14} />
-              <span>Đặt lại</span>
+              <span>{t('explore.resetFilters', 'Đặt lại')}</span>
             </button>
           </div>
         </div>
@@ -241,7 +243,7 @@ export const ExplorePage = ({ onHirePlayer }) => {
       {/* Players Grid */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
-          Đang tải danh sách player...
+          {t('explore.loading', 'Đang tải danh sách player...')}
         </div>
       ) : filteredPlayers.length > 0 ? (
         <div className="grid-cards">
@@ -262,12 +264,12 @@ export const ExplorePage = ({ onHirePlayer }) => {
           border: '1px solid var(--border-color)'
         }}>
           <Gamepad2 size={48} color="var(--text-muted)" style={{ margin: '0 auto 16px auto' }} />
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Không Tìm Thấy Player Nào Phù Hợp</h3>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>{t('explore.noMatchTitle', 'Không Tìm Thấy Player Nào Phù Hợp')}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '16px' }}>
-            Hãy thử tìm với từ khóa khác hoặc điều chỉnh lại bộ lọc giá và thể loại game.
+            {t('explore.noMatchDesc', 'Hãy thử tìm với từ khóa khác hoặc điều chỉnh lại bộ lọc giá và thể loại game.')}
           </p>
           <button className="btn btn-primary" onClick={handleResetFilters}>
-            Xóa Toàn Bộ Bộ Lọc
+            {t('explore.clearFilters', 'Xóa Toàn Bộ Bộ Lọc')}
           </button>
         </div>
       )}

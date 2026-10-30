@@ -120,7 +120,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
               <Check size={36} />
             </div>
             <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '6px' }}>
-              Nạp Tiền Thành Công!
+              {t('deposit.successTitle', 'Nạp Tiền Thành Công!')}
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
               Coin đã được cộng tự động vào ví PlayZone qua {lastDepositInfo?.method || paymentMethod}.
@@ -139,15 +139,15 @@ export const DepositModal = ({ isOpen, onClose }) => {
               gap: '10px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                <span>Phương thức thanh toán:</span>
+                <span>{t('deposit.paymentMethod', 'Phương thức thanh toán:')}</span>
                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {lastDepositInfo?.method === 'MOMO' ? 'Ví MoMo' :
-                   lastDepositInfo?.method === 'ZALOPAY' ? 'Ví ZaloPay' :
-                   lastDepositInfo?.method === 'VNPAY' ? 'Cổng VNPay' : 'VietQR Quét Mã'}
+                  {lastDepositInfo?.method === 'MOMO' ? t('deposit.momoWallet', 'Ví MoMo') :
+                   lastDepositInfo?.method === 'ZALOPAY' ? t('deposit.zaloPayWallet', 'Ví ZaloPay') :
+                   lastDepositInfo?.method === 'VNPAY' ? t('deposit.vnpayGateway', 'Cổng VNPay') : t('deposit.vietqrCode', 'VietQR Quét Mã')}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                <span>Mệnh giá nạp:</span>
+                <span>{t('deposit.denom', 'Mệnh giá nạp:')}</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{(lastDepositInfo?.amount || amount).toLocaleString('vi-VN')} đ</span>
               </div>
               {lastDepositInfo?.bonusAmount > 0 && (
@@ -166,7 +166,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
                 fontSize: '1rem',
                 fontWeight: 800
               }}>
-                <span>Tổng coin thực nhận:</span>
+                <span>{t('deposit.totalReceived', 'Tổng coin thực nhận:')}</span>
                 <span style={{ color: 'var(--accent-green)' }}>+{(lastDepositInfo?.totalReceived || totalReceived).toLocaleString('vi-VN')} đ</span>
               </div>
             </div>
@@ -185,7 +185,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
             </div>
 
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleClose}>
-              Xác Nhận & Tiếp Tục
+              {t('deposit.continueBtn', 'Xác Nhận & Tiếp Tục')}
             </button>
           </div>
         ) : (
@@ -233,19 +233,19 @@ export const DepositModal = ({ isOpen, onClose }) => {
               marginBottom: '20px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                <span>Mệnh giá thanh toán:</span>
+                <span>{t('deposit.paymentAmount', 'Mệnh giá thanh toán:')}</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{amount.toLocaleString('vi-VN')} đ</span>
               </div>
               {bonusAmount > 0 ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--accent-pink)', marginBottom: '8px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Sparkles size={14} /> Thưởng thêm ({selectedPreset.bonus}):
+                    <Sparkles size={14} /> {t('deposit.bonus', 'Thưởng thêm ({bonus}):').replace('{bonus}', selectedPreset.bonus)}
                   </span>
                   <span style={{ fontWeight: 700 }}>+{bonusAmount.toLocaleString('vi-VN')} đ</span>
                 </div>
               ) : (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  💡 <em>Chọn gói từ 100.000 đ để nhận thêm ưu đãi thưởng đến +20% coin</em>
+                  <em>{t('deposit.bonusPromoTip', '💡 Chọn gói từ 100.000 đ để nhận thêm ưu đãi thưởng đến +20% coin')}</em>
                 </div>
               )}
               <div style={{
@@ -291,7 +291,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '10px 4px' }}
                 >
                   <Sparkles size={20} color="#ec4899" />
-                  <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>Ví MoMo</span>
+                  <span style={{ fontSize: '0.76rem', fontWeight: 600 }}>{t('deposit.momoWallet', 'Ví MoMo')}</span>
                 </button>
                 <button
                   type="button"
@@ -345,7 +345,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
                 marginTop: '16px'
               }}>
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ec4899', marginBottom: '6px' }}>
-                  Cổng Thanh Toán Ví MoMo
+                  {t('deposit.momoTitle', 'Cổng Thanh Toán Ví MoMo')}
                 </div>
                 <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 }}>
                   {t('deposit.momoDesc', 'Thanh toán siêu tốc qua ứng dụng MoMo bằng mã QR hoặc tài khoản ví MoMo.')}
@@ -363,7 +363,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
                 marginTop: '16px'
               }}>
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0068ff', marginBottom: '6px' }}>
-                  Cổng Thanh Toán Ví ZaloPay
+                  {t('deposit.zalopayTitle', 'Cổng Thanh Toán Ví ZaloPay')}
                 </div>
                 <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 }}>
                   {t('deposit.zalopayDesc', 'Thanh toán qua ví ZaloPay hoặc quét mã QR trong app Zalo bảo mật 100%.')}
@@ -381,7 +381,7 @@ export const DepositModal = ({ isOpen, onClose }) => {
                 marginTop: '16px'
               }}>
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#3b82f6', marginBottom: '6px' }}>
-                  Cổng Quốc Gia VNPay-QR
+                  {t('deposit.vnpayTitle', 'Cổng Quốc Gia VNPay-QR')}
                 </div>
                 <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 }}>
                   {t('deposit.vnpayDesc', 'Hỗ trợ hơn 40 ngân hàng nội địa Việt Nam và thẻ quốc tế Visa / Mastercard.')}

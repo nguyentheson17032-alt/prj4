@@ -51,13 +51,13 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
 
   const handleConfirmBooking = async () => {
     if (!hasEnoughBalance) {
-      addToast('Số dư trong ví không đủ, vui lòng nạp thêm!', 'error');
+      addToast(t('booking.insufficientBalance', 'Số dư trong ví không đủ, vui lòng nạp thêm!'), 'error');
       onOpenDeposit();
       return;
     }
 
     if (!user?.id) {
-      addToast('Vui lòng đăng nhập để thuê player!', 'error');
+      addToast(t('booking.loginRequired', 'Vui lòng đăng nhập để thuê player!'), 'error');
       return;
     }
 
@@ -73,7 +73,7 @@ export const BookingModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
       )
     );
     if (isOwner) {
-      addToast('Bạn không thể tự thuê chính mình!', 'warning');
+      addToast(t('booking.cannotHireSelf', 'Bạn không thể tự thuê chính mình!'), 'warning');
       onClose();
       return;
     }

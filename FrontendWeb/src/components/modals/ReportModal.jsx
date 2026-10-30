@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import '../../styles/modals.css';
 
@@ -22,6 +23,7 @@ const REPORT_REASONS = [
 const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
   const { user, isAuthenticated } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
 
   const [reason, setReason] = useState(REPORT_REASONS[0].id);
   const [description, setDescription] = useState('');
@@ -124,14 +126,14 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
               }}
             >
               <ShieldAlert size={14} />
-              <span>Hệ Thống Khiếu Nại & Bảo Vệ Khách Hàng</span>
+              <span>{t('report.systemTag', 'Hệ Thống Khiếu Nại & Bảo Vệ Khách Hàng')}</span>
             </div>
 
             <h2 style={{ fontSize: '1.45rem', fontWeight: 900, marginBottom: '6px' }}>
-              Gửi Khiếu Nại & <span className="gradient-text" style={{ background: 'linear-gradient(135deg, #f43f5e, #fb7185)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Tố Cáo Idol</span>
+              {t('report.titlePrefix', 'Gửi Khiếu Nại &')} <span className="gradient-text" style={{ background: 'linear-gradient(135deg, #f43f5e, #fb7185)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('report.titleHighlight', 'Tố Cáo Idol')}</span>
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '440px', margin: '0 auto' }}>
-              Khiếu nại sẽ được Quản Trị Viên đối soát, hoàn tiền vào số dư khả dụng và xử phạt idol vi phạm.
+              {t('report.desc', 'Khiếu nại sẽ được Quản Trị Viên đối soát, hoàn tiền vào số dư khả dụng và xử phạt idol vi phạm.')}
             </p>
           </div>
         </div>
@@ -201,7 +203,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
           {/* Reason Selectable Pills */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, marginBottom: '10px' }}>
-              Lý do khiếu nại tố cáo <span style={{ color: '#f43f5e' }}>*</span>:
+              {t('report.reasonLabel', 'Lý Do Khiếu Nại *:')}
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px' }}>
               {REPORT_REASONS.map((r) => {
@@ -226,7 +228,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 700, margin: 0 }}>
-                Mô tả chi tiết vụ việc <span style={{ color: '#f43f5e' }}>*</span>:
+                {t('report.descLabel', 'Mô Tả Chi Tiết Vi Phạm *:')}
               </label>
               <span style={{ fontSize: '0.76rem', color: description.length > 900 ? '#f43f5e' : 'var(--text-muted)' }}>
                 {description.length}/1000 ký tự
@@ -238,7 +240,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
               onChange={(e) => setDescription(e.target.value)}
               required
               maxLength={1000}
-              placeholder="Mô tả cụ thể thời gian, diễn biến vụ việc, hành vi vi phạm hoặc các thỏa thuận không được idol thực hiện..."
+              placeholder={t('report.descPlaceholder', 'Mô tả chi tiết sự việc, thời gian diễn ra và hành vi vi phạm của player...')}
               rows={4}
               style={{
                 width: '100%',
@@ -332,7 +334,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
               onClick={handleClose}
               disabled={submitting}
             >
-              Hủy Bỏ
+              {t('report.cancelBtn', 'Hủy')}
             </button>
             <button
               type="submit"
@@ -353,11 +355,11 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
               disabled={submitting}
             >
               {submitting ? (
-                <span>Đang gửi khiếu nại...</span>
+                <span>{t('report.submitting', 'Đang Gửi...')}</span>
               ) : (
                 <>
                   <Send size={15} />
-                  <span>Gửi Khiếu Nại</span>
+                  <span>{t('report.submitBtn', 'Gửi Khiếu Nại')}</span>
                 </>
               )}
             </button>

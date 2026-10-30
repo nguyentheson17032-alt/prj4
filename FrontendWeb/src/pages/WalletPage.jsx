@@ -59,11 +59,11 @@ const formatTransactionDate = (dateVal) => {
   return `${hours}:${minutes} ${day}/${month}/${year}`;
 };
 
-const renderStatusBadge = (tx) => {
+const renderStatusBadge = (tx, t) => {
   // 1. Giao dịch Rút Tiền
   if (tx.type === 'WITHDRAW') {
     if (tx.status === 'COMPLETED') {
-      return <span className="badge badge-online">Thành Công</span>;
+      return <span className="badge badge-online">{t ? t('wallet.stSuccess', 'Thành Công') : 'Thành Công'}</span>;
     }
     if (tx.status === 'REJECTED' || tx.status === 'REFUNDED') {
       return (
@@ -90,29 +90,29 @@ const renderStatusBadge = (tx) => {
           fontWeight: 700
         }}
       >
-        ⏳ Đang Chờ Duyệt
+        {t ? t('wallet.stAwaitingReview', '⏳ Đang Chờ Duyệt') : '⏳ Đang Chờ Duyệt'}
       </span>
     );
   }
 
   // 2. Giao dịch Nhận Tiền Hoàn (cộng lại tiền vào ví)
   if (tx.type === 'REFUND') {
-    return <span className="badge badge-online">Thành Công</span>;
+    return <span className="badge badge-online">{t ? t('wallet.stSuccess', 'Thành Công') : 'Thành Công'}</span>;
   }
 
   // 3. Giao dịch Nạp Tiền
   if (tx.type === 'DEPOSIT') {
     if (tx.status === 'COMPLETED') {
-      return <span className="badge badge-online">Thành Công</span>;
+      return <span className="badge badge-online">{t ? t('wallet.stSuccess', 'Thành Công') : 'Thành Công'}</span>;
     }
     if (tx.status === 'FAILED') {
-      return <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>Thất Bại</span>;
+      return <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>{t ? t('wallet.stFailed', 'Thất Bại') : 'Thất Bại'}</span>;
     }
-    return <span className="badge badge-warning">Đang Xử Lý</span>;
+    return <span className="badge badge-warning">{t ? t('wallet.stProcessing', 'Đang Xử Lý') : 'Đang Xử Lý'}</span>;
   }
 
-  // 4. Giao dịch Thuê Duo (- Thuê Duo) hoặc Nhận tiền thuê (+ Nhận Tiền Thuê)
-  // 4.1 Đơn tố cáo CHƯA ĐƯỢC DUYỆT -> Hiện "↺ Khiếu Nại & Xử Lý"
+  // 4. Giao dịch Thuê Duo (- Thuê Duo) hoặc Nhận tiền thuê ({t('wallet.typeReceive', '+ Nhận Tiền Thuê')})
+  // 4.1 Đơn tố cáo CHƯA ĐƯỢC DUYỆT -> Hiện "{t ? t('wallet.stDisputed', '↺ Khiếu Nại & Xử Lý') : '↺ Khiếu Nại & Xử Lý'}"
   if (tx.status === 'DISPUTED_PENDING' || tx.status === 'DISPUTED') {
     return (
       <span
@@ -124,7 +124,7 @@ const renderStatusBadge = (tx) => {
           fontWeight: 700
         }}
       >
-        ↺ Khiếu Nại & Xử Lý
+        {t ? t('wallet.stDisputed', '↺ Khiếu Nại & Xử Lý') : '↺ Khiếu Nại & Xử Lý'}
       </span>
     );
   }
@@ -142,7 +142,7 @@ const renderStatusBadge = (tx) => {
           fontWeight: 700
         }}
       >
-        {tx.type === 'PAYMENT' ? `Đã Hoàn Tiền${percentText}` : 'Khấu Trừ Khiếu Nại'}
+        {tx.type === 'PAYMENT' ? (t ? `${t('wallet.stRefunded', 'Đã Hoàn Tiền')}${percentText}` : `Đã Hoàn Tiền${percentText}`) : (t ? t('wallet.stDeductedDispute', 'Khấu Trừ Khiếu Nại') : 'Khấu Trừ Khiếu Nại')}
       </span>
     );
   }
@@ -166,7 +166,7 @@ const renderStatusBadge = (tx) => {
 
   // 4.4 Các trạng thái đơn thuê thông thường
   if (tx.status === 'COMPLETED') {
-    return <span className="badge badge-online">Thành Công</span>;
+    return <span className="badge badge-online">{t ? t('wallet.stSuccess', 'Thành Công') : 'Thành Công'}</span>;
   }
   if (tx.status === 'FROZEN') {
     return (
@@ -178,12 +178,12 @@ const renderStatusBadge = (tx) => {
           border: '1px solid rgba(245, 158, 11, 0.3)'
         }}
       >
-        ⏳ Đang Đóng Băng
+        {t ? t('wallet.stFrozen', '⏳ Đang Đóng Băng') : '⏳ Đang Đóng Băng'}
       </span>
     );
   }
   if (tx.status === 'CONFIRMED') {
-    return <span className="badge badge-primary">Đang Diễn Ra</span>;
+    return <span className="badge badge-primary">{t ? t('wallet.stOngoing', 'Đang Diễn Ra') : 'Đang Diễn Ra'}</span>;
   }
   if (tx.status === 'PENDING') {
     return (
@@ -201,7 +201,7 @@ const renderStatusBadge = (tx) => {
         className="badge"
         style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}
       >
-        {tx.status === 'EXPIRED' ? 'Hết Hạn (Đã Hoàn Xu)' : 'Đã Hủy'}
+        {tx.status === 'EXPIRED' ? (t ? t('wallet.stExpiredRefunded', 'Hết Hạn (Đã Hoàn Xu)') : 'Hết Hạn (Đã Hoàn Xu)') : (t ? t('wallet.stCancelled', 'Đã Hủy') : 'Đã Hủy')}
       </span>
     );
   }
@@ -312,7 +312,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
             if (isResolvedRefund) {
               renterTxStatus = 'REFUNDED'; // Đã duyệt khiếu nại & hoàn tiền -> "Đã Hoàn Tiền"
             } else if (isDisputedPending) {
-              renterTxStatus = 'DISPUTED_PENDING'; // Chưa duyệt -> "↺ Khiếu Nại & Xử Lý"
+              renterTxStatus = 'DISPUTED_PENDING'; // Chưa duyệt -> "{t ? t('wallet.stDisputed', '↺ Khiếu Nại & Xử Lý') : '↺ Khiếu Nại & Xử Lý'}"
             } else if (isReportRejected) {
               renterTxStatus = 'REPORT_REJECTED'; // Bác bỏ khiếu nại -> "Bác Bỏ Khiếu Nại"
             }
@@ -651,9 +651,9 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
           <div className="balance-card-hero">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="balance-title" style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '0.3px' }}>SỐ DƯ KHẢ DỤNG</span>
+                <span className="balance-title" style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '0.3px' }}>{t('wallet.availableBalanceCard', 'SỐ DƯ KHẢ DỤNG')}</span>
                 <span style={{ fontSize: '0.72rem', background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '12px', fontWeight: 700, border: '1px solid rgba(16,185,129,0.3)' }}>
-                  Sẵn sàng sử dụng
+                  {t('wallet.readyToUse', 'Sẵn sàng sử dụng')}
                 </span>
               </div>
               <Wallet size={24} color="#06b6d4" />
@@ -664,7 +664,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
             </div>
 
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: effectiveFrozen > 0 ? '14px' : '20px' }}>
-              Số dư có thể dùng ngay để thuê Idol, gửi tặng quà hoặc rút tiền.
+              {t('wallet.readyToUseDesc', 'Số dư có thể dùng ngay để thuê Idol, gửi tặng quà hoặc rút tiền.')}
             </p>
 
             {effectiveFrozen > 0 ? (
@@ -681,14 +681,14 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontSize: '0.88rem', fontWeight: 700 }}>
                     <Clock size={16} />
-                    <span>Số Dư Đang Đóng Băng (Pending):</span>
+                    <span>{t('wallet.pendingEscrowTitle', 'Số Dư Đang Đóng Băng (Pending):')}</span>
                   </div>
                   <span style={{ color: '#f59e0b', fontWeight: 900, fontSize: '1.05rem' }}>
                     {effectiveFrozen.toLocaleString('vi-VN')} đ
                   </span>
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45, background: 'rgba(0,0,0,0.15)', padding: '6px 10px', borderRadius: '6px' }}>
-                  ⚡ <strong>Cơ chế tự động:</strong> Tiền đơn thuê sẽ được tự động cộng vào <strong>Số Dư Khả Dụng</strong> sau 24h kể từ khi đơn kết thúc, hoặc ngay khi khách hàng đánh giá từ 4★ trở lên.
+                  {t('wallet.autoReleaseMechanism', '⚡ Cơ chế tự động: Tiền đơn thuê sẽ được tự động cộng vào Số Dư Khả Dụng sau 24h kể từ khi đơn kết thúc, hoặc ngay khi khách hàng đánh giá từ 4★ trở lên.')}
                 </div>
               </div>
             ) : (
@@ -706,7 +706,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
               }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Clock size={14} />
-                  <span>Đang đóng băng:</span>
+                  <span>{t('wallet.frozenEscrow', 'Đang đóng băng:')}</span>
                 </span>
                 <span style={{ fontWeight: 600 }}>0 đ</span>
               </div>
@@ -744,13 +744,13 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
           <div className="glass-panel" style={{ padding: '20px' }}>
             <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldCheck size={18} color="var(--accent-green)" />
-              <span>Chính Sách & Bảo Vệ Tài Chính</span>
+              <span>{t('wallet.financialProtection', 'Chính Sách & Bảo Vệ Tài Chính')}</span>
             </h4>
             <ul style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-              <li>• <strong>Số dư khả dụng:</strong> Tiền sẵn sàng trong tài khoản dùng để thuê hoặc rút tiền bất cứ lúc nào.</li>
-              <li>• <strong>Giải ngân tự động sau 24h:</strong> Sau khi hoàn thành đơn thuê, hệ thống tạm giữ thu nhập trong 24h để đảm bảo quyền lợi khiếu nại. Hết 24h, tiền tự động vào số dư khả dụng.</li>
-              <li>• <strong>Giải ngân siêu tốc:</strong> Nếu khách hàng đánh giá đơn từ 4 sao trở lên, tiền lập tức vào số dư khả dụng mà không cần chờ 24h.</li>
-              <li>• <strong>Nạp tiền VietQR:</strong> Khớp lệnh nạp tự động 24/7 chỉ trong vài giây.</li>
+              <li>{t('wallet.fp1', '• Số dư khả dụng: Tiền sẵn sàng trong tài khoản dùng để thuê hoặc rút tiền bất cứ lúc nào.')}</li>
+              <li>{t('wallet.fp2', '• Giải ngân tự động sau 24h: Sau khi hoàn thành đơn thuê, hệ thống tạm giữ thu nhập trong 24h để đảm bảo quyền lợi khiếu nại. Hết 24h, tiền tự động vào số dư khả dụng.')}</li>
+              <li>{t('wallet.fp3', '• Giải ngân siêu tốc: Nếu khách hàng đánh giá đơn từ 4 sao trở lên, tiền lập tức vào số dư khả dụng mà không cần chờ 24h.')}</li>
+              <li>{t('wallet.fp4', '• Nạp tiền VietQR: Khớp lệnh nạp tự động 24/7 chỉ trong vài giây.')}</li>
             </ul>
           </div>
         </div>
@@ -827,12 +827,12 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
             <table className="history-table">
               <thead>
                 <tr>
-                  <th>Mã Giao Dịch</th>
-                  <th>Loại</th>
-                  <th>Nội Dung</th>
-                  <th>Số Tiền</th>
-                  <th>Thời Gian</th>
-                  <th>Trạng Thái</th>
+                  <th>{t('wallet.colTxId', 'Mã Giao Dịch')}</th>
+                  <th>{t('wallet.colType', 'Loại')}</th>
+                  <th>{t('wallet.colDesc', 'Nội Dung')}</th>
+                  <th>{t('wallet.colAmount', 'Số Tiền')}</th>
+                  <th>{t('wallet.colTime', 'Thời Gian')}</th>
+                  <th>{t('wallet.colStatus', 'Trạng Thái')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -841,7 +841,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                     <tr key={tx.id}>
                       <td style={{ fontWeight: 700, color: 'var(--text-muted)' }}>#{tx.id}</td>
                       <td>
-                        {tx.type === 'DEPOSIT' && <span className="badge badge-online">+ Nạp Tiền</span>}
+                        {tx.type === 'DEPOSIT' && <span className="badge badge-online">{t('wallet.typeDeposit', '+ Nạp Tiền')}</span>}
                         {tx.type === 'WITHDRAW' && (
                           <span
                             className="badge"
@@ -855,26 +855,26 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                             ⬆ Rút Tiền
                           </span>
                         )}
-                        {tx.type === 'PAYMENT' && <span className="badge badge-primary">- Thuê Duo</span>}
+                        {tx.type === 'PAYMENT' && <span className="badge badge-primary">{t('wallet.typeHire', '- Thuê Duo')}</span>}
                         {tx.type === 'RECEIVE' && (
                           tx.status === 'FROZEN' ? (
                             <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
-                              ⏳ Tiền Tạm Giữ
+                              {t('wallet.typeEscrow', '⏳ Tiền Tạm Giữ')}
                             </span>
                           ) : (
                             <span className="badge badge-online" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                              + Nhận Tiền Thuê
+                              {t('wallet.typeReceive', '+ Nhận Tiền Thuê')}
                             </span>
                           )
                         )}
                         {tx.type === 'DONATE' && (
                           tx.amount > 0 ? (
                             <span className="badge badge-online" style={{ background: 'rgba(236, 72, 153, 0.15)', color: '#ec4899', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
-                              🎁 + Nhận Quà
+                              {t('wallet.typeGiftReceive', '🎁 + Nhận Quà')}
                             </span>
                           ) : (
                             <span className="badge badge-vip" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
-                              🎁 - Tặng Quà
+                              {t('wallet.typeGiftSend', '🎁 - Tặng Quà')}
                             </span>
                           )
                         )}
@@ -888,7 +888,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                               fontWeight: 700
                             }}
                           >
-                            ↺ Nhận Tiền Hoàn
+                            {t('wallet.typeRefund', '↺ Nhận Tiền Hoàn')}
                           </span>
                         )}
                       </td>
@@ -943,14 +943,14 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{tx.date}</td>
                       <td>
-                        {renderStatusBadge(tx)}
+                        {renderStatusBadge(tx, t)}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                      Chưa có lịch sử giao dịch nào
+                      {t('wallet.emptyHistory', 'Chưa có lịch sử giao dịch nào')}
                     </td>
                   </tr>
                 )}

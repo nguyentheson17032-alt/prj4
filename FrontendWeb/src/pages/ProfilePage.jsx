@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getUserAvatar, getFunAvatar, FUN_AVATAR_STYLES } from '../utils/avatarUtils';
 import api from '../api/apiService';
 
@@ -378,6 +379,7 @@ const StatCard = ({ icon, label, value, color, suffix = '', sublabel = '', onCli
 export const ProfilePage = () => {
   const { user, updateProfile, isPlayer } = useAuth();
   const { addToast } = useToast();
+  const { t, language } = useLanguage();
 
   // Profile form state
   const [fullName, setFullName] = useState(user?.fullName || '');
@@ -587,10 +589,10 @@ export const ProfilePage = () => {
     <div className="container animate-fade-in" style={{ maxWidth: '800px', paddingBottom: '80px' }}>
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '8px' }}>
-          Hồ Sơ Cá Nhân & <span className="gradient-text">Cài Đặt Tài Khoản</span>
+          {t('profile.title', 'Hồ Sơ Cá Nhân &')} <span className="gradient-text">{t('profile.titleHighlight', 'Cài Đặt Tài Khoản')}</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Quản lý thông tin bảo mật, số điện thoại và thông tin hiển thị của bạn.
+          {t('profile.subtitle', 'Quản lý thông tin bảo mật, số điện thoại và thông tin hiển thị của bạn.')}
         </p>
       </div>
 
@@ -600,7 +602,7 @@ export const ProfilePage = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <Award size={20} color="var(--primary)" />
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>
-              Thông Tin <span className="gradient-text">Idol</span> Của Tôi
+              {t('profile.myIdolInfo', 'Thông Tin Idol Của Tôi')}
             </h3>
             {playerProfile?.status && (
               <span style={{
@@ -608,13 +610,13 @@ export const ProfilePage = () => {
                 background: playerProfile.status === 'AVAILABLE' ? 'rgba(34,197,94,0.15)' : playerProfile.status === 'PENDING' ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
                 color: playerProfile.status === 'AVAILABLE' ? '#22c55e' : playerProfile.status === 'PENDING' ? '#fbbf24' : '#ef4444',
               }}>
-                {playerProfile.status === 'AVAILABLE' ? 'Đang hoạt động' : playerProfile.status === 'PENDING' ? 'Chờ duyệt' : playerProfile.status === 'HIRED' ? 'Đang được thuê' : playerProfile.status}
+                {playerProfile.status === 'AVAILABLE' ? t('profile.active', 'Đang hoạt động') : playerProfile.status === 'PENDING' ? t('profile.pending', 'Chờ duyệt') : playerProfile.status === 'HIRED' ? t('profile.hired', 'Đang được thuê') : playerProfile.status}
               </span>
             )}
           </div>
 
           {loadingStats ? (
-            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>Đang tải thống kê...</div>
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>{t('profile.loadingStats', 'Đang tải thống kê...')}</div>
           ) : (
             <>
               {/* Stats cards - 3 ô 1 hàng */}
@@ -639,51 +641,51 @@ export const ProfilePage = () => {
               <div className="idol-stats-grid">
                 <StatCard
                   icon={<Zap size={22} color="#a855f7" />}
-                  label="Điểm EXP"
+                  label={t('profile.exp', 'Điểm EXP')}
                   value={exp != null ? Number(exp).toLocaleString('vi-VN') : '0'}
                   suffix="Exp"
-                  sublabel={`Chơi: ${playExp.toLocaleString('vi-VN')} · Quà: ${giftExp.toLocaleString('vi-VN')}`}
+                  sublabel={t('profile.expSub', 'Chơi: {play} · Quà: {gift}').replace('{play}', playExp.toLocaleString('vi-VN')).replace('{gift}', giftExp.toLocaleString('vi-VN'))}
                   color="#a855f7"
                 />
                 <StatCard
                   icon={<Gift size={22} color="#ec4899" />}
-                  label="Số quà đã nhận"
+                  label={t('profile.giftsReceived', 'Số quà đã nhận')}
                   value={giftCount}
-                  suffix="quà"
-                  sublabel={giftCoin > 0 ? `Trị giá: ${Number(giftCoin).toLocaleString('vi-VN')} đ` : (receivedGifts.length > 0 ? `${receivedGifts.length} lượt tặng` : 'Từ người hâm mộ')}
+                  suffix={t('common.gifts', 'quà')}
+                  sublabel={giftCoin > 0 ? t('profile.giftsValued', 'Trị giá: {coin} đ').replace('{coin}', Number(giftCoin).toLocaleString('vi-VN')) : (receivedGifts.length > 0 ? t('profile.giftsTimes', '{count} lượt tặng').replace('{count}', receivedGifts.length) : t('profile.giftsFromFans', 'Từ người hâm mộ'))}
                   color="#ec4899"
                   onClick={receivedGifts.length > 0 || giftCount > 0 ? () => setShowGiftsModal(true) : undefined}
                 />
                 <StatCard
                   icon={<Star size={22} fill="#f59e0b" color="#f59e0b" />}
-                  label="Đánh giá trung bình"
+                  label={t('profile.avgRating', 'Đánh giá trung bình')}
                   value={rating ? rating.toFixed(1) : '—'}
                   suffix="/ 5"
-                  sublabel={reviewCount > 0 ? `${reviewCount} lượt đánh giá` : 'Chưa có đánh giá'}
+                  sublabel={reviewCount > 0 ? t('profile.reviewCount', '{count} lượt đánh giá').replace('{count}', reviewCount) : t('profile.noReviews', 'Chưa có đánh giá')}
                   color="#f59e0b"
                 />
                 <StatCard
                   icon={<CheckCircle size={22} color="#22c55e" />}
-                  label="Đơn hoàn thành"
+                  label={t('profile.completedOrders', 'Đơn hoàn thành')}
                   value={completedOrders}
                   suffix="đơn"
-                  sublabel="Đã hoàn tất"
+                  sublabel={t('orders.statusCompleted', 'Đã hoàn tất')}
                   color="#22c55e"
                 />
                 <StatCard
                   icon={<XCircle size={22} color="#ef4444" />}
-                  label="Đơn đã hủy"
+                  label={t('profile.canceledOrders', 'Đơn đã hủy')}
                   value={canceledOrders}
                   suffix="đơn"
-                  sublabel={canceledOrders === 0 ? 'Tỷ lệ hủy 0%' : 'Đơn bị hủy/từ chối'}
+                  sublabel={canceledOrders === 0 ? t('profile.cancelRateZero', 'Tỷ lệ hủy 0%') : t('profile.cancelDesc', 'Đơn bị hủy/từ chối')}
                   color="#ef4444"
                 />
                 <StatCard
                   icon={<Clock size={22} color="#06b6d4" />}
-                  label="Tổng giờ chơi"
+                  label={t('profile.totalHours', 'Tổng giờ chơi')}
                   value={totalHours}
-                  suffix="giờ"
-                  sublabel="Từ đơn hoàn thành"
+                  suffix={t('booking.hoursShort', 'giờ')}
+                  sublabel={t('profile.hoursFromOrders', 'Từ đơn hoàn thành')}
                   color="#06b6d4"
                 />
               </div>
@@ -698,7 +700,7 @@ export const ProfilePage = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <MessageSquare size={20} color="var(--primary)" />
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{reviewCount} lượt đánh giá</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{t('profile.reviewCount', '{count} lượt đánh giá').replace('{count}', reviewCount)}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ color: '#f59e0b' }}>{'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}</span>
                         <span>{rating ? `${rating.toFixed(1)} / 5` : 'Chưa có đánh giá'}</span>
@@ -706,7 +708,7 @@ export const ProfilePage = () => {
                     </div>
                   </div>
                   <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.82rem', gap: '6px', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => setShowReviewsModal(true)}>
-                    <span>Xem chi tiết</span>
+                    <span>{t('profile.viewDetails', 'Xem chi tiết')}</span>
                     <ChevronRight size={14} />
                   </button>
                 </div>
@@ -720,14 +722,14 @@ export const ProfilePage = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <Gift size={20} color="#ec4899" />
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{giftCount} quà tặng từ Fan</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{t('profile.giftsFromFanCount', '{count} quà tặng từ Fan').replace('{count}', giftCount)}</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                           +{Number(giftExp || 0).toLocaleString('vi-VN')} Exp tích lũy {giftCoin > 0 ? `· ${Number(giftCoin).toLocaleString('vi-VN')} đ` : ''}
                         </div>
                       </div>
                     </div>
                     <button className="btn btn-outline" style={{ padding: '6px 14px', fontSize: '0.82rem', gap: '6px', borderColor: '#ec4899', color: '#ec4899' }} onClick={() => setShowGiftsModal(true)}>
-                      <span>Xem quà nhận</span>
+                      <span>{t('profile.viewReceivedGifts', 'Xem quà nhận')}</span>
                       <ChevronRight size={14} />
                     </button>
                   </div>
@@ -738,7 +740,7 @@ export const ProfilePage = () => {
               <div>
                 <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <TrendingUp size={16} color="var(--primary)" />
-                  Game Đã Đăng Ký ({allGamePlayers.length})
+                  {t('profile.registeredGames', 'Game Đã Đăng Ký ({count})').replace('{count}', allGamePlayers.length)}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                   {allGamePlayers.map(gp => {
@@ -776,19 +778,19 @@ export const ProfilePage = () => {
                         {/* Info rows */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Rank:</span>{' '}
+                            <span style={{ color: 'var(--text-secondary)' }}>{t('profile.rankLabel', 'Rank:')}</span>{' '}
                             <strong style={{ color: 'var(--secondary)' }}>{rank}</strong>
                           </div>
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Vị trí:</span>{' '}
+                            <span style={{ color: 'var(--text-secondary)' }}>{t('profile.roleLabel', 'Vị trí:')}</span>{' '}
                             <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }}>
                               {roles.length > 0 ? roles.map(r => (
                                 <span key={r} style={{ padding: '1px 8px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', fontSize: '0.75rem', fontWeight: 600 }}>{r}</span>
-                              )) : <span style={{ fontStyle: 'italic' }}>Không có</span>}
+                              )) : <span style={{ fontStyle: 'italic' }}>{t('profile.none', 'Không có')}</span>}
                             </span>
                           </div>
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>Server:</span>{' '}
+                            <span style={{ color: 'var(--text-secondary)' }}>{t('profile.serverLabel', 'Server:')}</span>{' '}
                             <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }}>
                               {servers.map(s => (
                                 <span key={s} style={{ padding: '1px 8px', borderRadius: '10px', background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', fontSize: '0.75rem', fontWeight: 600 }}>{s}</span>
@@ -801,7 +803,7 @@ export const ProfilePage = () => {
                         <div style={{ marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Coins size={13} color="var(--primary)" />
                           <span style={{ fontWeight: 800, color: 'var(--accent-pink)', fontSize: '1rem' }}>{price.toLocaleString('vi-VN')} đ</span>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>/ giờ</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t('player.perHour', '/ giờ')}</span>
                         </div>
                       </div>
                     );
@@ -817,7 +819,7 @@ export const ProfilePage = () => {
       <form onSubmit={handleSaveProfile} className="glass-panel" style={{ padding: '32px', marginBottom: '28px' }}>
         <h3 style={{ fontSize: '1.2rem', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <User size={20} color="var(--primary)" />
-          <span>Thông Tin Cá Nhân</span>
+          <span>{t('profile.personalInfo', 'Thông Tin Cá Nhân')}</span>
         </h3>
 
         {/* Avatar */}
@@ -829,7 +831,7 @@ export const ProfilePage = () => {
           />
           <div style={{ flex: 1, minWidth: '240px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label className="form-label" style={{ margin: 0 }}>Ảnh Đại Diện:</label>
+              <label className="form-label" style={{ margin: 0 }}>{t('profile.avatar', 'Ảnh Đại Diện:')}</label>
               <button
                 type="button"
                 className="btn btn-outline"
@@ -837,7 +839,7 @@ export const ProfilePage = () => {
                 onClick={handleRandomAvatar}
               >
                 <Sparkles size={14} />
-                <span>Đổi Avatar Vui Nhộn</span>
+                <span>{t('profile.funAvatar', 'Đổi Avatar Vui Nhộn')}</span>
               </button>
             </div>
             <input
@@ -852,46 +854,46 @@ export const ProfilePage = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div className="form-group">
-            <label className="form-label">Họ và Tên:</label>
+            <label className="form-label">{t('profile.fullName', 'Họ và Tên:')}</label>
             <input type="text" className="form-control" value={fullName} onChange={e => setFullName(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">Tên Đăng Nhập:</label>
+            <label className="form-label">{t('profile.username', 'Tên Đăng Nhập:')}</label>
             <input type="text" className="form-control" value={user?.username || ''} disabled style={{ opacity: 0.7, cursor: 'not-allowed' }} />
           </div>
           <div className="form-group">
-            <label className="form-label">Email:</label>
+            <label className="form-label">{t('profile.email', 'Email:')}</label>
             <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">Số Điện Thoại:</label>
+            <label className="form-label">{t('profile.phone', 'Số Điện Thoại:')}</label>
             <input type="tel" className="form-control" value={phone} onChange={e => setPhone(e.target.value)} />
           </div>
         </div>
 
         <div className="form-group">
-          <label className="form-label">Giới Tính:</label>
+          <label className="form-label">{t('profile.gender', 'Giới Tính:')}</label>
           <select className="form-control" value={gender} onChange={e => setGender(e.target.value)}>
-            <option value="MALE">Nam</option>
-            <option value="FEMALE">Nữ</option>
+            <option value="MALE">{t('profile.male', 'Nam')}</option>
+            <option value="FEMALE">{t('profile.female', 'Nữ')}</option>
           </select>
         </div>
 
         <div className="form-group">
-          <label className="form-label">Tiểu Sử (Bio):</label>
+          <label className="form-label">{t('profile.bio', 'Tiểu Sử (Bio):')}</label>
           <textarea
             className="form-control"
             rows="3"
             value={bio}
             onChange={e => setBio(e.target.value)}
-            placeholder="Viết đôi dòng về bạn..."
+            placeholder={t('profile.bioPlaceholder', 'Viết đôi dòng về bạn...')}
           />
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
           <button type="submit" className="btn btn-primary">
             <Save size={16} />
-            <span>Lưu Thay Đổi</span>
+            <span>{t('profile.saveChanges', 'Lưu Thay Đổi')}</span>
           </button>
         </div>
       </form>
@@ -900,19 +902,19 @@ export const ProfilePage = () => {
       <form onSubmit={handleChangePassword} className="glass-panel" style={{ padding: '32px' }}>
         <h3 style={{ fontSize: '1.2rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Lock size={20} color="var(--secondary)" />
-          <span>Đổi Mật Khẩu Bảo Mật</span>
+          <span>{t('profile.passwordTitle', 'Đổi Mật Khẩu Bảo Mật')}</span>
         </h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '24px' }}>
-          Để bảo vệ tài khoản, vui lòng đặt mật khẩu mới có ít nhất 6 ký tự và không chia sẻ cho người khác.
+          {t('profile.passwordSubtitle', 'Để bảo vệ tài khoản, vui lòng đặt mật khẩu mới có ít nhất 6 ký tự và không chia sẻ cho người khác.')}
         </p>
 
         <div className="form-group" style={{ marginBottom: '18px' }}>
-          <label className="form-label" style={{ fontWeight: 600 }}>Mật Khẩu Hiện Tại *:</label>
+          <label className="form-label" style={{ fontWeight: 600 }}>{t('profile.oldPassword', 'Mật Khẩu Hiện Tại *:')}</label>
           <div style={{ position: 'relative' }}>
             <input
               type={showOldPassword ? 'text' : 'password'}
               className="form-control"
-              placeholder="Nhập mật khẩu hiện tại"
+              placeholder={t('profile.oldPasswordPlaceholder', 'Nhập mật khẩu hiện tại')}
               value={oldPassword}
               onChange={e => setOldPassword(e.target.value)}
               style={{ paddingRight: '44px' }}
@@ -935,12 +937,12 @@ export const ProfilePage = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '18px' }}>
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontWeight: 600 }}>Mật Khẩu Mới * (Tối thiểu 6 ký tự):</label>
+            <label className="form-label" style={{ fontWeight: 600 }}>{t('profile.newPassword', 'Mật Khẩu Mới * (Tối thiểu 6 ký tự):')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showNewPassword ? 'text' : 'password'}
                 className="form-control"
-                placeholder="Nhập mật khẩu mới"
+                placeholder={t('profile.newPasswordPlaceholder', 'Nhập mật khẩu mới')}
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 style={{ paddingRight: '44px' }}
@@ -961,12 +963,12 @@ export const ProfilePage = () => {
             </div>
           </div>
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontWeight: 600 }}>Xác Nhận Mật Khẩu Mới *:</label>
+            <label className="form-label" style={{ fontWeight: 600 }}>{t('profile.confirmPassword', 'Xác Nhận Mật Khẩu Mới *:')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 className="form-control"
-                placeholder="Nhập lại mật khẩu mới"
+                placeholder={t('profile.confirmPasswordPlaceholder', 'Nhập lại mật khẩu mới')}
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 style={{ paddingRight: '44px' }}
@@ -991,7 +993,7 @@ export const ProfilePage = () => {
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
           <button type="submit" className="btn btn-cyan" disabled={changingPassword} style={{ minWidth: '170px', gap: '8px' }}>
             <ShieldCheck size={16} />
-            <span>{changingPassword ? 'Đang cập nhật...' : 'Cập Nhật Mật Khẩu'}</span>
+            <span>{changingPassword ? t('profile.updating', 'Đang cập nhật...') : t('profile.updatePasswordBtn', 'Cập Nhật Mật Khẩu')}</span>
           </button>
         </div>
       </form>

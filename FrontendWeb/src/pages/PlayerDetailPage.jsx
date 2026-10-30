@@ -243,17 +243,17 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
-    addToast('Đã sao chép liên kết trang player vào bộ nhớ tạm!', 'success');
+    addToast(t('player.copiedProfileLink', 'Đã sao chép liên kết trang player vào bộ nhớ tạm!'), 'success');
   };
 
   const handleToggleFavorite = () => {
     setIsFavorited(!isFavorited);
-    addToast(isFavorited ? 'Đã bỏ yêu thích player' : 'Đã thêm player vào danh sách yêu thích ❤️', 'success');
+    addToast(isFavorited ? t('player.unfavorited', 'Đã bỏ yêu thích player') : t('player.favorited', 'Đã thêm player vào danh sách yêu thích ❤️'), 'success');
   };
 
   const handleToggleLikePhoto = async (item) => {
     if (!isAuthenticated) {
-      addToast('Vui lòng đăng nhập để thích khoảnh khắc!', 'warning');
+      addToast(t('player.loginToLike', 'Vui lòng đăng nhập để thích khoảnh khắc!'), 'warning');
       return;
     }
 
@@ -291,7 +291,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
       return { ...prev, album: newAlbum };
     });
 
-    addToast(nextLiked ? 'Đã thích khoảnh khắc ❤️' : 'Đã bỏ thích khoảnh khắc', 'success');
+    addToast(nextLiked ? t('player.likedMoment', 'Đã thích khoảnh khắc ❤️') : t('player.unlikedMoment', 'Đã bỏ thích khoảnh khắc'), 'success');
 
     if (item.momentId) {
       try {
@@ -376,12 +376,12 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
             <button
               className="nav-icon-btn"
               onClick={handleToggleFavorite}
-              title="Yêu thích"
+              title={t('player.favoriteTooltip', 'Yêu thích')}
               style={{ color: isFavorited ? 'var(--accent-pink)' : 'inherit' }}
             >
               <Heart size={18} fill={isFavorited ? 'var(--accent-pink)' : 'transparent'} />
             </button>
-            <button className="nav-icon-btn" onClick={handleShare} title="Chia sẻ">
+            <button className="nav-icon-btn" onClick={handleShare} title={t('player.shareTooltip', 'Chia sẻ')}>
               <Share2 size={18} />
             </button>
           </div>
@@ -1031,7 +1031,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               zIndex: 100001,
               transition: 'all 0.2s ease'
             }}
-            title="Đóng (Esc)"
+            title={t('player.closeEscTooltip', 'Đóng (Esc)')}
           >
             <X size={22} />
           </button>
@@ -1063,7 +1063,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   backdropFilter: 'blur(8px)',
                   transition: 'all 0.2s'
                 }}
-                title="Ảnh trước (←)"
+                title={t('player.prevPhotoTooltip', 'Ảnh trước (←)')}
               >
                 <ChevronLeft size={24} />
               </button>
@@ -1092,7 +1092,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   backdropFilter: 'blur(8px)',
                   transition: 'all 0.2s'
                 }}
-                title="Ảnh tiếp theo (→)"
+                title={t('player.nextPhotoTooltip', 'Ảnh tiếp theo (→)')}
               >
                 <ChevronRight size={24} />
               </button>
@@ -1224,13 +1224,13 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                       fill={previewItem.isLiked ? '#ef4444' : 'none'}
                       color={previewItem.isLiked ? '#ef4444' : '#fff'}
                     />
-                    <span>{previewItem.likeCount || 0} lượt thích</span>
+                    <span>{previewItem.likeCount || 0} {(previewItem.likeCount === 1) ? t('moments.likeSingular', 'lượt thích') : t('moments.likePlural', 'lượt thích')}</span>
                   </button>
 
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(previewItem.url);
-                      addToast('Đã sao chép liên kết ảnh!', 'success');
+                      addToast(t('player.copiedPhotoLink', 'Đã sao chép liên kết ảnh!'), 'success');
                     }}
                     className="btn btn-outline"
                     style={{
@@ -1238,7 +1238,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                       borderRadius: '12px',
                       color: 'var(--text-secondary)'
                     }}
-                    title="Sao chép liên kết ảnh"
+                    title={t('player.copyPhotoUrlTooltip', 'Sao chép liên kết ảnh')}
                   >
                     <Share2 size={18} />
                   </button>

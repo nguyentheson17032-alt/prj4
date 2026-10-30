@@ -12,6 +12,7 @@ import StatusBadge from '../components/common/StatusBadge';
 import api from '../api/apiService';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getUserAvatar } from '../utils/avatarUtils';
 import realtimeService from '../services/realtimeService';
 import '../styles/chat.css';
@@ -74,6 +75,7 @@ export const ChatPage = ({ onHirePlayer }) => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { t, language } = useLanguage();
 
   const [conversations, setConversations] = useState([]);
   const [activeConv, setActiveConv] = useState(null);
@@ -522,9 +524,9 @@ export const ChatPage = ({ onHirePlayer }) => {
       <div className="container animate-fade-in" style={{ padding: '60px 20px', textAlign: 'center' }}>
         <div style={{ maxWidth: '480px', margin: '0 auto', background: 'var(--bg-card)', padding: '40px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
           <MessageSquare size={48} style={{ color: 'var(--primary)', marginBottom: '16px' }} />
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px' }}>Hộp Thoại Tin Nhắn</h2>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '8px' }}>{t('chat.chatDialog', 'Hộp Thoại Tin Nhắn')}</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '24px' }}>
-            Vui lòng đăng nhập tài khoản để xem tin nhắn và trò chuyện cùng Idol Duo Game!
+            {t('chat.loginPrompt', 'Vui lòng đăng nhập tài khoản để xem tin nhắn và trò chuyện cùng Idol Duo Game!')}
           </p>
           <Link to="/" className="btn btn-primary" style={{ display: 'inline-block', padding: '10px 24px' }}>
             Về Trang Chủ Đăng Nhập
@@ -540,9 +542,9 @@ export const ChatPage = ({ onHirePlayer }) => {
         {/* Sidebar */}
         <div className="chat-sidebar">
           <div className="chat-sidebar-header">
-            <span>Hộp Thoại Tin Nhắn</span>
+            <span>{t('chat.chatDialog', 'Hộp Thoại Tin Nhắn')}</span>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {conversations.length} hội thoại
+              {t('chat.conversationsCount', '{count} hội thoại').replace('{count}', conversations.length)}
             </span>
           </div>
 
@@ -562,7 +564,7 @@ export const ChatPage = ({ onHirePlayer }) => {
                 type="text"
                 className="form-control"
                 style={{ paddingLeft: '32px', fontSize: '0.85rem' }}
-                placeholder="Tìm hội thoại..."
+                placeholder={t('chat.search', 'Tìm hội thoại...')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -573,11 +575,11 @@ export const ChatPage = ({ onHirePlayer }) => {
             {loading ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 10px', color: 'var(--text-muted)', gap: '8px' }}>
                 <Loader2 size={18} className="animate-spin" />
-                <span style={{ fontSize: '0.85rem' }}>Đang tải tin nhắn...</span>
+                <span style={{ fontSize: '0.85rem' }}>{t('chat.loadingMessages', 'Đang tải tin nhắn...')}</span>
               </div>
             ) : filteredConversations.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                Chưa có cuộc trò chuyện nào
+                {t('chat.noConversations', 'Chưa có cuộc trò chuyện nào')}
               </div>
             ) : (
               filteredConversations.map((conv) => (
@@ -649,7 +651,7 @@ export const ChatPage = ({ onHirePlayer }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
                     <StatusBadge status={activeConv.partner?.status || 'ONLINE'} />
                     <span style={{ color: 'var(--text-muted)' }}>
-                      • {activeConv.partner?.primaryGame || (activeConv.partner?.isPlayer ? 'Idol Duo' : 'Thành viên')}
+                      • {activeConv.partner?.primaryGame || (activeConv.partner?.isPlayer ? t('chat.idolDuo', 'Idol Duo') : t('chat.member', 'Thành viên'))}
                     </span>
                   </div>
                 </div>
@@ -663,7 +665,7 @@ export const ChatPage = ({ onHirePlayer }) => {
                     onClick={() => onHirePlayer(activeConv.partner)}
                   >
                     <Gamepad2 size={16} />
-                    <span>Thuê Player Này</span>
+                    <span>{t('chat.hireThisPlayer', 'Thuê Player Này')}</span>
                   </button>
                 </div>
               )}
@@ -675,10 +677,10 @@ export const ChatPage = ({ onHirePlayer }) => {
                 <div style={{ textAlign: 'center', margin: 'auto', padding: '40px 20px', color: 'var(--text-muted)' }}>
                   <MessageSquare size={36} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
                   <p style={{ fontSize: '0.95rem' }}>
-                    Bắt đầu cuộc trò chuyện với <strong>{activeConv.partner?.fullName}</strong>
+                    {t('chat.startWith', 'Bắt đầu cuộc trò chuyện với')} <strong>{activeConv.partner?.fullName}</strong>
                   </p>
                   <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>
-                    Gửi tin nhắn bên dưới để trao đổi thông tin chơi game nhé!
+                    {t('chat.startWithHint', 'Gửi tin nhắn bên dưới để trao đổi thông tin chơi game nhé!')}
                   </span>
                 </div>
               ) : (
@@ -696,7 +698,7 @@ export const ChatPage = ({ onHirePlayer }) => {
               <input
                 type="text"
                 className="form-control"
-                placeholder={`Nhắn tin cho ${activeConv.partner?.fullName || 'đối phương'}...`}
+                placeholder={t('chat.inputPlaceholder', 'Nhắn tin cho {name}...').replace('{name}', activeConv.partner?.fullName || '')}
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 onKeyDown={(e) => {
@@ -725,7 +727,7 @@ export const ChatPage = ({ onHirePlayer }) => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', height: '100%', gap: '12px' }}>
             <MessageSquare size={48} style={{ opacity: 0.3 }} />
-            <span>Chọn một hội thoại ở danh sách bên trái để bắt đầu trò chuyện</span>
+            <span>{t('chat.selectToStart', 'Chọn một hội thoại ở danh sách bên trái để bắt đầu trò chuyện')}</span>
           </div>
         )}
       </div>

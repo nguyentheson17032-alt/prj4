@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/apiService';
 
@@ -33,6 +34,7 @@ const initGameForm = (game) => ({
 export const RegisterPlayerPage = ({ onOpenAuth }) => {
   const { user, updateProfile, isAuthenticated, isAdmin, isPlayer, loading: authLoading } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // 1: Info, 2: Chọn game, 3: Form từng game, 4: Media, 5: Thành công
@@ -265,10 +267,10 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
   }
 
   const stepLabels = [
-    { num: 1, label: 'Thông tin cơ bản' },
-    { num: 2, label: 'Chọn Game' },
-    { num: 3, label: 'Chi tiết game' },
-    { num: 4, label: 'Hình ảnh & Giọng nói' },
+    { num: 1, label: t('registerPlayer.step1', '1. Thông tin cơ bản') },
+    { num: 2, label: t('registerPlayer.step2', '2. Chọn Game') },
+    { num: 3, label: t('registerPlayer.step3', '3. Chi tiết game') },
+    { num: 4, label: t('registerPlayer.step4', '4. Hình ảnh & Giọng nói') },
   ];
 
   return (
@@ -280,10 +282,10 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
           <span>Kiếm Thu Nhập Từ Đam Mê Chơi Game</span>
         </div>
         <h1 style={{ fontSize: '2.4rem', fontWeight: 900, marginBottom: '8px' }}>
-          Đăng Ký Trở Thành <span className="gradient-text">Idol & Duo Player</span>
+          {t('registerPlayer.title', 'Đăng Ký Trở Thành')} <span className="gradient-text">{t('registerPlayer.titleHighlight', 'Idol & Duo Player')}</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Gia nhập cộng đồng hơn 5,000+ Idol, nhận thu nhập hấp dẫn từ 10.000.000đ - 30.000.000đ/tháng.
+          {t('registerPlayer.subtitle', 'Gia nhập cộng đồng hơn 5,000+ Idol, nhận thu nhập hấp dẫn từ 10.000.000đ - 30.000.000đ/tháng.')}
         </p>
       </div>
 
@@ -360,7 +362,7 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
               <button className="btn btn-primary" onClick={handleNextToStep2}>
-                <span>Tiếp Tục</span>
+                <span>{t('registerPlayer.next', 'Tiếp Tục')}</span>
                 <ArrowRight size={16} />
               </button>
             </div>
@@ -454,9 +456,9 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-              <button className="btn btn-secondary" onClick={() => setStep(1)}>Quay lại</button>
+              <button className="btn btn-secondary" onClick={() => setStep(1)}>{t('registerPlayer.back', 'Quay lại')}</button>
               <button className="btn btn-primary" onClick={handleNextToStep3}>
-                <span>Tiếp Tục</span>
+                <span>{t('registerPlayer.next', 'Tiếp Tục')}</span>
                 <ArrowRight size={16} />
               </button>
             </div>
@@ -632,7 +634,7 @@ export const RegisterPlayerPage = ({ onOpenAuth }) => {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
               <button className="btn btn-secondary" onClick={() => { setCurrentGameIndex(gameFormData.length - 1); setStep(3); }}>
-                Quay lại
+                {t('registerPlayer.back', 'Quay lại')}
               </button>
               <button className="btn btn-primary" disabled={isSubmitting || !isPolicyAccepted} onClick={handleSubmit}>
                 <ShieldCheck size={18} />

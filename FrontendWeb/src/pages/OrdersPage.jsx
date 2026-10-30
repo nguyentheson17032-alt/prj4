@@ -432,7 +432,7 @@ export const OrdersPage = () => {
                       <button
                         className="btn btn-secondary btn-sm"
                         onClick={() => handleChatWithPartner(order, isCurrentPlayer)}
-                        title={isCurrentPlayer ? `Nhắn tin cho khách hàng ${renterDisplayName}` : `Nhắn tin cho Idol ${displayName}`}
+                        title={isCurrentPlayer ? t('orders.tooltipChatClient', 'Nhắn tin cho khách hàng {name}').replace('{name}', renterDisplayName) : t('orders.tooltipChatIdol', 'Nhắn tin cho Idol {name}').replace('{name}', displayName)}
                       >
                         <MessageSquare size={16} />
                         <span>{t('orders.sendMessage', 'Nhắn Tin')}</span>
@@ -445,7 +445,7 @@ export const OrdersPage = () => {
                             className="btn btn-primary btn-sm"
                             onClick={() => handleConfirmOrder(order.id)}
                             style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', color: '#fff' }}
-                            title="Xác nhận nhận đơn thuê"
+                            title={t('orders.tooltipAccept', 'Xác nhận nhận đơn thuê')}
                           >
                             <CheckCircle2 size={16} />
                             <span>{t('orders.accept', 'Đồng Ý')}</span>
@@ -454,7 +454,7 @@ export const OrdersPage = () => {
                             className="btn btn-outline btn-sm"
                             style={{ borderColor: 'var(--accent-red)', color: 'var(--accent-red)' }}
                             onClick={() => handleCancelOrder(order.id)}
-                            title="Hủy đơn và hoàn coin"
+                            title={t('orders.tooltipCancelRefund', 'Hủy đơn và hoàn coin')}
                           >
                             <XCircle size={16} />
                             <span>{t('orders.cancelOrder', 'Hủy Đơn')}</span>
@@ -473,7 +473,7 @@ export const OrdersPage = () => {
                                 <span
                                   className="badge badge-busy"
                                   style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px' }}
-                                  title={`Thời gian kết thúc: ${order.endTime || order.hireTime}`}
+                                  title={t('orders.tooltipEndTime', 'Thời gian kết thúc: {time}').replace('{time}', order.endTime || order.hireTime)}
                                 >
                                   <Clock size={13} />
                                   <span>{remainingText}</span>
@@ -501,7 +501,7 @@ export const OrdersPage = () => {
                                 className="btn btn-outline btn-sm"
                                 style={{ borderColor: 'var(--accent-red)', color: 'var(--accent-red)' }}
                                 onClick={() => handleCancelOrder(order.id)}
-                                title="Hủy đơn"
+                                title={t('orders.tooltipCancel', 'Hủy đơn')}
                               >
                                 <span>{t('orders.cancelOrder', 'Hủy Đơn')}</span>
                               </button>
@@ -523,7 +523,7 @@ export const OrdersPage = () => {
                               <button
                                 className="btn btn-cyan btn-sm"
                                 onClick={() => setSelectedOrderForReview(order)}
-                                title="Chỉ người thuê mới được đánh giá dịch vụ"
+                                title={t('orders.tooltipRenterOnlyRate', 'Chỉ người thuê mới được đánh giá dịch vụ')}
                               >
                                 <Star size={16} />
                                 <span>{t('orders.ratePlayer', 'Đánh Giá Player')}</span>
@@ -552,7 +552,7 @@ export const OrdersPage = () => {
                                           background: 'rgba(239,68,68,0.12)',
                                           border: '1px solid rgba(239,68,68,0.3)'
                                         }}
-                                        title="Khiếu nại về idol này đã bị Admin từ chối"
+                                        title={t('orders.tooltipReportRejected', 'Khiếu nại về idol này đã bị Admin từ chối')}
                                       >
                                         <XCircle size={14} />
                                         <span>{t('orders.reportRejected', 'Đã Khiếu Nại & Bị Từ Chối')}</span>
@@ -574,7 +574,7 @@ export const OrdersPage = () => {
                                           background: 'rgba(16,185,129,0.12)',
                                           border: '1px solid rgba(16,185,129,0.3)'
                                         }}
-                                        title="Khiếu nại đã được Admin chấp thuận"
+                                        title={t('orders.tooltipReportApproved', 'Khiếu nại đã được Admin chấp thuận')}
                                       >
                                         <CheckCircle2 size={14} />
                                         <span>{t('orders.reportApprovedAndRefunded', 'Đã Khiếu Nại & Hoàn Tiền')}</span>
@@ -595,7 +595,7 @@ export const OrdersPage = () => {
                                         background: 'rgba(245,158,11,0.12)',
                                         border: '1px solid rgba(245,158,11,0.3)'
                                       }}
-                                      title="Khiếu nại đang chờ Admin duyệt"
+                                      title={t('orders.tooltipReportReviewing', 'Khiếu nại đang chờ Admin duyệt')}
                                     >
                                       <Flag size={14} />
                                       <span>{t('orders.reportSubmitted', 'Đã Khiếu Nại')}</span>
@@ -617,7 +617,7 @@ export const OrdersPage = () => {
 
                                 if (isExpired) {
                                   return (
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }} title="Đã qua 24h sau khi đơn kết thúc, không thể khiếu nại">
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }} title={t('orders.tooltipReportExpired', 'Đã qua 24h sau khi đơn kết thúc, không thể khiếu nại')}>
                                       {t('orders.reportExpired', 'Hết hạn khiếu nại (quá 24h)')}
                                     </span>
                                   );
@@ -628,7 +628,7 @@ export const OrdersPage = () => {
                                     <button
                                       className="btn btn-outline btn-sm"
                                       style={{ borderColor: '#f43f5e', color: '#f43f5e' }}
-                                      title="Tố cáo / Khiếu nại về idol này (trong vòng 24h sau khi kết thúc)"
+                                      title={t('orders.tooltipReportBtn', 'Tố cáo / Khiếu nại về idol này (trong vòng 24h sau khi kết thúc)')}
                                       onClick={() => setSelectedPlayerForReport({
                                         id: order.player?.id || order.playerId,
                                         fullName: order.playerName || order.player?.fullName || 'Idol',
@@ -676,7 +676,7 @@ export const OrdersPage = () => {
                                   borderRadius: '4px',
                                   border: '1px solid rgba(16,185,129,0.2)'
                                 }}
-                                title="Đơn được đánh giá từ 4 sao hoặc đã qua 24h, tiền đã vào số dư khả dụng"
+                                title={t('orders.tooltipEscrowReleased', 'Đơn được đánh giá từ 4 sao hoặc đã qua 24h, tiền đã vào số dư khả dụng')}
                               >
                                 <CheckCircle2 size={13} />
                                 <span>{t('orders.payoutAvailable', 'Đã vào số dư khả dụng (+{amount} đ)').replace('{amount}', Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN'))}</span>
@@ -713,7 +713,7 @@ export const OrdersPage = () => {
                                   borderRadius: '4px',
                                   border: '1px solid rgba(245,158,11,0.2)'
                                 }}
-                                title="Số tiền đang tạm đóng băng trong 24h sau khi đơn kết thúc hoặc chờ khách đánh giá 4★ trở lên"
+                                title={t('orders.tooltipEscrowPending', 'Số tiền đang tạm đóng băng trong 24h sau khi đơn kết thúc hoặc chờ khách đánh giá 4★ trở lên')}
                               >
                                 <Clock size={13} />
                                 <span>{t('orders.payoutFrozen', 'Đang đóng băng: {amount} đ (chờ 24h hoặc đánh giá ≥4★)').replace('{amount}', Number(order.playerReceived || Math.round((order.price || 0) * 0.85)).toLocaleString('vi-VN'))}</span>

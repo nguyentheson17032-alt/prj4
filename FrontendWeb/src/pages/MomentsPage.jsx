@@ -23,12 +23,14 @@ import api from '../api/apiService';
 import CreateMomentModal from '../components/modals/CreateMomentModal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { GAME_TOPICS_20 } from '../constants/gamesList';
 import '../styles/moments.css';
 
 export const MomentsPage = () => {
   const { user, isPlayer, isAuthenticated } = useAuth();
   const { addToast } = useToast();
+  const { t, language } = useLanguage();
 
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -252,14 +254,14 @@ export const MomentsPage = () => {
   };
 
   const handleDeleteMoment = async (momentId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa bài viết khoảnh khắc này?')) return;
+    if (!window.confirm(t('moments.deleteConfirm', 'Bạn có chắc chắn muốn xóa bài viết khoảnh khắc này?'))) return;
 
     try {
       await api.deleteMoment(momentId);
       setMoments(prev => prev.filter(m => m.id !== momentId));
-      addToast('Đã xóa khoảnh khắc thành công', 'success');
+      addToast(t('moments.deleteSuccess', 'Đã xóa khoảnh khắc thành công'), 'success');
     } catch (_) {
-      addToast('Không thể xóa bài viết. Vui lòng thử lại!', 'error');
+      addToast(t('moments.deleteError', 'Không thể xóa bài viết. Vui lòng thử lại!'), 'error');
     }
   };
 
@@ -333,7 +335,7 @@ export const MomentsPage = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Sparkles size={24} className="gradient-text" />
                 <h1 style={{ fontSize: '1.9rem', fontWeight: 800, margin: 0, color: '#fff' }}>
-                  Khoảnh Khắc <span className="gradient-text">Cộng Đồng</span>
+                  {t('moments.title', 'Khoảnh Khắc')} <span className="gradient-text">{t('moments.titleHighlight', 'Cộng Đồng')}</span>
                 </h1>
               </div>
               <span
@@ -347,11 +349,11 @@ export const MomentsPage = () => {
                   fontWeight: 700
                 }}
               >
-                📌 Luật Idol: 1 khoảnh khắc/ngày
+                {t('moments.idolRule', '📌 Luật Idol: 1 khoảnh khắc/ngày')}
               </span>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
-              Chia sẻ chiến tích, highlight leo rank và thả tim khoảnh khắc cùng các Idol PlayZone.
+              {t('moments.subtitle', 'Chia sẻ chiến tích, highlight leo rank và thả tim khoảnh khắc cùng các Idol PlayZone.')}
             </p>
           </div>
 
@@ -378,7 +380,7 @@ export const MomentsPage = () => {
                   title="Hôm nay bạn đã đăng 1 khoảnh khắc. Mỗi Idol được đăng 1 khoảnh khắc mỗi ngày. Hãy quay lại vào ngày mai nhé!"
                 >
                   <CheckCircle2 size={18} color="#10b981" />
-                  <span>Đã Đăng Hôm Nay (1/1)</span>
+                  <span>{t('moments.postedToday', 'Đã Đăng Hôm Nay (1/1)')}</span>
                 </button>
               </div>
             ) : (
@@ -393,7 +395,7 @@ export const MomentsPage = () => {
                 }}
               >
                 <PlusCircle size={18} />
-                <span>Đăng Khoảnh Khắc</span>
+                <span>{t('moments.postMoment', 'Đăng Khoảnh Khắc')}</span>
               </button>
             )
           ) : (
@@ -411,7 +413,7 @@ export const MomentsPage = () => {
               }}
             >
               <Compass size={16} color="var(--primary)" />
-              <span>Khám phá & Thả tim Idol</span>
+              <span>{t('moments.exploreLike', 'Khám phá & Thả tim Idol')}</span>
             </div>
           )}
         </div>
@@ -426,7 +428,7 @@ export const MomentsPage = () => {
                 onClick={() => setActiveTab('ALL')}
               >
                 <Compass size={15} />
-                <span>Tất Cả ({moments.length})</span>
+                <span>{t('moments.tabAll', 'Tất Cả ({count})').replace('{count}', moments.length)}</span>
               </button>
 
               {/* "Khoảnh Khắc Của Tôi" Tab: Only for logged-in players */}
@@ -436,7 +438,7 @@ export const MomentsPage = () => {
                   onClick={() => setActiveTab('MY_POSTS')}
                 >
                   <UserCheck size={15} />
-                  <span>Khoảnh Khắc Của Tôi</span>
+                  <span>{t('moments.tabMyPosts', 'Khoảnh Khắc Của Tôi')}</span>
                 </button>
               )}
 
@@ -445,7 +447,7 @@ export const MomentsPage = () => {
                 onClick={() => setActiveTab('TOP')}
               >
                 <TrendingUp size={15} />
-                <span>Nổi Bật Nhất</span>
+                <span>{t('moments.tabTop', 'Nổi Bật Nhất')}</span>
               </button>
             </div>
 
@@ -455,7 +457,7 @@ export const MomentsPage = () => {
                 <Search size={15} className="moment-search-icon" />
                 <input
                   type="text"
-                  placeholder="Tìm kiếm theo game (VD: LOL, VALORANT...)"
+                  placeholder={t('moments.searchGamePlaceholder', 'Tìm kiếm theo game (VD: LOL, VALORANT...)')}
                   value={gameSearchQuery}
                   onChange={(e) => {
                     setGameSearchQuery(e.target.value);
@@ -468,7 +470,7 @@ export const MomentsPage = () => {
                     type="button"
                     className="moment-search-clear-btn"
                     onClick={() => setGameSearchQuery('')}
-                    title="Xóa tìm kiếm"
+                    title={t('moments.clearSearch', 'Xóa tìm kiếm')}
                   >
                     <X size={14} />
                   </button>
@@ -497,10 +499,10 @@ export const MomentsPage = () => {
                     whiteSpace: 'nowrap',
                     transition: 'all 0.2s ease'
                   }}
-                  title="Xóa bộ lọc game"
+                  title={t('moments.clearGameFilter', 'Xóa bộ lọc game')}
                 >
                   <X size={13} />
-                  <span>Bỏ lọc{selectedGameFilter !== 'ALL' ? `: ${selectedGameFilter}` : ''}</span>
+                  <span>{t('moments.clearGameFilter', 'Bỏ lọc')}{selectedGameFilter !== 'ALL' ? `: ${selectedGameFilter}` : ''}</span>
                 </button>
               )}
             </div>
@@ -515,7 +517,7 @@ export const MomentsPage = () => {
                 setGameSearchQuery('');
               }}
             >
-              🎮 Tất Cả Game
+              {t('moments.allGames', '🎮 Tất Cả Game')}
             </button>
             {visibleGameTopics.map((game) => (
               <button
@@ -536,7 +538,7 @@ export const MomentsPage = () => {
             ))}
             {visibleGameTopics.length === 0 && gameSearchQuery && (
               <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '5px 12px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>Đang lọc bài viết theo game: <strong>"{gameSearchQuery}"</strong></span>
+                <span>{t('moments.filterByGame', 'Đang lọc bài viết theo game: "{game}"').replace('{game}', gameSearchQuery)}</span>
               </div>
             )}
           </div>
@@ -546,7 +548,7 @@ export const MomentsPage = () => {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
             <div className="spinner-border text-primary" role="status" style={{ marginBottom: '12px' }}></div>
-            <div>Đang tải khoảnh khắc gaming...</div>
+            <div>{t('moments.loading', 'Đang tải khoảnh khắc gaming...')}</div>
           </div>
         ) : filteredMoments.length === 0 ? (
           <div
@@ -577,18 +579,18 @@ export const MomentsPage = () => {
 
             <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', color: '#fff', fontWeight: 700 }}>
               {activeTab === 'MY_POSTS'
-                ? 'Bạn Chưa Đăng Khoảnh Khắc Nào'
+                ? t('moments.emptyMyPosts', 'Bạn Chưa Đăng Khoảnh Khắc Nào')
                 : (gameSearchQuery || selectedGameFilter !== 'ALL')
-                ? `Không Tìm Thấy Khoảnh Khắc Cho Game "${gameSearchQuery || selectedGameFilter}"`
-                : 'Chưa Có Khoảnh Khắc Nào'}
+                ? t('moments.emptyGameSearch', 'Không Tìm Thấy Khoảnh Khắc Cho Game "{game}"').replace('{game}', gameSearchQuery || selectedGameFilter)
+                : t('moments.emptyAll', 'Chưa Có Khoảnh Khắc Nào')}
             </h3>
 
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px', maxWidth: '440px', margin: '0 auto 20px auto' }}>
               {activeTab === 'MY_POSTS'
-                ? 'Hãy chia sẻ chiến tích leo rank hoặc hình ảnh highlight của bạn để người hâm mộ cùng chiêm ngưỡng!'
+                ? t('moments.emptyMyPostsDesc', 'Hãy chia sẻ chiến tích leo rank hoặc hình ảnh highlight của bạn để người hâm mộ cùng chiêm ngưỡng!')
                 : (gameSearchQuery || selectedGameFilter !== 'ALL')
-                ? 'Không có bài viết nào phù hợp với tựa game bạn tìm kiếm. Hãy thử từ khóa khác hoặc xóa bộ lọc!'
-                : 'Hãy đón chờ những khoảnh khắc tiếp theo từ các Idol PlayZone nhé!'}
+                ? t('moments.emptyGameSearchDesc', 'Không có bài viết nào phù hợp với tựa game bạn tìm kiếm. Hãy thử từ khóa khác hoặc xóa bộ lọc!')
+                : t('moments.emptyAllDesc', 'Hãy đón chờ những khoảnh khắc tiếp theo từ các Idol PlayZone nhé!')}
             </p>
 
             {isPlayer && !hasPostedToday ? (
@@ -598,7 +600,7 @@ export const MomentsPage = () => {
                 style={{ padding: '10px 24px', borderRadius: '12px' }}
               >
                 <PlusCircle size={16} />
-                <span>Đăng Bài Đầu Tiên</span>
+                <span>{t('moments.postFirst', 'Đăng Bài Đầu Tiên')}</span>
               </button>
             ) : (selectedGameFilter !== 'ALL' || gameSearchQuery) ? (
               <button
@@ -609,7 +611,7 @@ export const MomentsPage = () => {
                 }}
                 style={{ padding: '8px 20px', borderRadius: '10px' }}
               >
-                Xóa Bộ Lọc Game
+                {t('moments.clearGameFilter', 'Xóa Bộ Lọc Game')}
               </button>
             ) : null}
           </div>
@@ -705,10 +707,10 @@ export const MomentsPage = () => {
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
                       }}
-                      title="Xóa bài viết này"
+                      title={t('moments.deleteTooltip', 'Xóa bài viết này')}
                     >
                       <Trash2 size={14} />
-                      <span>Xóa</span>
+                      <span>{t('moments.delete', 'Xóa')}</span>
                     </button>
                   )}
                 </div>
@@ -779,14 +781,14 @@ export const MomentsPage = () => {
                         cursor: 'pointer',
                         transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                       }}
-                      title={isLiked ? 'Bỏ thích' : 'Thích khoảnh khắc'}
+                      title={isLiked ? t('moments.unlikeTooltip', 'Bỏ thích') : t('moments.likeTooltip', 'Thích khoảnh khắc')}
                     >
                       <Heart
                         size={19}
                         fill={isLiked ? '#ec4899' : 'transparent'}
                         color={isLiked ? '#ec4899' : 'currentColor'}
                       />
-                      <span>{moment.likeCount || 0} Lượt thích</span>
+                      <span>{moment.likeCount || 0} {(moment.likeCount === 1) ? t('moments.likeSingular', 'Lượt thích') : t('moments.likePlural', 'Lượt thích')}</span>
                     </button>
                   </div>
 
@@ -794,7 +796,7 @@ export const MomentsPage = () => {
                     className="moment-action-btn"
                     onClick={() => {
                       navigator.clipboard.writeText(window.location.href);
-                      addToast('Đã sao chép liên kết khoảnh khắc vào bộ nhớ tạm!', 'success');
+                      addToast(t('moments.copied', 'Đã sao chép liên kết khoảnh khắc vào bộ nhớ tạm!'), 'success');
                     }}
                     style={{
                       display: 'flex',
@@ -809,7 +811,7 @@ export const MomentsPage = () => {
                     }}
                   >
                     <Share2 size={16} />
-                    <span>Chia sẻ</span>
+                    <span>{t('moments.share', 'Chia sẻ')}</span>
                   </button>
                 </div>
 
@@ -831,21 +833,21 @@ export const MomentsPage = () => {
                       cursor: 'pointer',
                       transition: 'all 0.2s'
                     }}
-                    title="Bấm để xem danh sách người đã thích"
+                    title={t('moments.seeWhoLiked', 'Bấm để xem danh sách người đã thích')}
                   >
                     <Heart size={14} fill="#ec4899" color="#ec4899" />
                     <span style={{ flex: 1 }}>
                       {Array.isArray(moment.likedByUsers) && moment.likedByUsers.length > 0 ? (
                         <>
-                          Được thích bởi <strong style={{ color: '#fff' }}>{moment.likedByUsers[0]}</strong>
-                          {moment.likeCount > 1 && <> và <strong style={{ color: '#fff' }}>{moment.likeCount - 1} người khác</strong></>}
+                          {t('moments.likedBy', 'Được thích bởi')} <strong style={{ color: '#fff' }}>{moment.likedByUsers[0]}</strong>
+                          {moment.likeCount > 1 && <> {t('moments.andOthers', 'và {count} người khác').replace('{count}', moment.likeCount - 1)}</>}
                         </>
                       ) : (
-                        <><strong style={{ color: '#fff' }}>{moment.likeCount}</strong> người đã thích khoảnh khắc này</>
+                        <>{t('moments.peopleLikedThis', '{count} người đã thích khoảnh khắc này').replace('{count}', moment.likeCount)}</>
                       )}
                     </span>
                     <span style={{ fontSize: '0.74rem', color: '#f472b6', textDecoration: 'underline' }}>
-                      Xem ai đã thích
+                      {t('moments.seeWhoLiked', 'Xem ai đã thích')}
                     </span>
                   </div>
                 )}
@@ -914,7 +916,7 @@ export const MomentsPage = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Heart size={18} fill="#ec4899" color="#ec4899" />
                 <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#fff', fontWeight: 700 }}>
-                  Người Đã Thích ({viewingLikersMoment.likeCount || 0})
+                  {t('moments.likersTitle', 'Người Đã Thích ({count})').replace('{count}', viewingLikersMoment.likeCount || 0)}
                 </h3>
               </div>
               <button
@@ -958,14 +960,14 @@ export const MomentsPage = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.92rem' }}>{likerName}</div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Thành viên PlayZone</div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{t('moments.playzoneMember', 'Thành viên PlayZone')}</div>
                     </div>
                     <Heart size={16} fill="#ec4899" color="#ec4899" />
                   </div>
                 ))
               ) : (
                 <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                  {viewingLikersMoment.likeCount} lượt thích từ thành viên cộng đồng PlayZone
+                  {t('moments.communityLikes', '{count} lượt thích từ thành viên cộng đồng PlayZone').replace('{count}', viewingLikersMoment.likeCount)}
                 </div>
               )}
             </div>

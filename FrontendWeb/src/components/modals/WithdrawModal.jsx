@@ -3,6 +3,7 @@ import { X, Landmark, ArrowUpRight, ShieldCheck, Check, AlertCircle, Sparkles, B
 import confetti from 'canvas-confetti';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import '../../styles/modals.css';
 
 const POPULAR_BANKS = [
@@ -23,6 +24,7 @@ const POPULAR_BANKS = [
 export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
   const { withdrawMoney, user } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
 
   const currentBalance = Number(user?.balance || user?.walletBalance || user?.coin || 0);
 
@@ -176,9 +178,9 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
               <Landmark size={20} />
             </div>
             <div>
-              <span style={{ fontSize: '1.15rem', fontWeight: 800 }}>Rút Tiền Về Ngân Hàng</span>
+              <span style={{ fontSize: '1.15rem', fontWeight: 800 }}>{t('withdraw.title', 'Rút Tiền Về Ngân Hàng')}</span>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                Chuyển coin về tài khoản ngân hàng cá nhân
+                {t('withdraw.subtitle', 'Chuyển coin về tài khoản ngân hàng cá nhân')}
               </div>
             </div>
           </div>
@@ -206,10 +208,10 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
             </div>
 
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '6px' }}>
-              Yêu Cầu Rút Tiền Đã Gửi!
+              {t('withdraw.successTitle', 'Yêu Cầu Rút Tiền Đã Gửi!')}
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '20px' }}>
-              Hệ thống đã tiếp nhận yêu cầu rút tiền của bạn. Admin sẽ kiểm tra và chuyển khoản trong vòng 5 - 30 phút.
+              {t('withdraw.successDesc', 'Hệ thống đã tiếp nhận yêu cầu rút tiền của bạn. Admin sẽ kiểm tra và chuyển khoản trong vòng 5 - 30 phút.')}
             </p>
 
             {/* Chi tiết biên nhận */}
@@ -225,25 +227,25 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
               gap: '10px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-                <span>Mã giao dịch:</span>
+                <span>{t('withdraw.txId', 'Mã giao dịch:')}</span>
                 <span style={{ fontWeight: 700, color: 'var(--primary, #6366f1)' }}>#{successInfo?.paymentId}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-                <span>Số tiền rút:</span>
+                <span>{t('withdraw.withdrawnAmount', 'Số tiền rút:')}</span>
                 <span style={{ fontWeight: 800, color: '#f59e0b', fontSize: '1.05rem' }}>
                   {(successInfo?.amount || 0).toLocaleString('vi-VN')} đ
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-                <span>Ngân hàng nhận:</span>
+                <span>{t('withdraw.receivingBank', 'Ngân hàng nhận:')}</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{successInfo?.bankName}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-                <span>Số tài khoản:</span>
+                <span>{t('withdraw.accountNumber', 'Số tài khoản:')}</span>
                 <span style={{ fontWeight: 700, letterSpacing: '0.5px' }}>{successInfo?.bankAccountNumber}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-                <span>Chủ tài khoản:</span>
+                <span>{t('withdraw.accountHolder', 'Chủ tài khoản:')}</span>
                 <span style={{ fontWeight: 700 }}>{successInfo?.bankAccountName}</span>
               </div>
               <div style={{
@@ -253,7 +255,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                 justifyContent: 'space-between',
                 fontSize: '0.88rem'
               }}>
-                <span style={{ color: 'var(--text-muted)' }}>Số dư khả dụng còn lại:</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('withdraw.remainingBalance', 'Số dư khả dụng còn lại:')}</span>
                 <span style={{ fontWeight: 800, color: '#10b981' }}>
                   {(successInfo?.newBalance || 0).toLocaleString('vi-VN')} đ
                 </span>
@@ -266,7 +268,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                 style={{ flex: 1, padding: '10px 16px', fontWeight: 600 }}
                 onClick={handleClose}
               >
-                Đóng
+                {t('common.close', 'Đóng')}
               </button>
               {onNavigateWallet && (
                 <button
@@ -278,7 +280,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                   }}
                 >
                   <History size={16} />
-                  <span>Xem Lịch Sử</span>
+                  <span>{t('withdraw.viewHistory', 'Xem Lịch Sử')}</span>
                 </button>
               )}
             </div>
@@ -297,7 +299,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
             }}>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-                  Số Dư Khả Dụng Có Thể Rút
+                  {t('withdraw.availableBalanceTitle', 'Số Dư Khả Dụng Có Thể Rút')}
                 </div>
                 <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>
                   {currentBalance.toLocaleString('vi-VN')} <span style={{ fontSize: '0.95rem' }}>đ</span>
@@ -320,7 +322,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                   boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
                 }}
               >
-                RÚT TẤT CẢ (MAX)
+                {t('withdraw.withdrawAll', 'RÚT TẤT CẢ (MAX)')}
               </button>
             </div>
 
@@ -328,10 +330,10 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Số tiền muốn rút <span style={{ color: 'var(--accent-red, #ef4444)' }}>*</span>
+                  {t('withdraw.amountLabel', 'Số tiền muốn rút *')}
                 </label>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Tối đa: <strong style={{ color: '#10b981' }}>{currentBalance.toLocaleString('vi-VN')} đ</strong>
+                  {t('withdraw.maxAmount', 'Tối đa: {amount} đ').replace('{amount}', currentBalance.toLocaleString('vi-VN'))}
                 </span>
               </div>
 
@@ -347,7 +349,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                     borderColor: isOverBalance ? 'var(--accent-red, #ef4444)' : undefined,
                     boxShadow: isOverBalance ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined
                   }}
-                  placeholder="Nhập số tiền..."
+                  placeholder={t('withdraw.amountPlaceholder', 'Nhập số tiền...')}
                   value={amount ? Number(amount).toLocaleString('vi-VN') : ''}
                   onChange={handleAmountChange}
                   autoFocus
@@ -377,7 +379,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                   marginTop: '6px'
                 }}>
                   <AlertCircle size={14} />
-                  <span>Số tiền rút không thể vượt quá số dư khả dụng ({currentBalance.toLocaleString('vi-VN')} đ)</span>
+                  <span>{t('withdraw.overBalanceNotice', 'Số tiền rút không thể vượt quá số dư khả dụng ({amount} đ)').replace('{amount}', currentBalance.toLocaleString('vi-VN'))}</span>
                 </div>
               )}
 
@@ -422,13 +424,13 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
             }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Building size={16} color="var(--primary, #6366f1)" />
-                <span>Tài Khoản Ngân Hàng Nhận Tiền</span>
+                <span>{t('withdraw.bankInfoTitle', 'Tài Khoản Ngân Hàng Nhận Tiền')}</span>
               </div>
 
               {/* Chọn ngân hàng */}
               <div>
                 <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block', fontWeight: 600 }}>
-                  Ngân hàng thụ hưởng <span style={{ color: 'var(--accent-red)' }}>*</span>
+                  {t('withdraw.beneficiaryBank', 'Ngân hàng thụ hưởng *')}
                 </label>
                 <select
                   className="form-control"
@@ -457,7 +459,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
               {/* Số tài khoản */}
               <div>
                 <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block', fontWeight: 600 }}>
-                  Số tài khoản ngân hàng <span style={{ color: 'var(--accent-red)' }}>*</span>
+                  {t('withdraw.bankAccountNum', 'Số tài khoản ngân hàng *')}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -475,7 +477,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
               {/* Tên chủ tài khoản */}
               <div>
                 <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block', fontWeight: 600 }}>
-                  Tên chủ tài khoản (Không dấu hoặc có dấu) <span style={{ color: 'var(--accent-red)' }}>*</span>
+                  {t('withdraw.accountHolderName', 'Tên chủ tài khoản (Không dấu hoặc có dấu) *')}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -503,11 +505,11 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
               gap: '6px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Phí xử lý giao dịch:</span>
-                <span style={{ color: '#10b981', fontWeight: 700 }}>0 đ (Miễn phí)</span>
+                <span>{t('withdraw.processingFee', 'Phí xử lý giao dịch:')}</span>
+                <span style={{ color: '#10b981', fontWeight: 700 }}>{t('withdraw.free', '0 đ (Miễn phí)')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Số dư còn lại dự kiến:</span>
+                <span>{t('withdraw.remainingEstimated', 'Số dư còn lại dự kiến:')}</span>
                 <span style={{ fontWeight: 700, color: numAmount > currentBalance ? 'var(--accent-red)' : 'var(--text-primary)' }}>
                   {Math.max(0, currentBalance - numAmount).toLocaleString('vi-VN')} đ
                 </span>
@@ -522,7 +524,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                 style={{ flex: '0 0 100px' }}
                 onClick={handleClose}
               >
-                Hủy
+                {t('common.cancel', 'Hủy')}
               </button>
               <button
                 type="submit"
@@ -543,11 +545,11 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                 }}
               >
                 {isProcessing ? (
-                  <span>Đang xử lý...</span>
+                  <span>{t('withdraw.processing', 'Đang xử lý...')}</span>
                 ) : (
                   <>
                     <ArrowUpRight size={18} />
-                    <span>Xác Nhận Rút Tiền</span>
+                    <span>{t('withdraw.confirmBtn', 'Xác Nhận Rút Tiền')}</span>
                   </>
                 )}
               </button>

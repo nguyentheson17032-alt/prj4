@@ -3,6 +3,7 @@ import { X, Gift, Sparkles, Send, Wallet, PlusCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import '../../styles/modals.css';
 
@@ -205,6 +206,19 @@ const DEFAULT_GIFTS = [
 export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
   const { user, deductBalance, refreshUser } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
+
+  const getGiftName = (id, fallback) => {
+    switch (id) {
+      case 'boba': return t('donate.giftBoba', fallback);
+      case 'rose': return t('donate.giftRose', fallback);
+      case 'cake': return t('donate.giftCake', fallback);
+      case 'bear': return t('donate.giftBear', fallback);
+      case 'crown': return t('donate.giftCrown', fallback);
+      case 'supercar': return t('donate.giftSupercar', fallback);
+      default: return fallback;
+    }
+  };
   
   const [selectedGift, setSelectedGift] = useState(DEFAULT_GIFTS[0]);
   const [message, setMessage] = useState('');
@@ -292,7 +306,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
         <div className="modal-header">
           <div className="modal-title">
             <Gift size={22} color="#ec4899" />
-            <span>Tặng Quà Cho {playerName}</span>
+            <span>{t('donate.title', 'Tặng Quà Cho {name}').replace('{name}', playerName)}</span>
           </div>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
@@ -304,7 +318,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
           <div className="donate-wallet-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Wallet size={16} color="var(--accent-primary)" />
-              <span style={{ color: 'var(--text-secondary)' }}>Số dư ví hiện tại:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{t('donate.currentBalance', 'Số dư ví hiện tại:')}</span>
               <span className="balance-val">{currentBalance.toLocaleString('vi-VN')} đ</span>
             </div>
             {onOpenDeposit && (
@@ -323,9 +337,9 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
           {/* Gifts Grid */}
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Chọn Món Quà Idol Yêu Thích:</span>
+              <span>{t('donate.chooseGift', 'Chọn Món Quà Idol Yêu Thích:')}</span>
               <span style={{ color: 'var(--accent-pink)', fontSize: '0.8rem', fontWeight: 600 }}>
-                {selectedGift.name} ({selectedGift.exp})
+                {getGiftName(selectedGift.id, selectedGift.name)} ({selectedGift.exp})
               </span>
             </label>
             <div className="gift-grid">
@@ -343,7 +357,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                     >
                       <GiftIcon type={g.id} size={42} />
                     </div>
-                    <span className="gift-name">{g.name}</span>
+                    <span className="gift-name">{getGiftName(g.id, g.name)}</span>
                     <span className="gift-price">{g.price.toLocaleString('vi-VN')} đ</span>
                     <span className="gift-exp-badge">{g.exp}</span>
                   </div>
@@ -354,11 +368,11 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
 
           {/* Message input */}
           <div className="form-group">
-            <label className="form-label">Lời Nhắn Gửi Tặng:</label>
+            <label className="form-label">{t('donate.giftMessage', 'Lời Nhắn Gửi Tặng:')}</label>
             <input
               type="text"
               className="form-control"
-              placeholder="Chúc em live vui vẻ và leo rank mượt mà nha! ❤️"
+              placeholder={t('donate.messagePlaceholder', 'Chúc em live vui vẻ và leo rank mượt mà nha! ❤️')}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               disabled={isSubmitting}
@@ -376,11 +390,11 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
             border: '1px solid var(--border-color)'
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Tổng giá trị quà tặng:</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('donate.totalGiftValue', 'Tổng giá trị quà tặng:')}</span>
               <span style={{ fontSize: '0.75rem', color: isBalanceEnough ? 'var(--accent-green)' : '#ef4444' }}>
                 {isBalanceEnough
-                  ? `Số dư sau khi tặng: ${(currentBalance - selectedGift.price).toLocaleString('vi-VN')} đ`
-                  : 'Số dư không đủ để tặng quà này'}
+                  ? t('donate.remainingBalance', 'Số dư sau khi tặng: {balance} đ').replace('{balance}', (currentBalance - selectedGift.price).toLocaleString('vi-VN'))
+                  : t('donate.insufficientBalance', 'Số dư không đủ để tặng quà này')}
               </span>
             </div>
             <span style={{ fontWeight: 800, color: 'var(--accent-pink)', fontSize: '1.2rem' }}>
@@ -399,16 +413,16 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
             alignItems: 'center',
             justifyContent: 'space-between'
           }}>
-            <span>💡 Chiết khấu hệ thống: <strong>15%</strong></span>
+            <span>{t('donate.systemDiscount', '💡 Chiết khấu hệ thống: 15%')}</span>
             <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
-              Idol thực nhận: {Math.round(selectedGift.price * 0.85).toLocaleString('vi-VN')} đ
+              {t('donate.idolReceives', 'Idol thực nhận: {amount} đ').replace('{amount}', Math.round(selectedGift.price * 0.85).toLocaleString('vi-VN'))}
             </span>
           </div>
         </div>
 
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
-            Hủy
+            {t('donate.cancelBtn', 'Hủy')}
           </button>
           {!isBalanceEnough ? (
             <button
@@ -419,7 +433,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
               }}
             >
               <PlusCircle size={16} />
-              <span>Nạp Thêm Tiền</span>
+              <span>{t('donate.topupBtn', 'Nạp Thêm Tiền')}</span>
             </button>
           ) : (
             <button
@@ -428,7 +442,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
               onClick={handleSendGift}
             >
               <Send size={16} />
-              <span>{isSubmitting ? 'Đang Tặng Quà...' : 'Tặng Quà Ngay'}</span>
+              <span>{isSubmitting ? t('donate.sending', 'Đang Tặng Quà...') : t('donate.sendGiftBtn', 'Tặng Quà Ngay')}</span>
             </button>
           )}
         </div>

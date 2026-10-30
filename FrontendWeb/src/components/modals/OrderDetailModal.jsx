@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { createPortal } from 'react-dom';
 import { 
   X, User, Gamepad2, Calendar, Clock, DollarSign, 
@@ -51,24 +52,25 @@ export const getRefundPercentage = (order) => {
   return null;
 };
 
-const getStatusBadge = (status, refundPercentage) => {
+const getStatusBadge = (status, refundPercentage, t) => {
   const st = (status || 'PENDING').toUpperCase();
+  const tr = (k, fb) => (t ? t(k, fb) : fb);
   switch (st) {
     case 'COMPLETED':
-      return { label: 'Đã hoàn thành', bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: 'rgba(16, 185, 129, 0.3)' };
+      return { label: tr('orders.statusCompleted', 'Đã hoàn thành'), bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: 'rgba(16, 185, 129, 0.3)' };
     case 'CONFIRMED':
-      return { label: 'Đã xác nhận', bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', border: 'rgba(59, 130, 246, 0.3)' };
+      return { label: tr('orders.accept', 'Đã xác nhận'), bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', border: 'rgba(59, 130, 246, 0.3)' };
     case 'PENDING':
-      return { label: 'Chờ xác nhận', bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)' };
+      return { label: tr('orders.statusPending', 'Chờ xác nhận'), bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)' };
     case 'CANCELLED':
     case 'CANCELED':
     case 'REJECTED':
-      return { label: 'Đã hủy', bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' };
+      return { label: tr('orders.statusCancelled', 'Đã hủy'), bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' };
     case 'EXPIRED':
-      return { label: 'Hết hạn xác nhận', bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' };
+      return { label: tr('orders.statusExpired', 'Hết hạn xác nhận'), bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' };
     case 'REFUNDED':
       return { 
-        label: refundPercentage ? `Đã hoàn tiền ${refundPercentage}%` : 'Đã hoàn tiền', 
+        label: refundPercentage ? `${tr('orders.statusRefunded', 'Đã hoàn tiền')} ${refundPercentage}%` : tr('orders.statusRefunded', 'Đã hoàn tiền'), 
         bg: 'rgba(168, 85, 247, 0.15)', 
         color: '#a855f7', 
         border: 'rgba(168, 85, 247, 0.3)' 
@@ -79,10 +81,11 @@ const getStatusBadge = (status, refundPercentage) => {
 };
 
 export const OrderDetailModal = ({ isOpen, onClose, order }) => {
+  const { t } = useLanguage();
   if (!isOpen || !order) return null;
 
   const refundPercent = getRefundPercentage(order);
-  const stBadge = getStatusBadge(order.status, refundPercent);
+  const stBadge = getStatusBadge(order.status, refundPercent, t);
   const totalPrice = Number(order.totalPrice || order.price || 0);
   const platformFee = Number(order.platformFee !== undefined ? order.platformFee : Math.round(totalPrice * 0.15));
   const playerReceived = Number(order.playerReceived !== undefined ? order.playerReceived : (totalPrice - platformFee));
@@ -155,7 +158,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>
-                  Đơn Hàng #{order.id}
+                  {t('orderDetail.title', 'Đơn Hàng #{id}').replace('{id}', order.id)}
                 </h3>
                 <span
                   style={{
@@ -172,7 +175,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
                 </span>
               </div>
               <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: 'var(--text-muted, #94a3b8)' }}>
-                Thời gian tạo: {formatDateTime(order.startTime || order.createdAt)}
+                {t('orderDetail.createdAt', 'Thời gian tạo: {time}').replace('{time}', formatDateTime(order.startTime || order.createdAt))}
               </p>
             </div>
           </div>
@@ -216,7 +219,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  👤 Người Thuê (Khách hàng)
+                  {t('orderDetail.renter', '👤 Người Thuê (Khách hàng)')}
                 </span>
                 {order.renterId && (
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '6px' }}>
@@ -232,7 +235,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
                 />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff' }}>{renterDisplayName}</div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)' }}>Tài khoản thành viên</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.memberAccount', 'Tài khoản thành viên')}</div>
                 </div>
               </div>
             </div>
@@ -251,7 +254,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  🎮 Game Thủ (Idol PlayZone)
+                  {t('orderDetail.player', '🎮 Game Thủ (Idol PlayZone)')}
                 </span>
                 {order.playerId && (
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '6px' }}>
@@ -288,21 +291,21 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
             }}
           >
             <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>
-              ⏱️ Chi Tiết Lịch Thuê & Thời Lượng
+              {t('orderDetail.scheduleTitle', '⏱️ Chi Tiết Lịch Thuê & Thời Lượng')}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>Tựa Game</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.game', 'Tựa Game')}</div>
                 <div style={{ fontWeight: 600, color: '#fff', marginTop: '3px' }}>{order.game || 'Duo Game'}</div>
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>Thời Lượng Thuê</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.duration', 'Thời Lượng Thuê')}</div>
                 <div style={{ fontWeight: 600, color: '#fff', marginTop: '3px' }}>
                   {order.hours ? `${order.hours} giờ` : '1 giờ'}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>Khung Giờ</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.timeSlot', 'Khung Giờ')}</div>
                 <div style={{ fontWeight: 600, color: '#fff', marginTop: '3px', fontSize: '0.85rem' }}>
                   {order.hireTime || formatDateTime(order.startTime)}
                 </div>
@@ -311,7 +314,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
 
             {order.specialRequest && (
               <div style={{ marginTop: '4px', background: 'rgba(0, 0, 0, 0.25)', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid #6366f1' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '2px' }}>💬 Lời nhắn / Ghi chú đặc biệt:</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '2px' }}>{t('orderDetail.note', '💬 Lời nhắn / Ghi chú đặc biệt:')}</div>
                 <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontStyle: 'italic' }}>"{order.specialRequest}"</div>
               </div>
             )}
@@ -330,11 +333,11 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
             }}
           >
             <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>
-              💰 Phân Bổ Tài Chính & Chiết Khấu
+              {t('orderDetail.financialTitle', '💰 Phân Bổ Tài Chính & Chiết Khấu')}
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #94a3b8)' }}>Tổng thanh toán (Người thuê trả)</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.totalPayment', 'Tổng thanh toán (Người thuê trả)')}</span>
               <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981' }}>
                 {totalPrice.toLocaleString('vi-VN')} đ
               </span>
@@ -342,7 +345,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #94a3b8)' }}>
-                Phí dịch vụ nền tảng PlayZone (15%)
+                {t('orderDetail.platformFee', 'Phí dịch vụ nền tảng PlayZone (15%)')}
               </span>
               <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b' }}>
                 + {platformFee.toLocaleString('vi-VN')} đ
@@ -352,7 +355,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
             {refundPercent > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(168, 85, 247, 0.12)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
                 <span style={{ fontSize: '0.85rem', color: '#c084fc', fontWeight: 700 }}>
-                  💸 Đã hoàn tiền cho người thuê ({refundPercent}%)
+                  {t('orderDetail.refundedClient', '💸 Đã hoàn tiền cho người thuê ({percent}%)').replace('{percent}', refundPercent)}
                 </span>
                 <span style={{ fontSize: '1rem', fontWeight: 800, color: '#c084fc' }}>
                   {refundAmount.toLocaleString('vi-VN')} đ
@@ -362,7 +365,9 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px dashed rgba(255, 255, 255, 0.1)' }}>
               <span style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 600 }}>
-                {refundPercent > 0 ? `Idol thực nhận (sau khi trừ ${refundPercent}% hoàn tiền)` : 'Idol thực nhận (85%)'}
+                {refundPercent > 0
+                  ? t('orderDetail.idolReceivesNet', 'Idol thực nhận (sau khi trừ {percent}% hoàn tiền)').replace('{percent}', refundPercent)
+                  : t('orderDetail.idolReceives85', 'Idol thực nhận (85%)')}
               </span>
               <span style={{ fontSize: '1rem', fontWeight: 800, color: '#6366f1' }}>
                 {playerReceived.toLocaleString('vi-VN')} đ
@@ -371,12 +376,12 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
 
             {order.payoutStatus && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '0.8rem' }}>
-                <span style={{ color: 'var(--text-muted, #94a3b8)' }}>Trạng thái quyết toán ví Idol:</span>
+                <span style={{ color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.payoutStatus', 'Trạng thái quyết toán ví Idol:')}</span>
                 <span style={{ 
                   fontWeight: 700, 
                   color: order.payoutStatus === 'RELEASED' ? '#10b981' : order.payoutStatus === 'FROZEN' ? '#ef4444' : '#f59e0b' 
                 }}>
-                  {order.payoutStatus === 'RELEASED' ? '✅ Đã quyết toán' : order.payoutStatus === 'FROZEN' ? '❄️ Tạm đóng băng' : '⏳ Chờ duyệt giải ngân'}
+                  {order.payoutStatus === 'RELEASED' ? t('orderDetail.settled', '✅ Đã quyết toán') : order.payoutStatus === 'FROZEN' ? t('orderDetail.frozen', '❄️ Tạm đóng băng') : t('orderDetail.awaitingRelease', '⏳ Chờ duyệt giải ngân')}
                 </span>
               </div>
             )}
@@ -398,7 +403,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Star size={16} color="#f59e0b" fill="#f59e0b" />
                 <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
-                  Đánh giá từ khách hàng: {order.reviewRating || 5} / 5 ⭐
+                  {t('orderDetail.clientReview', 'Đánh giá từ khách hàng: {rating} / 5 ⭐').replace('{rating}', order.reviewRating || 5)}
                 </span>
               </div>
               {order.reviewComment && (
@@ -425,10 +430,10 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
               <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#ef4444' }}>
-                  Đơn hàng này có khiếu nại ({order.reportStatus || 'Đang xử lý'})
+                  {t('orderDetail.disputeNotice', 'Đơn hàng này có khiếu nại ({status})').replace('{status}', order.reportStatus || 'Đang xử lý')}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)', marginTop: '2px' }}>
-                  Vui lòng kiểm tra mục Báo Cáo & Khiếu Nại để xem chi tiết bằng chứng và lịch sử khiếu nại.
+                  {t('orderDetail.disputeHint', 'Vui lòng kiểm tra mục Báo Cáo & Khiếu Nại để xem chi tiết bằng chứng và lịch sử khiếu nại.')}
                 </div>
               </div>
             </div>
@@ -457,7 +462,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
               cursor: 'pointer'
             }}
           >
-            Đóng
+            {t('common.close', 'Đóng')}
           </button>
         </div>
       </div>

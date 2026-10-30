@@ -251,7 +251,9 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
               <div
                 className="balance-chip"
                 onClick={onOpenDeposit}
-                title={`Số dư khả dụng: ${(user?.balance || user?.coin || 0).toLocaleString('vi-VN')} đ${user?.frozenBalance > 0 ? ` (Đang đóng băng: ${user.frozenBalance.toLocaleString('vi-VN')} đ)` : ''} - Bấm để nạp thêm`}
+                title={t('nav.balanceTooltip', 'Số dư khả dụng: {balance} đ{frozen} - Bấm để nạp thêm')
+                  .replace('{balance}', (user?.balance || user?.coin || 0).toLocaleString('vi-VN'))
+                  .replace('{frozen}', user?.frozenBalance > 0 ? t('nav.frozenEscrowTag', ' (Đang đóng băng: {amount} đ)').replace('{amount}', user.frozenBalance.toLocaleString('vi-VN')) : '')}
                 style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 <Wallet size={16} color="var(--primary-light, #06b6d4)" />
@@ -272,7 +274,7 @@ export const Navbar = ({ onOpenDeposit, onOpenWithdraw, onOpenAuth }) => {
                       alignItems: 'center',
                       gap: '2px'
                     }}
-                    title={`Đang đóng băng: ${user.frozenBalance.toLocaleString('vi-VN')} đ (Tự động vào số dư khả dụng sau 24h hoặc khi khách đánh giá ≥4★)`}
+                    title={t('nav.frozenTooltip', 'Đang đóng băng: {amount} đ (Tự động vào số dư khả dụng sau 24h hoặc khi khách đánh giá ≥4★)').replace('{amount}', user.frozenBalance.toLocaleString('vi-VN'))}
                   >
                     ⏳ {user.frozenBalance.toLocaleString('vi-VN')}đ
                   </span>

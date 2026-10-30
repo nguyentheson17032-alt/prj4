@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { X, Star, Send } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/modals.css';
 
 export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -28,12 +30,12 @@ export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
   if (!isOpen || !order || !isCurrentRenter) return null;
 
   const sampleTags = [
-    'Gánh team cực tốt',
-    'Giọng nói dễ thương',
-    'Rất nhiệt tình',
-    'Kỹ năng đỉnh cao',
-    'Đúng giờ',
-    'Hài hước vui vẻ'
+    { key: 'rate.tagCarry', fallback: 'Gánh team cực tốt' },
+    { key: 'rate.tagSweetVoice', fallback: 'Giọng nói dễ thương' },
+    { key: 'rate.tagEnthusiastic', fallback: 'Rất nhiệt tình' },
+    { key: 'rate.tagTopTier', fallback: 'Kỹ năng đỉnh cao' },
+    { key: 'rate.tagPunctual', fallback: 'Đúng giờ' },
+    { key: 'rate.tagHumorous', fallback: 'Hài hước vui vẻ' }
   ];
 
   const toggleTag = (tag) => {
@@ -56,7 +58,7 @@ export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
         <div className="modal-header">
           <div className="modal-title">
             <Star size={22} color="#f59e0b" fill="#f59e0b" />
-            <span>Đánh Giá Dịch Vụ Player</span>
+            <span>{t('rate.title', 'Đánh Giá Dịch Vụ Player')}</span>
           </div>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
@@ -72,7 +74,7 @@ export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
               style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 10px auto', border: '2px solid var(--primary)' }}
             />
             <h4 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{order.player?.fullName}</h4>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Đơn hàng: {order.id} • {order.game}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t('rate.orderLabel', 'Đơn hàng: #{id} • {game}').replace('{id}', order.id).replace('{game}', order.game)}</div>
           </div>
 
           {/* Star rating selector */}
@@ -97,29 +99,33 @@ export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
 
           {/* Tags */}
           <div className="form-group">
-            <label className="form-label">Chọn Nhãn Đánh Giá:</label>
+            <label className="form-label">{t('rate.selectTags', 'Chọn Nhãn Đánh Giá:')}</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {sampleTags.map((tag) => (
-                <button
-                  type="button"
-                  key={tag}
-                  className={`badge ${selectedTags.includes(tag) ? 'badge-primary' : 'badge-offline'}`}
-                  style={{ cursor: 'pointer', padding: '6px 12px', fontSize: '0.82rem' }}
-                  onClick={() => toggleTag(tag)}
-                >
-                  {tag}
-                </button>
-              ))}
+              {sampleTags.map((item) => {
+                const tagLabel = t(item.key, item.fallback);
+                const isSelected = selectedTags.includes(item.fallback) || selectedTags.includes(tagLabel);
+                return (
+                  <button
+                    type="button"
+                    key={item.key}
+                    className={`badge ${isSelected ? 'badge-primary' : 'badge-offline'}`}
+                    style={{ cursor: 'pointer', padding: '6px 12px', fontSize: '0.82rem' }}
+                    onClick={() => toggleTag(tagLabel)}
+                  >
+                    {tagLabel}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Comment */}
           <div className="form-group">
-            <label className="form-label">Nhận Xét Chi Tiết:</label>
+            <label className="form-label">{t('rate.detailedReview', 'Nhận Xét Chi Tiết:')}</label>
             <textarea
               className="form-control"
               rows="3"
-              placeholder="Chia sẻ trải nghiệm chơi game của bạn với player này..."
+              placeholder={t('rate.reviewPlaceholder', 'Chia sẻ trải nghiệm chơi game của bạn với player này...')}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />
@@ -127,11 +133,11 @@ export const RateOrderModal = ({ order, isOpen, onClose, onReviewed }) => {
 
           <div className="modal-footer" style={{ padding: '16px 0 0 0', borderTop: 'none' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Hủy
+              {t('rate.cancel', 'Hủy')}
             </button>
             <button type="submit" className="btn btn-primary">
               <Send size={16} />
-              <span>Gửi Đánh Giá</span>
+              <span>{t('rate.submit', 'Gửi Đánh Giá')}</span>
             </button>
           </div>
         </form>

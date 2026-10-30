@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import { GAME_TOPICS_20 } from '../../constants/gamesList';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +24,7 @@ import '../../styles/modals.css';
 export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday = false }) => {
   const { user, isPlayer } = useAuth();
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [content, setContent] = useState('');
@@ -255,7 +257,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
             </div>
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#fff' }}>
-                Đăng Khoảnh Khắc <span className="gradient-text">Gaming</span>
+                {t('createMoment.title', 'Đăng Khoảnh Khắc Mới')}
               </h2>
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Chia sẻ chiến tích, highlight leo rank cùng người hâm mộ
@@ -769,7 +771,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 disabled={isSubmitting}
                 style={{ padding: '10px 20px', borderRadius: '12px' }}
               >
-                Hủy
+                {t('common.cancel', 'Hủy')}
               </button>
               <button
                 type="submit"
@@ -790,7 +792,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 {isSubmitting ? (
                   <>
                     <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Đang Đăng Khoảnh Khắc...</span>
+                    <span>{t('createMoment.submitting', 'Đang Đăng...')}</span>
                   </>
                 ) : hasPostedToday ? (
                   <>
@@ -800,7 +802,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 ) : (
                   <>
                     <Send size={16} />
-                    <span>Đăng Khoảnh Khắc</span>
+                    <span>{t('createMoment.submitBtn', 'Đăng Bài')}</span>
                   </>
                 )}
               </button>
