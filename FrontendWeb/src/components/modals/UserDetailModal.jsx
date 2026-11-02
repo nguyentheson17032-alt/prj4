@@ -1,8 +1,10 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { User, Mail, Phone, Calendar, DollarSign, Shield, X, Clock, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const UserDetailModal = ({ isOpen, onClose, user }) => {
+  const { t, language } = useLanguage();
   if (!isOpen || !user) return null;
 
   const isAdmin = user.roles?.some(r => r.includes('ADMIN'));
@@ -53,6 +55,7 @@ export const UserDetailModal = ({ isOpen, onClose, user }) => {
         >
           <button
             onClick={onClose}
+            aria-label={t('common.close', 'Đóng')}
             style={{
               background: 'rgba(0, 0, 0, 0.4)',
               border: 'none',
@@ -97,7 +100,7 @@ export const UserDetailModal = ({ isOpen, onClose, user }) => {
                   border: `1px solid ${isBanned ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
                 }}
               >
-                {isBanned ? '🔒 Đang Bị Khóa' : '🟢 Sẵn Sàng'}
+                {isBanned ? t('admin.statusBannedUser', '🔒 Đang Bị Khóa') : t('admin.statusActiveUser', '🟢 Sẵn Sàng')}
               </span>
               <span
                 style={{
@@ -109,7 +112,7 @@ export const UserDetailModal = ({ isOpen, onClose, user }) => {
                   color: isAdmin ? '#f43f5e' : isPlayer ? '#06b6d4' : 'var(--text-muted)'
                 }}
               >
-                {isAdmin ? '🛡️ Admin' : isPlayer ? '🎮 Game thủ' : '👤 Thành viên'}
+                {isAdmin ? t('admin.roleAdminBadge', '🛡️ Admin') : isPlayer ? t('admin.rolePlayerBadge', '🎮 Game thủ') : t('admin.roleUserBadge', '👤 Thành viên')}
               </span>
             </div>
           </div>
@@ -135,19 +138,19 @@ export const UserDetailModal = ({ isOpen, onClose, user }) => {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f87171', fontWeight: 700, fontSize: '0.88rem' }}>
                 <AlertTriangle size={16} />
-                <span>Chi tiết tài khoản đang bị khóa:</span>
+                <span>{t('admin.banDetailsAlertTitle', 'Chi tiết tài khoản đang bị khóa:')}</span>
               </div>
               <div style={{ fontSize: '0.85rem', color: '#f8fafc' }}>
-                <strong>Lý do:</strong> {activeBan?.reason || 'Khóa bởi Ban Quản Trị'}
+                <strong>{t('admin.banReasonLabel', 'Lý do:')}</strong> {activeBan?.reason || t('admin.banByAdminFallback', 'Khóa bởi Ban Quản Trị')}
               </div>
               {activeBan?.description && (
                 <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
-                  <strong>Mô tả:</strong> {activeBan.description}
+                  <strong>{t('admin.descColon', 'Mô tả:')}</strong> {activeBan.description}
                 </div>
               )}
               {activeBan?.banExpiresAt && (
                 <div style={{ fontSize: '0.8rem', color: '#f59e0b', marginTop: '2px' }}>
-                  ⏳ Hạn mở khóa: {new Date(activeBan.banExpiresAt).toLocaleString('vi-VN')}
+                  ⏳ {t('admin.unbanDateLabel', 'Hạn mở khóa:')} {new Date(activeBan.banExpiresAt).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN')}
                 </div>
               )}
             </div>
@@ -163,30 +166,30 @@ export const UserDetailModal = ({ isOpen, onClose, user }) => {
             }}
           >
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Email</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('auth.email', 'Email')}</div>
               <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#f8fafc', wordBreak: 'break-all' }}>
                 {user.email || '—'}
               </div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Số dư ví</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('admin.walletBalanceLabel', 'Số dư ví')}</div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: '#10b981' }}>
                 {((user.coin ?? user.walletBalance ?? user.balance ?? 0)).toLocaleString('vi-VN')} đ
               </div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Số điện thoại</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('admin.phoneNumberLabel', 'Số điện thoại')}</div>
               <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#f8fafc' }}>
                 {user.phoneNumber || user.phone || '—'}
               </div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Ngày tạo</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('admin.createdAtLabel', 'Ngày tạo')}</div>
               <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#f8fafc' }}>
-                {user.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '—'}
+                {user.createdAt ? new Date(user.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'vi-VN') : '—'}
               </div>
             </div>
           </div>
@@ -197,7 +200,7 @@ export const UserDetailModal = ({ isOpen, onClose, user }) => {
               className="btn btn-secondary"
               style={{ padding: '8px 24px', fontSize: '0.88rem' }}
             >
-              Đóng
+              {t('common.close', 'Đóng')}
             </button>
           </div>
         </div>

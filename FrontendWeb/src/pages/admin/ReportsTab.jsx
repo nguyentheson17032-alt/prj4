@@ -4,12 +4,14 @@ import {
   RefreshCw, Clock, X, Eye, Download, RotateCcw
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import { getUserAvatar } from '../../utils/avatarUtils';
 import { MetricCard, parseDateToDateObj } from './adminHelpers';
 
 export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadReports, onStatsRefresh }) => {
   const { addToast } = useToast();
+  const { t, language } = useLanguage();
   const [expandedId, setExpandedId] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [resolutionTexts, setResolutionTexts] = useState({});
@@ -56,8 +58,8 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
     return Array.from(set);
   }, [reportsList]);
 
-  const getReporterName = (r) => r.reporter?.username || r.reporter?.fullName || r.reportedBy || 'Khách hàng';
-  const getTargetName = (r) => r.reportedPlayer?.username || r.reportedPlayer?.user?.username || r.targetUser || 'Game thủ';
+  const getReporterName = (r) => r.reporter?.username || r.reporter?.fullName || r.reportedBy || t('admin.clientGuest', 'Khách hàng');
+  const getTargetName = (r) => r.reportedPlayer?.username || r.reportedPlayer?.user?.username || r.targetUser || t('admin.playerFallback', 'Game thủ');
 
   // Lọc dữ liệu khiếu nại
   const filtered = useMemo(() => {
@@ -169,10 +171,10 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
       } else if (onStatsRefresh) {
         await onStatsRefresh();
       }
-      addToast('Đã làm mới danh sách khiếu nại', 'info');
+      addToast(t('admin.toastRefreshSuccess', 'Đã làm mới danh sách khiếu nại'), 'info');
     } catch (e) {
       console.error(e);
-      addToast('Lỗi khi tải lại dữ liệu khiếu nại', 'error');
+      addToast(t('admin.toastDisputesRefreshError', 'Lỗi khi tải lại dữ liệu khiếu nại'), 'error');
     } finally {
       setIsRefreshing(false);
     }
@@ -181,29 +183,35 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
   // Xuất file CSV
   const handleExportCSV = () => {
     if (filtered.length === 0) {
-      addToast('Không có dữ liệu khiếu nại để xuất file', 'warning');
+      addToast(t('admin.noDisputeDataToExport', 'Không có dữ liệu khiếu nại để xuất file'), 'warning');
       return;
     }
     const headers = [
-      'Mã Khiếu Nại',
-      'Người Khiếu Nại',
-      'Game Thủ Bị Tố Cáo',
-      'Mã Đơn Thuê',
-      'Giá Đơn (VNĐ)',
-      'Lý Do',
-      'Mô Tả',
-      'Trạng Thái',
-      'Tỷ Lệ Hoàn (%)',
-      'Số Tiền Hoàn (VNĐ)',
-      'Kết Quả Xử Lý',
-      'Ngày Tạo'
+      t('admin.colDisputeId', 'Mã Khiếu Nại'),
+      t('admin.colReporter', 'Người Khiếu Nại'),
+      t('admin.colReportedIdol', 'Game Thủ Bị Tố Cáo'),
+      t('admin.colRelatedOrder', 'Mã Đơn Thuê'),
+      `${t('admin.colTotalPrice', 'Giá Đơn')} (${language === 'en' ? 'VND' : 'VNĐ'})`,
+      t('admin.colReason', 'Lý Do'),
+      t('admin.colDescription', 'Mô Tả'),
+      t('admin.colStatus', 'Trạng Thái'),
+      `${t('admin.colRefundPercent', 'Tỷ Lệ Hoàn')} (%)`,
+      `${t('admin.colRefundAmount', 'Số Tiền Hoàn')} (${language === 'en' ? 'VND' : 'VNĐ'})`,
+      t('admin.colResolution', 'Kết Quả Xử Lý'),
+      t('admin.colCreatedAt', 'Ngày Tạo')
     ];
 
     const rows = filtered.map(r => {
       const reporter = getReporterName(r);
       const target = getTargetName(r);
-      const statusText = r.status === 'RESOLVED' ? 'Đã hoàn tiền' : r.status === 'REJECTED' ? 'Đã từ chối' : r.status === 'INVESTIGATING' ? 'Đang điều tra' : 'Chờ xử lý';
-      const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : '—';
+      const statusText = r.status === 'RESOLVED'
+        ? t('admin.statusRefunded', 'Đã hoàn tiền')
+        : r.status === 'REJECTED'
+          ? t('admin.statusRejected', 'Đã từ chối')
+          : r.status === 'INVESTIGATING'
+            ? t('admin.investigatingDisputes', 'Đang điều tra')
+            : t('admin.statusPendingAction', 'Chờ xử lý');
+      const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN').replace(/,/g, '') : '—';
       return [
         r.id,
         '"' + String(reporter).replace(/"/g, '""') + '"',
@@ -220,17 +228,17 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
       ];
     });
 
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const csvContent = '﻿' + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `danh_sach_khieu_nai_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', language === 'en' ? `disputes_list_${new Date().toISOString().slice(0, 10)}.csv` : `danh_sach_khieu_nai_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    addToast(`Đã xuất file CSV cho ${filtered.length} khiếu nại!`, 'success');
+    addToast(t('admin.toastExportSuccess', `Đã xuất file CSV cho ${filtered.length} khiếu nại!`), 'success');
   };
 
   const handleResolve = async (id) => {
@@ -238,8 +246,8 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
     const percent = refundPercentages[id] !== undefined ? Number(refundPercentages[id]) : 100;
     const finalPercent = (percent > 0 && percent <= 100) ? percent : 100;
     const defaultResolution = report?.order
-      ? `Admin chấp thuận khiếu nại (Hoàn tiền ${finalPercent}%)`
-      : 'Admin đã chấp thuận khiếu nại';
+      ? t('admin.defaultApprovedWithPercent', 'Admin chấp thuận khiếu nại (Hoàn tiền {percent}%)').replace('{percent}', finalPercent)
+      : t('admin.defaultApprovedDispute', 'Admin đã chấp thuận khiếu nại');
     const resolution = resolutionTexts[id]?.trim() || defaultResolution;
 
     try {
@@ -254,32 +262,32 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
       setExpandedId(null);
       setSelectedReport(null);
       if (onStatsRefresh) onStatsRefresh();
-      addToast(`Đã chấp thuận khiếu nại & hoàn tiền ${finalPercent}% thành công (Số tiền còn lại đã chuyển vào số dư khả dụng của idol)!`, 'success');
+      addToast(t('admin.toastResolveSuccess', `Đã giải quyết khiếu nại #${id} thành công!`).replace('#{id}', `#${id}`), 'success');
     } catch (e) {
-      addToast('Lỗi khi xử lý khiếu nại!', 'error');
+      addToast(t('admin.toastResolveError', 'Lỗi khi xử lý khiếu nại!'), 'error');
     }
   };
 
   const handleReject = async (id) => {
-    const resolution = resolutionTexts[id]?.trim() || 'Admin từ chối khiếu nại';
+    const resolution = resolutionTexts[id]?.trim() || t('admin.defaultRejectDispute', 'Admin từ chối khiếu nại');
     try {
       await api.updateReportStatus(id, 'REJECTED', resolution);
       setReportsList(prev => prev.map(r => r.id === id ? { ...r, status: 'REJECTED', resolution } : r));
       setExpandedId(null);
       setSelectedReport(null);
       if (onStatsRefresh) onStatsRefresh();
-      addToast('Đã từ chối khiếu nại (Toàn bộ số tiền đóng băng đã chuyển vào số dư khả dụng của idol)!', 'success');
+      addToast(t('admin.toastRejectReportSuccess', `Đã bác bỏ khiếu nại #${id} thành công!`).replace('#{id}', `#${id}`), 'success');
     } catch (e) {
-      addToast('Lỗi khi từ chối khiếu nại!', 'error');
+      addToast(t('admin.toastRejectError', 'Lỗi khi từ chối khiếu nại!'), 'error');
     }
   };
 
   const ReportStatusBadge = ({ status }) => {
     const map = {
-      PENDING: { label: 'Chờ xử lý', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-      INVESTIGATING: { label: 'Đang điều tra', bg: 'rgba(99,102,241,0.15)', color: '#6366f1', border: 'rgba(99,102,241,0.3)' },
-      RESOLVED: { label: 'Đã hoàn tiền', bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-      REJECTED: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+      PENDING: { label: t('admin.statusPendingAction', 'Chờ xử lý'), bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+      INVESTIGATING: { label: t('admin.investigatingDisputes', 'Đang điều tra'), bg: 'rgba(99,102,241,0.15)', color: '#6366f1', border: 'rgba(99,102,241,0.3)' },
+      RESOLVED: { label: t('admin.statusRefunded', 'Đã hoàn tiền'), bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
+      REJECTED: { label: t('admin.statusRejected', 'Từ chối'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
     };
     const s = map[status?.toUpperCase()] || map.PENDING;
     return (
@@ -306,47 +314,43 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
         gap: '14px'
       }}>
         <MetricCard
-          label="Tổng Khiếu Nại"
+          label={t('admin.totalDisputes', 'Tổng Khiếu Nại')}
           value={totalReports}
-          sub={`${withOrderCount} gắn đơn • ${withoutOrderCount} tự do`}
+          sub={t('admin.withOrderCountSub', '{withOrder} gắn đơn • {withoutOrder} tự do')
+            .replace('{withOrder}', withOrderCount)
+            .replace('{withoutOrder}', withoutOrderCount)}
           icon={AlertTriangle}
           color="#6366f1"
         />
         <MetricCard
-          label="Chờ Xử Lý"
+          label={t('admin.pendingDisputes', 'Chờ Xử Lý')}
           value={pendingCount}
-          sub={pendingCount > 0 ? "Cần admin xem xét ngay" : "Không có tồn đọng"}
+          sub={pendingCount > 0 ? t('admin.pendingDisputesSub', 'Cần admin xem xét ngay') : t('admin.noPendingDisputesSub', 'Không có tồn đọng')}
           icon={Clock}
           color="#f59e0b"
         />
         <MetricCard
-          label="Đã Hoàn Tiền"
+          label={t('admin.resolvedDisputes', 'Đã Hoàn Tiền')}
           value={resolvedCount}
-          sub={`Chiếm ${totalReports > 0 ? Math.round((resolvedCount / totalReports) * 100) : 0}% tổng đơn`}
+          sub={t('admin.resolvedDisputesSub', 'Chiếm {percent}% tổng đơn')
+            .replace('{percent}', totalReports > 0 ? Math.round((resolvedCount / totalReports) * 100) : 0)}
           icon={CheckCircle2}
           color="#10b981"
         />
         <MetricCard
-          label="Đã Từ Chối"
+          label={t('admin.rejectedDisputes', 'Đã Từ Chối')}
           value={rejectedCount}
-          sub="Tiền trả lại ví khả dụng idol"
+          sub={t('admin.rejectedDisputesSub', 'Tiền trả lại ví khả dụng idol')}
           icon={XCircle}
           color="#ef4444"
         />
         <MetricCard
-          label="Tổng Tiền Đã Hoàn"
+          label={t('admin.totalRefundedDisputes', 'Tổng Tiền Đã Hoàn')}
           value={`${totalRefundAmount.toLocaleString('vi-VN')} đ`}
-          sub="Tổng tiền đã hoàn trả khách"
+          sub={t('admin.totalRefundedDisputesSub', 'Tổng tiền đã hoàn trả khách')}
           icon={RotateCcw}
           color="#0ea5e9"
         />
-        {/* <MetricCard
-          label="Tỷ Lệ Xử Lý"
-          value={`${resolutionRate}%`}
-          sub={`${resolvedCount + rejectedCount} / ${totalReports} khiếu nại`}
-          icon={TrendingUp}
-          color="#a855f7"
-        /> */}
       </div>
 
       {/* ─── MAIN CONTAINER: BỘ LỌC, TÌM KIẾM VÀ DANH SÁCH ─── */}
@@ -356,13 +360,13 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
           <div>
             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <AlertTriangle size={20} color="#f59e0b" />
-              <span>Quản Lý Khiếu Nại & Vi Phạm</span>
+              <span>{t('admin.disputesManagementTitle', 'Quản Lý Khiếu Nại & Vi Phạm')}</span>
               <span style={{ fontSize: '0.82rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
                 {filtered.length} / {totalReports}
               </span>
             </h3>
             <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Theo dõi, điều tra tranh chấp đơn thuê và phân xử tỷ lệ hoàn tiền giữa khách hàng và idol
+              {t('admin.disputesManagementSub', 'Theo dõi, điều tra tranh chấp đơn thuê và phân xử tỷ lệ hoàn tiền giữa khách hàng và idol')}
             </p>
           </div>
 
@@ -373,7 +377,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               <input
                 type="text"
                 className="form-control"
-                placeholder="Tìm mã khiếu nại, đơn, idol..."
+                placeholder={t('admin.searchReportPlaceholder', 'Tìm mã khiếu nại, đơn, idol...')}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 style={{ paddingLeft: '34px', paddingRight: search ? '30px' : '12px', height: '38px', fontSize: '0.85rem', width: '100%', borderRadius: '10px' }}
@@ -393,7 +397,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                     cursor: 'pointer',
                     padding: '2px'
                   }}
-                  title="Xóa tìm kiếm"
+                  title={t('common.clearSearch', 'Xóa tìm kiếm')}
                 >
                   <X size={14} />
                 </button>
@@ -406,10 +410,10 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               style={{ height: '38px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px' }}
               onClick={handleExportCSV}
               disabled={filtered.length === 0}
-              title="Xuất file CSV báo cáo"
+              title={t('admin.exportCsv', 'Xuất file CSV báo cáo')}
             >
               <Download size={15} />
-              <span>Xuất CSV</span>
+              <span>{t('admin.exportCsv', 'Xuất CSV')}</span>
             </button>
             <button
               type="button"
@@ -417,14 +421,14 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               style={{ height: '38px', width: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px' }}
               onClick={handleRefresh}
               disabled={isRefreshing || loading}
-              title="Làm mới dữ liệu"
+              title={t('admin.refresh', 'Làm mới dữ liệu')}
             >
               <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
           </div>
         </div>
 
-        {/* Responsive Filter Toolbar - Giống Đơn Hàng */}
+        {/* Responsive Filter Toolbar */}
         <div
           style={{
             display: 'flex',
@@ -443,10 +447,10 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="PENDING">⏳ Chờ xử lý / Đang điều tra</option>
-              <option value="RESOLVED">✅ Đã hoàn tiền</option>
-              <option value="REJECTED">❌ Đã từ chối</option>
+              <option value="all">{t('admin.allStatuses', 'Tất cả trạng thái')}</option>
+              <option value="PENDING">{t('admin.statusPendingInvestigation', '⏳ Chờ xử lý / Đang điều tra')}</option>
+              <option value="RESOLVED">{t('admin.statusResolvedOption', '✅ Đã hoàn tiền')}</option>
+              <option value="REJECTED">{t('admin.statusRejectedOption', '❌ Đã từ chối')}</option>
             </select>
           </div>
 
@@ -458,7 +462,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               value={reasonFilter}
               onChange={e => setReasonFilter(e.target.value)}
             >
-              <option value="all">⚡ Tất cả lý do ({uniqueReasons.length})</option>
+              <option value="all">⚡ {t('admin.allDisputeReasons', 'Tất cả lý do')} ({uniqueReasons.length})</option>
               {uniqueReasons.map(r => (
                 <option key={r} value={r}>{r}</option>
               ))}
@@ -473,9 +477,9 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               value={typeFilter}
               onChange={e => setTypeFilter(e.target.value)}
             >
-              <option value="all">📦 Tất cả ({totalReports})</option>
-              <option value="with_order">📦 Có đơn thuê ({withOrderCount})</option>
-              <option value="without_order">👤 Tố cáo tự do ({withoutOrderCount})</option>
+              <option value="all">📦 {t('admin.allDisputeTypes', 'Tất cả')} ({totalReports})</option>
+              <option value="with_order">📦 {t('admin.withOrderType', 'Có đơn thuê')} ({withOrderCount})</option>
+              <option value="without_order">👤 {t('admin.withoutOrderType', 'Tố cáo tự do')} ({withoutOrderCount})</option>
             </select>
           </div>
 
@@ -487,13 +491,13 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               value={dateFilter}
               onChange={e => setDateFilter(e.target.value)}
             >
-              <option value="all">📅 Tất cả thời gian</option>
-              <option value="today">Hôm nay</option>
-              <option value="yesterday">Hôm qua</option>
-              <option value="last7days">7 ngày qua</option>
-              <option value="last30days">30 ngày qua</option>
-              <option value="thisMonth">Tháng này</option>
-              <option value="custom">Tùy chọn ngày...</option>
+              <option value="all">{t('admin.allDates', '📅 Tất cả thời gian')}</option>
+              <option value="today">{t('admin.todayFilter', 'Hôm nay')}</option>
+              <option value="yesterday">{t('admin.yesterday', 'Hôm qua')}</option>
+              <option value="last7days">{t('admin.last7DaysFilter', '7 ngày qua')}</option>
+              <option value="last30days">{t('admin.last30DaysFilter', '30 ngày qua')}</option>
+              <option value="thisMonth">{t('admin.thisMonth', 'Tháng này')}</option>
+              <option value="custom">{t('admin.customDateRange', 'Tùy chọn ngày...')}</option>
             </select>
           </div>
 
@@ -505,10 +509,10 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
             >
-              <option value="newest">Mới nhất trước</option>
-              <option value="oldest">Cũ nhất trước</option>
-              <option value="order-price-desc">Giá đơn cao nhất</option>
-              <option value="order-price-asc">Giá đơn thấp nhất</option>
+              <option value="newest">{t('admin.sortNewest', 'Mới nhất trước')}</option>
+              <option value="oldest">{t('admin.sortOldest', 'Cũ nhất trước')}</option>
+              <option value="order-price-desc">{t('admin.sortOrderPriceDesc', 'Giá đơn: Cao → Thấp')}</option>
+              <option value="order-price-asc">{t('admin.sortOrderPriceAsc', 'Giá đơn: Thấp → Cao')}</option>
             </select>
           </div>
 
@@ -521,7 +525,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               onClick={handleResetFilters}
             >
               <RotateCcw size={13} />
-              <span>Xóa bộ lọc</span>
+              <span>{t('admin.clearFilters', 'Xóa bộ lọc')}</span>
             </button>
           )}
         </div>
@@ -529,7 +533,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
         {/* Ngày tùy chỉnh nếu chọn custom */}
         {dateFilter === 'custom' && (
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Từ ngày:</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{t('admin.startDate', 'Từ ngày:')}</span>
             <input
               type="date"
               className="form-control"
@@ -537,7 +541,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
             />
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Đến ngày:</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{t('admin.endDate', 'Đến ngày:')}</span>
             <input
               type="date"
               className="form-control"
@@ -550,43 +554,48 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
 
         {/* Dòng tóm tắt kết quả */}
         <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
-          Đang hiển thị <strong>{filtered.length}</strong> / {totalReports} khiếu nại
+          {t('admin.showingDisputesCount', 'Đang hiển thị {count} / {total} khiếu nại')
+            .replace('{count}', filtered.length)
+            .replace('{total}', totalReports)}
           <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
-          {pendingCount} chờ xử lý • {resolvedCount} đã hoàn tiền (<strong style={{ color: '#10b981' }}>{totalRefundAmount.toLocaleString('vi-VN')} đ</strong>) • {rejectedCount} đã từ chối
+          {t('admin.disputesSummaryStats', 'Chờ xử lý: {pending} • Đã hoàn tiền: {resolved} • Từ chối: {rejected}')
+            .replace('{pending}', pendingCount)
+            .replace('{resolved}', `${resolvedCount} (${totalRefundAmount.toLocaleString('vi-VN')} đ)`)
+            .replace('{rejected}', rejectedCount)}
         </div>
 
-        {/* ─── BẢNG DANH SÁCH KHIẾU NẠI (Giống Đơn Hàng) ─── */}
+        {/* ─── BẢNG DANH SÁCH KHIẾU NẠI ─── */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Mã KN</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Người tố cáo</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Bị tố cáo</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Lý do & Đơn thuê</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Tổng tiền</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Thời gian</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Trạng thái</th>
-                <th style={{ padding: '12px 14px', textAlign: 'center' }}>Thao tác</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colDisputeId', 'Mã KN')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colComplainant', 'Người tố cáo')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colReportedIdol', 'Bị tố cáo')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colReason', 'Lý do & Đơn thuê')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colTotalPrice', 'Tổng tiền')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colDurationOrTime', 'Thời gian')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colDisputeStatus', 'Trạng thái')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'center' }}>{t('admin.colActions', 'Thao tác')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Đang tải danh sách khiếu nại...
+                    {t('admin.loading', 'Đang tải danh sách khiếu nại...')}
                   </td>
                 </tr>
               ) : reportsList.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Hiện không có khiếu nại hoặc báo cáo vi phạm nào trong hệ thống!
+                    {t('admin.noDisputesFound', 'Hiện không có khiếu nại hoặc báo cáo vi phạm nào trong hệ thống!')}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Không tìm thấy khiếu nại nào phù hợp
+                    {t('admin.noDisputesFound', 'Không tìm thấy khiếu nại nào phù hợp')}
                   </td>
                 </tr>
               ) : (
@@ -627,7 +636,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                           <div style={{ lineHeight: 1.25 }}>
                             <div style={{ fontWeight: 600, color: '#f43f5e' }}>{targetName}</div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>
-                              {r.order?.game || 'Game thủ'}
+                              {r.order?.game || t('admin.playerFallback', 'Game thủ')}
                             </div>
                           </div>
                         </div>
@@ -656,11 +665,11 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                               color: '#0284c7',
                               fontWeight: 600
                             }}>
-                              📦 Đơn #{r.order.id}
+                              📦 {t('admin.colRelatedOrder', 'Đơn')} #{r.order.id}
                             </span>
                           ) : (
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              👤 Tố cáo tự do
+                              👤 {t('admin.withoutOrderType', 'Tố cáo tự do')}
                             </span>
                           )}
                         </div>
@@ -695,10 +704,10 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                             display: 'inline-flex',
                             alignItems: 'center'
                           }}
-                          title="Xem chi tiết & xử lý khiếu nại"
+                          title={t('admin.detail', 'Xem chi tiết')}
                         >
                           <Eye size={13} />
-                          <span>Chi tiết</span>
+                          <span>{t('admin.detail', 'Chi tiết')}</span>
                         </button>
                       </td>
                     </tr>
@@ -745,7 +754,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px', marginBottom: '18px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary)' }}>
-                  Khiếu Nại #{selectedReport.id}
+                  {t('admin.colDisputeId', 'Khiếu Nại')} #{selectedReport.id}
                 </span>
                 <span style={{
                   fontSize: '0.78rem',
@@ -783,7 +792,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '18px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '6px' }}>
-                  👤 Người tố cáo (Khách)
+                  👤 {t('admin.colComplainant', 'Người tố cáo (Khách)')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <img
@@ -804,7 +813,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
 
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '6px' }}>
-                  🎮 Bị tố cáo (Idol)
+                  🎮 {t('admin.colReportedIdol', 'Bị tố cáo (Idol)')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <img
@@ -817,7 +826,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                       {getTargetName(selectedReport)}
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {selectedReport.order?.game || 'Game thủ'}
+                      {selectedReport.order?.game || t('admin.playerFallback', 'Game thủ')}
                     </div>
                   </div>
                 </div>
@@ -836,10 +845,10 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      📦 Đơn thuê #{selectedReport.order.id}
+                      📦 {t('admin.colRelatedOrder', 'Đơn thuê')} #{selectedReport.order.id}
                     </span>
                     <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      Giá đơn: <strong style={{ color: '#10b981' }}>{Number(selectedReport.order.price || 0).toLocaleString('vi-VN')} đ</strong>
+                      {t('admin.colTotalPrice', 'Giá đơn')}: <strong style={{ color: '#10b981' }}>{Number(selectedReport.order.price || 0).toLocaleString('vi-VN')} đ</strong>
                     </span>
                   </div>
                   <span style={{
@@ -850,7 +859,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                     background: selectedReport.order.status === 'REFUNDED' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
                     color: selectedReport.order.status === 'REFUNDED' ? '#ef4444' : '#10b981'
                   }}>
-                    Đơn: {selectedReport.order.status === 'REFUNDED' ? 'Đã Hoàn Tiền' : selectedReport.order.status}
+                    {selectedReport.order.status === 'REFUNDED' ? t('admin.statusRefunded', 'Đã hoàn tiền') : selectedReport.order.status}
                   </span>
                 </div>
 
@@ -867,7 +876,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed rgba(16, 185, 129, 0.3)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
-                          🎯 Tỷ lệ hoàn tiền cho khách: <span style={{ color: '#10b981' }}>{numPercent}%</span>
+                          🎯 {t('admin.refundRateLabel', 'Tỷ lệ hoàn tiền cho khách:')} <span style={{ color: '#10b981' }}>{numPercent}%</span>
                         </label>
                         <div style={{ display: 'flex', gap: '4px' }}>
                           {[20, 40, 50, 70, 100].map(p => (
@@ -938,13 +947,17 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                         fontSize: '0.82rem'
                       }}>
                         <div>
-                          <div style={{ color: 'var(--text-muted)' }}>Khách nhận lại ({numPercent}%):</div>
+                          <div style={{ color: 'var(--text-muted)' }}>
+                            {t('admin.renterReceivesBack', 'Khách nhận lại ({percent}%):').replace('{percent}', numPercent)}
+                          </div>
                           <div style={{ color: '#10b981', fontWeight: 800, fontSize: '0.95rem' }}>
                             +{renterRefundVal.toLocaleString('vi-VN')} đ
                           </div>
                         </div>
                         <div>
-                          <div style={{ color: 'var(--text-muted)' }}>Idol bị thu hồi ({numPercent}%):</div>
+                          <div style={{ color: 'var(--text-muted)' }}>
+                            {t('admin.idolDeducted', 'Idol bị thu hồi ({percent}%):').replace('{percent}', numPercent)}
+                          </div>
                           <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.95rem' }}>
                             -{playerDeductVal.toLocaleString('vi-VN')} đ
                           </div>
@@ -958,16 +971,18 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
 
             {/* Chi tiết nội dung mô tả khiếu nại */}
             <div style={{ fontSize: '0.85rem', marginBottom: '16px', background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>📝 Nội dung chi tiết:</div>
+              <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                {t('admin.postContentLabel', 'Nội dung chi tiết:')}
+              </div>
               <div style={{ color: 'var(--text-secondary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                {selectedReport.description || 'Không có mô tả chi tiết'}
+                {selectedReport.description || t('admin.noEvidenceProvided', 'Không có mô tả chi tiết')}
               </div>
             </div>
 
             {/* Link bằng chứng */}
             {(selectedReport.videoUrl || selectedReport.imageUrls) && (
               <div style={{ marginBottom: '14px', fontSize: '0.85rem' }}>
-                <strong>🔗 Link bằng chứng:</strong>{' '}
+                <strong>{t('admin.disputeEvidenceLabel', 'Link bằng chứng:')}</strong>{' '}
                 <a
                   href={selectedReport.videoUrl || selectedReport.imageUrls}
                   target="_blank"
@@ -985,10 +1000,12 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
               if (imageList.length <= 1) return null;
               return (
                 <div style={{ marginBottom: '16px' }}>
-                  <strong style={{ fontSize: '0.85rem' }}>🖼 Ảnh bằng chứng ({imageList.length}):</strong>
+                  <strong style={{ fontSize: '0.85rem' }}>
+                    {t('admin.attachedPhotosLabel', 'Ảnh bằng chứng ({count}):').replace('{count}', imageList.length)}
+                  </strong>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
                     {imageList.map((url, idx) => (
-                      <a key={idx} href={url} target="_blank" rel="noreferrer" title="Bấm để mở ảnh gốc">
+                      <a key={idx} href={url} target="_blank" rel="noreferrer" title={t('admin.clickToViewContent', 'Bấm để mở ảnh')}>
                         <img
                           src={url}
                           alt={`Bằng chứng ${idx + 1}`}
@@ -1017,11 +1034,11 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                 gap: '8px',
                 flexWrap: 'wrap'
               }}>
-                <strong>Kết quả giải quyết:</strong>
+                <strong>{t('admin.resolutionResult', 'Kết quả giải quyết:')}</strong>
                 <span>{selectedReport.resolution}</span>
                 {selectedReport.refundPercentage != null && (
                   <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 700 }}>
-                    Đã hoàn {selectedReport.refundPercentage}% ({Number(selectedReport.refundAmount || 0).toLocaleString('vi-VN')} đ)
+                    {t('admin.refundedPercent', 'Đã hoàn {percent}%').replace('{percent}', selectedReport.refundPercentage)} ({Number(selectedReport.refundAmount || 0).toLocaleString('vi-VN')} đ)
                   </span>
                 )}
               </div>
@@ -1031,7 +1048,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
             {selectedReport.status === 'PENDING' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
                 <textarea
-                  placeholder="Ghi chú kết quả xử lý gửi cho người dùng (ví dụ: Chấp thuận hoàn tiền do idol vắng mặt không lý do)..."
+                  placeholder={t('admin.resolutionNotesPlaceholder', 'Ghi chú kết quả xử lý gửi cho người dùng (ví dụ: Chấp thuận hoàn tiền do idol vắng mặt không lý do)...')}
                   value={resolutionTexts[selectedReport.id] || ''}
                   onChange={e => setResolutionTexts(prev => ({ ...prev, [selectedReport.id]: e.target.value }))}
                   rows={2}
@@ -1057,7 +1074,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                     }}
                   >
                     <X size={16} />
-                    <span>Từ Chối Khiếu Nại</span>
+                    <span>{t('admin.rejectDisputeOption', 'Từ Chối Khiếu Nại')}</span>
                   </button>
                   <button
                     className="btn btn-primary"
@@ -1068,7 +1085,7 @@ export const ReportsTab = ({ reportsList = [], setReportsList, loading, reloadRe
                     }}
                   >
                     <CheckCircle2 size={16} />
-                    <span>Chấp Thuận & Hoàn Tiền</span>
+                    <span>{t('admin.applyAdjudication', 'Áp Dụng Phán Quyết')}</span>
                   </button>
                 </div>
               </div>

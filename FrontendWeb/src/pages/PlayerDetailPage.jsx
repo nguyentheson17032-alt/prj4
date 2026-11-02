@@ -85,8 +85,8 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
               .filter(p => (p.status || '').toUpperCase() !== 'REJECTED')
               .map(p => ({
                 name: p.game?.name || p.gameName || 'Game',
-                rank: p.rank || 'Cao Thủ',
-                role: p.role || 'Không có',
+                rank: p.rank || t('player.defaultRank', 'Cao Thủ'),
+                role: p.role || t('player.noRole', 'Không có'),
                 price: Number(p.pricePerHour || 50000),
               }));
           }
@@ -129,7 +129,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                   albumList.push({
                     url: img,
                     gameName: m.gameName || pData.primaryGame || 'Gaming',
-                    createdAt: m.createdAt || 'Vừa xong',
+                    createdAt: m.createdAt || t('player.underOneMin', 'Vừa xong'),
                     caption: m.content || '',
                     likeCount: Number(m.likeCount || 0),
                     likedByUsers: Array.isArray(m.likedByUsers) ? m.likedByUsers : [],
@@ -159,7 +159,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                 albumList.push({
                   url,
                   gameName: matchedMoment.gameName || pData.primaryGame || 'Gaming',
-                  createdAt: matchedMoment.createdAt || 'Vừa xong',
+                  createdAt: matchedMoment.createdAt || t('player.underOneMin', 'Vừa xong'),
                   caption: matchedMoment.content || '',
                   likeCount: Number(matchedMoment.likeCount || 0),
                   likedByUsers: Array.isArray(matchedMoment.likedByUsers) ? matchedMoment.likedByUsers : [],
@@ -176,7 +176,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                 albumList.push(typeof item === 'string' ? {
                   url,
                   gameName: pData.primaryGame || 'PlayZone',
-                  createdAt: 'Ảnh hồ sơ',
+                  createdAt: t('player.profilePhoto', 'Ảnh hồ sơ'),
                   caption: '',
                   likeCount: 0,
                   likedByUsers: [],
@@ -191,7 +191,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                 } : {
                   url: item.url,
                   gameName: item.gameName || pData.primaryGame || 'PlayZone',
-                  createdAt: item.createdAt || 'Ảnh hồ sơ',
+                  createdAt: item.createdAt || t('player.profilePhoto', 'Ảnh hồ sơ'),
                   caption: item.caption || item.content || '',
                   likeCount: Number(item.likeCount || 0),
                   likedByUsers: Array.isArray(item.likedByUsers) ? item.likedByUsers : [],
@@ -258,7 +258,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
     }
 
     const myId = user?.id ? Number(user.id) : null;
-    const myName = user?.fullName || user?.username || 'Bạn';
+    const myName = user?.fullName || user?.username || t('player.you', 'Bạn');
     const nextLiked = !item.isLiked;
     const newCount = nextLiked ? (item.likeCount || 0) + 1 : Math.max(0, (item.likeCount || 0) - 1);
 
@@ -321,7 +321,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
   if (loading) {
     return (
       <div className="container" style={{ textAlign: 'center', padding: '100px 0', color: 'var(--text-muted)' }}>
-        Đang tải thông tin player...
+        {t('player.loading', 'Đang tải thông tin player...')}
       </div>
     );
   }
@@ -329,7 +329,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
   if (!player) {
     return (
       <div className="container" style={{ textAlign: 'center', padding: '100px 0' }}>
-        <h2>Không tìm thấy thông tin Player</h2>
+        <h2>{t('player.notFound', 'Không tìm thấy thông tin Player')}</h2>
         <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => navigate('/explore')}>
           {t('player.backToList', 'Quay lại danh sách')}
         </button>
@@ -1136,7 +1136,7 @@ export const PlayerDetailPage = ({ onHirePlayer, onDonatePlayer }) => {
                         <Crown size={14} color="#f59e0b" fill="#f59e0b" />
                       </div>
                       <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                        {previewItem.createdAt || 'Khoảnh khắc gaming'}
+                        {previewItem.createdAt || t('player.gamingMoment', 'Khoảnh khắc gaming')}
                       </div>
                     </div>
                   </div>

@@ -99,11 +99,26 @@ public class MomentController {
 
         // Find or assign GamePlayer
         GamePlayer targetGp = null;
-        if (request.getGameName() != null && !request.getGameName().trim().isEmpty()) {
+        String rawGameName = request.getGameName() != null ? request.getGameName().trim() : "";
+        String canonicalGameName = rawGameName;
+        if (canonicalGameName.equalsIgnoreCase("Liên Minh Huyền Thoại") || canonicalGameName.equalsIgnoreCase("LMHT") || canonicalGameName.equalsIgnoreCase("LoL")) {
+            canonicalGameName = "League of Legends";
+        } else if (canonicalGameName.equalsIgnoreCase("Đấu Trường Chân Lý") || canonicalGameName.equalsIgnoreCase("DTCL") || canonicalGameName.equalsIgnoreCase("ĐTCL") || canonicalGameName.equalsIgnoreCase("TFT")) {
+            canonicalGameName = "Teamfight Tactics";
+        } else if (canonicalGameName.equalsIgnoreCase("Arena of Valor") || canonicalGameName.equalsIgnoreCase("AOV")) {
+            canonicalGameName = "Liên Quân Mobile";
+        } else if (canonicalGameName.equalsIgnoreCase("Tốc Chiến") || canonicalGameName.equalsIgnoreCase("Liên Minh: Tốc Chiến")) {
+            canonicalGameName = "Wild Rift";
+        }
+
+        if (!rawGameName.isEmpty()) {
             for (GamePlayer gp : userGamePlayers) {
-                if (gp.getGame() != null && gp.getGame().getName().equalsIgnoreCase(request.getGameName().trim())) {
-                    targetGp = gp;
-                    break;
+                if (gp.getGame() != null) {
+                    String gn = gp.getGame().getName();
+                    if (gn.equalsIgnoreCase(rawGameName) || gn.equalsIgnoreCase(canonicalGameName)) {
+                        targetGp = gp;
+                        break;
+                    }
                 }
             }
         }
@@ -115,8 +130,9 @@ public class MomentController {
         if (targetGp == null) {
             // Player has role but no GamePlayer entity yet, create default for selected game
             Game game = null;
-            if (request.getGameName() != null && !request.getGameName().trim().isEmpty()) {
-                game = gameRepository.findByName(request.getGameName().trim()).orElse(null);
+            if (!canonicalGameName.isEmpty()) {
+                game = gameRepository.findByName(canonicalGameName)
+                        .orElseGet(() -> gameRepository.findByName(rawGameName).orElse(null));
             }
             if (game == null) {
                 List<Game> allGames = gameRepository.findAll();

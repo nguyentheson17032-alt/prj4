@@ -928,7 +928,7 @@ export const ProfilePage = () => {
                 background: 'none', border: 'none', cursor: 'pointer', color: showOldPassword ? 'var(--primary)' : 'var(--text-muted)',
                 padding: '6px', display: 'flex', alignItems: 'center', transition: 'color 0.15s'
               }}
-              title={showOldPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              title={showOldPassword ? t('auth.hidePassword', 'Ẩn mật khẩu') : t('auth.showPassword', 'Hiện mật khẩu')}
             >
               {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -956,7 +956,7 @@ export const ProfilePage = () => {
                   background: 'none', border: 'none', cursor: 'pointer', color: showNewPassword ? 'var(--primary)' : 'var(--text-muted)',
                   padding: '6px', display: 'flex', alignItems: 'center', transition: 'color 0.15s'
                 }}
-                title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                title={showNewPassword ? t('auth.hidePassword', 'Ẩn mật khẩu') : t('auth.showPassword', 'Hiện mật khẩu')}
               >
                 {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -982,7 +982,7 @@ export const ProfilePage = () => {
                   background: 'none', border: 'none', cursor: 'pointer', color: showConfirmPassword ? 'var(--primary)' : 'var(--text-muted)',
                   padding: '6px', display: 'flex', alignItems: 'center', transition: 'color 0.15s'
                 }}
-                title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                title={showConfirmPassword ? t('auth.hidePassword', 'Ẩn mật khẩu') : t('auth.showPassword', 'Hiện mật khẩu')}
               >
                 {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>

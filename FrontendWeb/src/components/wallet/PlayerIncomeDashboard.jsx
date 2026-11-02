@@ -18,7 +18,7 @@ import { useLanguage } from '../../context/LanguageContext';
 
 export const PlayerIncomeDashboard = () => {
   const { addToast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('DAILY'); // 'DAILY' | 'WEEKLY'
@@ -61,17 +61,28 @@ export const PlayerIncomeDashboard = () => {
       addToast(t('wallet.statementDownloaded', 'Đã xuất và tải file sao kê CSV thành công!'), 'success');
     } catch (err) {
       console.error('Export CSV error:', err);
-      addToast('Xuất sao kê thất bại, vui lòng thử lại', 'error');
+      addToast(t('wallet.exportFailed', 'Xuất sao kê thất bại, vui lòng thử lại'), 'error');
     } finally {
       setExporting(false);
     }
+  };
+
+  const formatPeriodLabel = (item, idx) => {
+    if (item.date) return item.date;
+    if (item.weekLabel) {
+      if (language === 'en') {
+        return item.weekLabel.replace(/Tuần/g, 'Week');
+      }
+      return item.weekLabel;
+    }
+    return `${t('common.item', 'Mục')} ${idx + 1}`;
   };
 
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
         <Loader2 className="animate-spin" size={36} style={{ margin: '0 auto 12px auto' }} />
-        <p>Đang tải báo cáo thu nhập Idol...</p>
+        <p>{t('wallet.loadingReport', 'Đang tải báo cáo thu nhập Idol...')}</p>
       </div>
     );
   }
@@ -92,10 +103,10 @@ export const PlayerIncomeDashboard = () => {
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BarChart2 className="gradient-text" size={26} />
-            <span>Dashboard Báo Cáo Thu Nhập Idol</span>
+            <span>{t('wallet.incomeReportTitle', 'Dashboard Báo Cáo Thu Nhập Idol')}</span>
           </h2>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-            Theo dõi chi tiết doanh thu đơn thuê và quà tặng người hâm mộ theo ngày và tuần
+            {t('wallet.incomeReportSubtitle', 'Theo dõi chi tiết doanh thu đơn thuê và quà tặng người hâm mộ theo ngày và tuần')}
           </p>
         </div>
         <button
@@ -192,10 +203,10 @@ export const PlayerIncomeDashboard = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 800 }}>
-              Biểu Đồ & Thống Kê Chi Tiết
+              {t('wallet.chartAndStats', 'Biểu Đồ & Thống Kê Chi Tiết')}
             </h3>
             <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
-              {viewMode === 'DAILY' ? 'Thống kê theo từng ngày trong 14 ngày qua' : 'Thống kê tổng hợp theo từng tuần (8 tuần gần nhất)'}
+              {viewMode === 'DAILY' ? t('wallet.statDailyDesc', 'Thống kê theo từng ngày trong 14 ngày qua') : t('wallet.statWeeklyDesc', 'Thống kê tổng hợp theo từng tuần (8 tuần gần nhất)')}
             </span>
           </div>
 
@@ -221,11 +232,11 @@ export const PlayerIncomeDashboard = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {currentList.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-              Chưa có dữ liệu giao dịch trong khoảng thời gian này
+              {t('wallet.noIncomeData', 'Chưa có dữ liệu giao dịch trong khoảng thời gian này')}
             </div>
           ) : (
             currentList.map((item, idx) => {
-              const label = item.date || item.weekLabel || `Mục ${idx + 1}`;
+              const label = formatPeriodLabel(item, idx);
               const amount = item.totalIncome || 0;
               const percent = Math.min(100, Math.max(6, Math.round((amount / maxIncome) * 100)));
 
@@ -237,7 +248,7 @@ export const PlayerIncomeDashboard = () => {
                       +{amount.toLocaleString('vi-VN')} đ
                       {item.orderCount > 0 && (
                         <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.78rem', marginLeft: '6px' }}>
-                          ({item.orderCount} đơn)
+                          ({item.orderCount} {item.orderCount === 1 ? t('wallet.orderSingle', 'đơn') : t('wallet.ordersPlural', 'đơn')})
                         </span>
                       )}
                     </span>
@@ -264,17 +275,17 @@ export const PlayerIncomeDashboard = () => {
           <table className="history-table">
             <thead>
               <tr>
-                <th>{viewMode === 'DAILY' ? 'Ngày' : 'Khoảng Thời Gian'}</th>
-                <th>Thu Nhập Thuê (VNĐ)</th>
-                <th>Quà Tặng / Donate (VNĐ)</th>
-                <th>Số Đơn</th>
-                <th>Tổng Thực Nhận</th>
+                <th>{viewMode === 'DAILY' ? t('wallet.colDate', 'Ngày') : t('wallet.colTimeRange', 'Khoảng Thời Gian')}</th>
+                <th>{t('wallet.colRentalIncome', 'Thu Nhập Thuê (VNĐ)')}</th>
+                <th>{t('wallet.colGiftIncome', 'Quà Tặng / Donate (VNĐ)')}</th>
+                <th>{t('wallet.colOrderCount', 'Số Đơn')}</th>
+                <th>{t('wallet.colTotalNet', 'Tổng Thực Nhận')}</th>
               </tr>
             </thead>
             <tbody>
               {currentList.map((item, idx) => (
                 <tr key={idx}>
-                  <td style={{ fontWeight: 600 }}>{item.date || item.weekLabel}</td>
+                  <td style={{ fontWeight: 600 }}>{formatPeriodLabel(item, idx)}</td>
                   <td style={{ color: item.orderIncome > 0 ? 'var(--accent-cyan)' : 'inherit' }}>
                     +{(item.orderIncome || 0).toLocaleString('vi-VN')} đ
                   </td>

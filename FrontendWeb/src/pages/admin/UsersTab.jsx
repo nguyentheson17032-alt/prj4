@@ -4,12 +4,14 @@ import {
   RotateCcw, RefreshCw, Lock, Unlock, Eye, X
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { getUserAvatar } from '../../utils/avatarUtils';
 import { BanUserModal } from '../../components/modals/BanUserModal';
 import { UnbanUserModal } from '../../components/modals/UnbanUserModal';
 import { UserDetailModal } from '../../components/modals/UserDetailModal';
 
 export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers }) => {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, ACTIVE, BANNED
@@ -114,7 +116,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
       }
       return u;
     }));
-    addToast('Đã khóa tài khoản thành công!', 'success');
+    addToast(t('admin.toastBanSuccess', 'Đã khóa tài khoản thành công!'), 'success');
     reloadUsers?.();
   };
 
@@ -130,7 +132,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
       }
       return u;
     }));
-    addToast('Đã mở khóa tài khoản thành công!', 'success');
+    addToast(t('admin.toastUnbanSuccess', 'Đã mở khóa tài khoản thành công!'), 'success');
     reloadUsers?.();
   };
 
@@ -143,7 +145,9 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
             <Users size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Tổng Người Dùng</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              {t('admin.totalUsers', 'Tổng Người Dùng')}
+            </div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '2px' }}>{totalUsers}</div>
           </div>
         </div>
@@ -153,7 +157,9 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
             <UserCheck size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Đang Hoạt Động</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              {t('admin.activeUsers', 'Đang Hoạt Động')}
+            </div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>{activeCount}</div>
           </div>
         </div>
@@ -163,7 +169,9 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
             <Ban size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#f87171', fontWeight: 700, textTransform: 'uppercase' }}>Đang Bị Khóa</div>
+            <div style={{ fontSize: '0.78rem', color: '#f87171', fontWeight: 700, textTransform: 'uppercase' }}>
+              {t('admin.bannedUsers', 'Đang Bị Khóa')}
+            </div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444', marginTop: '2px' }}>{bannedCount}</div>
           </div>
         </div>
@@ -173,7 +181,9 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
             <Gamepad2 size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Game Thủ / Idol</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+              {t('admin.playerOrIdolCount', 'Game Thủ / Idol')}
+            </div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#06b6d4', marginTop: '2px' }}>{playerCount}</div>
           </div>
         </div>
@@ -185,10 +195,10 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px' }}>
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
-              Quản Lý Người Dùng & Phân Quyền ({filteredUsers.length})
+              {t('admin.userManagementTitle', 'Quản Lý Người Dùng & Phân Quyền ({count})').replace('{count}', filteredUsers.length)}
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-              Kiểm soát tài khoản, áp dụng chế tài kỷ luật khóa/mở khóa tức thì
+              {t('admin.userManagementSub', 'Kiểm soát tài khoản, áp dụng chế tài kỷ luật khóa/mở khóa tức thì')}
             </p>
           </div>
 
@@ -215,7 +225,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                   width: '100%',
                   borderRadius: '10px'
                 }}
-                placeholder="Tìm tên, username, email, SĐT..."
+                placeholder={t('admin.searchUserPlaceholder', 'Tìm tên, username, email, SĐT...')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -245,7 +255,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                 className="btn btn-outline"
                 style={{ height: '38px', width: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px' }}
                 onClick={reloadUsers}
-                title="Làm mới danh sách"
+                title={t('admin.refreshList', 'Làm mới danh sách')}
               >
                 <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
               </button>
@@ -278,10 +288,10 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
             >
-              <option value="ALL">Tất cả vai trò</option>
-              <option value="ADMIN">🛡️ Admin</option>
-              <option value="PLAYER">🎮 Game thủ</option>
-              <option value="USER">👤 Thành viên</option>
+              <option value="ALL">{t('admin.allRoles', 'Tất cả vai trò')}</option>
+              <option value="ADMIN">{t('admin.roleAdmin', '🛡️ Admin')}</option>
+              <option value="PLAYER">{t('admin.rolePlayer', '🎮 Game thủ')}</option>
+              <option value="USER">{t('admin.roleUser', '👤 Thành viên')}</option>
             </select>
           </div>
 
@@ -299,9 +309,9 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">🟢 Đang hoạt động</option>
-              <option value="BANNED">🔒 Đang bị khóa</option>
+              <option value="ALL">{t('admin.allStatuses', 'Tất cả trạng thái')}</option>
+              <option value="ACTIVE">{t('admin.statusActiveOption', '🟢 Đang hoạt động')}</option>
+              <option value="BANNED">{t('admin.statusBannedOption', '🔒 Đang bị khóa')}</option>
             </select>
           </div>
 
@@ -319,9 +329,9 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
-              <option value="NEWEST">Mới nhất trước</option>
-              <option value="BALANCE_DESC">Số dư ví: Cao → Thấp</option>
-              <option value="USERNAME_ASC">Tên đăng nhập (A-Z)</option>
+              <option value="NEWEST">{t('admin.sortNewest', 'Mới nhất trước')}</option>
+              <option value="BALANCE_DESC">{t('admin.sortBalanceDesc', 'Số dư ví: Cao → Thấp')}</option>
+              <option value="USERNAME_ASC">{t('admin.sortUsernameAsc', 'Tên đăng nhập (A-Z)')}</option>
             </select>
           </div>
 
@@ -334,16 +344,21 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
               onClick={handleResetFilters}
             >
               <RotateCcw size={13} />
-              <span>Xóa bộ lọc</span>
+              <span>{t('admin.clearFilters', 'Xóa bộ lọc')}</span>
             </button>
           )}
         </div>
 
         {/* Thanh tóm tắt kết quả theo bộ lọc */}
         <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
-          Đang hiển thị <strong>{filteredUsers.length}</strong> / {totalUsers} người dùng
+          {t('admin.showingUsersCount', 'Đang hiển thị {count} / {total} người dùng')
+            .replace('{count}', filteredUsers.length)
+            .replace('{total}', totalUsers)}
           <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
-          Hoạt động: <strong style={{ color: '#10b981' }}>{activeCount}</strong> • Bị khóa: <strong style={{ color: '#ef4444' }}>{bannedCount}</strong> • Game thủ: <strong style={{ color: '#06b6d4' }}>{playerCount}</strong>
+          {t('admin.usersSummaryStats', 'Hoạt động: {active} • Bị khóa: {banned} • Game thủ: {players}')
+            .replace('{active}', activeCount)
+            .replace('{banned}', bannedCount)
+            .replace('{players}', playerCount)}
         </div>
 
         {/* User Table */}
@@ -351,12 +366,12 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Thành viên</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Email & Liên Hệ</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Số dư ví</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Vai trò</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Trạng thái</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Hành động</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colMember', 'Thành viên')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colContact', 'Email & Liên Hệ')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colWalletBalance', 'Số dư ví')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colRole', 'Vai trò')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colStatus', 'Trạng thái')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'right' }}>{t('admin.colActions', 'Hành động')}</th>
               </tr>
             </thead>
             <tbody>
@@ -365,14 +380,14 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                   <td colSpan={6} style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                       <RefreshCw size={18} className="animate-spin" />
-                      <span>Đang tải danh sách tài khoản...</span>
+                      <span>{t('admin.loadingUsers', 'Đang tải danh sách tài khoản...')}</span>
                     </div>
                   </td>
                 </tr>
               ) : paginatedUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>
-                    Không tìm thấy người dùng nào phù hợp với bộ lọc
+                    {t('admin.noUsersMatch', 'Không tìm thấy người dùng nào phù hợp với bộ lọc')}
                   </td>
                 </tr>
               ) : (
@@ -449,7 +464,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                             color: isAdmin ? '#f43f5e' : isPlayer ? '#06b6d4' : 'var(--text-muted)'
                           }}
                         >
-                          {isAdmin ? '🛡️ Admin' : isPlayer ? '🎮 Game thủ' : '👤 Thành viên'}
+                          {isAdmin ? t('admin.roleAdmin', '🛡️ Admin') : isPlayer ? t('admin.rolePlayer', '🎮 Game thủ') : t('admin.roleUser', '👤 Thành viên')}
                         </span>
                       </td>
 
@@ -473,7 +488,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                               }}
                             >
                               <Lock size={11} />
-                              Bị khóa
+                              {t('admin.locked', 'Bị khóa')}
                             </span>
                             {activeBan && (
                               <span
@@ -487,7 +502,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                                 }}
                                 title={activeBan.reason}
                               >
-                                {activeBan.banType === 'TEMPORARY' ? '⏳ Tạm thời' : '🛑 Vĩnh viễn'}
+                                {activeBan.banType === 'TEMPORARY' ? t('admin.tempBan', '⏳ Tạm thời') : t('admin.permBan', '🛑 Vĩnh viễn')}
                                 {activeBan.reason ? `: ${activeBan.reason}` : ''}
                               </span>
                             )}
@@ -508,7 +523,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                             }}
                           >
                             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
-                            Sẵn sàng
+                            {t('admin.readyStatus', 'Sẵn sàng')}
                           </span>
                         )}
                       </td>
@@ -518,7 +533,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
                           <button
                             className="btn btn-outline"
-                            title="Xem chi tiết người dùng"
+                            title={t('admin.viewUserDetail', 'Xem chi tiết người dùng')}
                             style={{ padding: '5px 8px', height: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}
                             onClick={() => setSelectedUserDetail(u)}
                           >
@@ -527,7 +542,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
 
                           {isAdmin ? (
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 8px' }}>
-                              Bảo vệ
+                              {t('admin.protected', 'Bảo vệ')}
                             </span>
                           ) : isBanned ? (
                             <button
@@ -547,7 +562,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                               onClick={() => setSelectedUserUnban(u)}
                             >
                               <Unlock size={13} />
-                              <span>Mở khóa</span>
+                              <span>{t('admin.unban', 'Mở khóa')}</span>
                             </button>
                           ) : (
                             <button
@@ -567,7 +582,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                               onClick={() => setSelectedUserToBan(u)}
                             >
                               <Lock size={13} />
-                              <span>Khóa</span>
+                              <span>{t('admin.ban', 'Khóa')}</span>
                             </button>
                           )}
                         </div>
@@ -584,7 +599,10 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
         {!loading && filteredUsers.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Hiển thị <strong>{((currentPage - 1) * pageSize) + 1}</strong> - <strong>{Math.min(currentPage * pageSize, filteredUsers.length)}</strong> trên tổng số <strong>{filteredUsers.length}</strong> người dùng
+              {t('admin.paginationShowing', 'Hiển thị {from} - {to} trên tổng số {total} người dùng')
+                .replace('{from}', ((currentPage - 1) * pageSize) + 1)
+                .replace('{to}', Math.min(currentPage * pageSize, filteredUsers.length))
+                .replace('{total}', filteredUsers.length)}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -594,7 +612,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 style={{ padding: '5px 10px', height: 'auto', fontSize: '0.78rem' }}
               >
-                Trước
+                {t('admin.prevPage', 'Trước')}
               </button>
 
               {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -628,7 +646,7 @@ export const UsersTab = ({ usersList = [], setUsersList, loading, reloadUsers })
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 style={{ padding: '5px 10px', height: 'auto', fontSize: '0.78rem' }}
               >
-                Sau
+                {t('admin.nextPage', 'Sau')}
               </button>
             </div>
           </div>

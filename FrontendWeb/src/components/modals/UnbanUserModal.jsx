@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Unlock, ShieldCheck, AlertCircle, X, Check } from 'lucide-react';
+import { Unlock, AlertCircle, X } from 'lucide-react';
 import api from '../../api/apiService';
+import { useLanguage } from '../../context/LanguageContext';
+
+const PRESET_UNBAN_REASONS = [
+  { key: 'admin.unbanPresetExpired', fallback: 'Đã hết hạn phạt' },
+  { key: 'admin.unbanPresetCommit', fallback: 'Người dùng cam kết không tái phạm' },
+  { key: 'admin.unbanPresetAmnesty', fallback: 'Ân xá từ Ban Quản Trị' },
+  { key: 'admin.unbanPresetDispute', fallback: 'Khiếu nại được chấp thuận' }
+];
 
 export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
-  const [unbanReason, setUnbanReason] = useState('Đã được Ban Quản Trị xem xét và mở khóa');
+  const { t } = useLanguage();
+  const [unbanReason, setUnbanReason] = useState(() => t('admin.defaultUnbanReason', 'Đã được Ban Quản Trị xem xét và mở khóa'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -18,11 +27,11 @@ export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
     setLoading(true);
 
     try {
-      await api.unbanUser(user.id, unbanReason.trim() || 'Mở khóa bởi Admin');
+      await api.unbanUser(user.id, unbanReason.trim() || t('admin.unbanByAdminFallback', 'Mở khóa bởi Admin'));
       onSuccess?.(user.id);
       onClose();
     } catch (err) {
-      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Không thể mở khóa tài khoản.';
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || t('admin.unbanFailed', 'Không thể mở khóa tài khoản.');
       if (typeof msg === 'string' && (msg.toLowerCase().includes('no active ban') || msg.toLowerCase().includes('not found'))) {
         // User already has no active ban record in DB, complete unban state on frontend
         onSuccess?.(user.id);
@@ -97,15 +106,16 @@ export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#34d399' }}>
-                Mở Khóa Tài Khoản
+                {t('admin.unbanUserModalTitle', 'Mở Khóa Tài Khoản')}
               </h3>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Khôi phục toàn bộ quyền truy cập và hoạt động
+                {t('admin.unbanSub', 'Khôi phục toàn bộ quyền truy cập và hoạt động')}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label={t('common.close', 'Đóng')}
             style={{
               background: 'rgba(255, 255, 255, 0.06)',
               border: 'none',
@@ -167,14 +177,14 @@ export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
                 }}
               >
                 <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '4px' }}>
-                  Thông tin vi phạm trước đó:
+                  {t('admin.previousBanInfo', 'Thông tin vi phạm trước đó:')}
                 </div>
                 <div style={{ color: '#cbd5e1' }}>
-                  <strong>Lý do:</strong> {activeBan.reason || 'Vi phạm điều khoản'}
+                  <strong>{t('admin.banReasonLabel', 'Lý do:')}</strong> {activeBan.reason || t('admin.termsViolationFallback', 'Vi phạm điều khoản')}
                 </div>
                 {activeBan.description && (
                   <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: '2px' }}>
-                    <strong>Ghi chú:</strong> {activeBan.description}
+                    <strong>{t('admin.notesColon', 'Ghi chú:')}</strong> {activeBan.description}
                   </div>
                 )}
               </div>
@@ -202,35 +212,38 @@ export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
 
             <div style={{ marginBottom: '18px' }}>
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>
-                Lý do mở khóa:
+                {t('admin.unbanReasonLabel', 'Lý do mở khóa:')}
               </label>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Nhập lý do hoặc căn cứ mở khóa..."
+                placeholder={t('admin.unbanReasonPlaceholder', 'Nhập lý do hoặc căn cứ mở khóa...')}
                 value={unbanReason}
                 onChange={(e) => setUnbanReason(e.target.value)}
                 style={{ height: '40px', fontSize: '0.88rem' }}
               />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                {['Đã hết hạn phạt', 'Người dùng cam kết không tái phạm', 'Ân xá từ Ban Quản Trị', 'Khiếu nại được chấp thuận'].map((reason, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setUnbanReason(reason)}
-                    style={{
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: 'var(--text-muted)',
-                      fontSize: '0.72rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {reason}
-                  </button>
-                ))}
+                {PRESET_UNBAN_REASONS.map((reasonObj, idx) => {
+                  const label = t(reasonObj.key, reasonObj.fallback);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setUnbanReason(label)}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.72rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -246,7 +259,7 @@ export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
                 lineHeight: 1.4
               }}
             >
-              ✅ <strong>Thông báo:</strong> Sau khi mở khóa, người dùng có thể đăng nhập bình thường và trạng thái sẽ chuyển về <strong>Sẵn sàng</strong>.
+              ✅ <strong>{t('admin.noticeNotification', 'Thông báo:')}</strong> {t('admin.unbanNoticeText', 'Sau khi mở khóa, người dùng có thể đăng nhập bình thường và trạng thái sẽ chuyển về Sẵn sàng.')}
             </div>
           </div>
 
@@ -269,7 +282,7 @@ export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
               disabled={loading}
               style={{ padding: '8px 16px', fontSize: '0.88rem' }}
             >
-              Hủy Bỏ
+              {t('common.cancel', 'Hủy Bỏ')}
             </button>
             <button
               type="submit"
@@ -289,7 +302,7 @@ export const UnbanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
               }}
             >
               <Unlock size={15} />
-              {loading ? 'Đang Mở Khóa...' : 'Xác Nhận Mở Khóa'}
+              {loading ? t('admin.unbanning', 'Đang Mở Khóa...') : t('admin.confirmUnbanBtn', 'Xác Nhận Mở Khóa')}
             </button>
           </div>
         </form>

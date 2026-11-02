@@ -1,24 +1,26 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Lock, ShieldAlert, Clock, AlertTriangle, Calendar, X, Check } from 'lucide-react';
+import { Lock, ShieldAlert, Clock, AlertTriangle, Calendar, X } from 'lucide-react';
 import api from '../../api/apiService';
+import { useLanguage } from '../../context/LanguageContext';
 
 const PRESET_DAYS = [1, 3, 7, 14, 30];
 
-const PRESET_REASONS = [
-  'Vi phạm quy tắc ứng xử / Ngôn từ độc hại',
-  'Gian lận thanh toán / Giao dịch ví bất thường',
-  'Spam tin nhắn / Phát tán liên kết độc hại',
-  'Quấy rối / Đe dọa Idol hoặc thành viên khác',
-  'Hủy đơn hàng vô lý liên tục / Phá hoại dịch vụ',
-  'Lý do khác (Nhập chi tiết)'
+const PRESET_REASON_KEYS = [
+  { key: 'admin.banReasonToxic', fallback: 'Vi phạm quy tắc ứng xử / Ngôn từ độc hại' },
+  { key: 'admin.banReasonFraud', fallback: 'Gian lận thanh toán / Giao dịch ví bất thường' },
+  { key: 'admin.banReasonSpam', fallback: 'Spam tin nhắn / Phát tán liên kết độc hại' },
+  { key: 'admin.banReasonHarassment', fallback: 'Quấy rối / Đe dọa Idol hoặc thành viên khác' },
+  { key: 'admin.banReasonDisruption', fallback: 'Hủy đơn hàng vô lý liên tục / Phá hoại dịch vụ' },
+  { key: 'admin.banReasonOther', fallback: 'Lý do khác (Nhập chi tiết)' }
 ];
 
 export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
+  const { t, language } = useLanguage();
   const [banType, setBanType] = useState('TEMPORARY'); // TEMPORARY | PERMANENT
   const [days, setDays] = useState(7);
   const [customDays, setCustomDays] = useState('');
-  const [selectedReason, setSelectedReason] = useState(PRESET_REASONS[0]);
+  const [selectedReasonKey, setSelectedReasonKey] = useState('admin.banReasonToxic');
   const [customReason, setCustomReason] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,14 +39,14 @@ export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
     if (banType === 'PERMANENT') return null;
     const d = new Date();
     d.setDate(d.getDate() + finalDays);
-    return d.toLocaleString('vi-VN', {
+    return d.toLocaleString(language === 'en' ? 'en-US' : 'vi-VN', {
       hour: '2-digit',
       minute: '2-digit',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     });
-  }, [banType, finalDays]);
+  }, [banType, finalDays, language]);
 
   if (!isOpen || !user) return null;
 
@@ -52,14 +54,17 @@ export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
     e.preventDefault();
     setError('');
 
-    const finalReason = selectedReason === 'Lý do khác (Nhập chi tiết)' ? customReason.trim() : selectedReason;
+    const activeReasonFallback = PRESET_REASON_KEYS.find(r => r.key === selectedReasonKey)?.fallback || '';
+    const localizedReason = t(selectedReasonKey, activeReasonFallback);
+    const finalReason = selectedReasonKey === 'admin.banReasonOther' ? customReason.trim() : localizedReason;
+
     if (!finalReason) {
-      setError('Vui lòng nhập lý do khóa tài khoản.');
+      setError(t('admin.errEnterBanReason', 'Vui lòng nhập lý do khóa tài khoản.'));
       return;
     }
 
     if (banType === 'TEMPORARY' && (!finalDays || finalDays <= 0)) {
-      setError('Số ngày bị khóa phải lớn hơn 0.');
+      setError(t('admin.errBanDaysMin', 'Số ngày bị khóa phải lớn hơn 0.'));
       return;
     }
 
@@ -89,7 +94,7 @@ export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
       });
       onClose();
     } catch (err) {
-      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Không thể khóa tài khoản.';
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || t('admin.errBanFailed', 'Không thể khóa tài khoản.');
       setError(msg);
     } finally {
       setLoading(false);
@@ -159,15 +164,16 @@ export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#f87171' }}>
-                Khóa Tài Khoản Người Dùng
+                {t('admin.banUserModalTitle', 'Khóa Tài Khoản Người Dùng')}
               </h3>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Thiết lập thời hạn và nguyên nhân vi phạm
+                {t('admin.banUserSubtitle', 'Thiết lập thời hạn và nguyên nhân vi phạm')}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label={t('common.close', 'Đóng')}
             style={{
               background: 'rgba(255, 255, 255, 0.06)',
               border: 'none',
@@ -217,215 +223,221 @@ export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Số dư ví</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {t('admin.walletBalanceLabel', 'Số dư ví')}
+                </div>
                 <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#10b981' }}>
                   {(user.coin ?? user.walletBalance ?? user.balance ?? 0).toLocaleString('vi-VN')} đ
                 </div>
               </div>
             </div>
-          {error && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                fontSize: '0.85rem',
-                marginBottom: '16px'
-              }}
-            >
-              <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
-            </div>
-          )}
 
-          {/* Ban Type selector */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '8px' }}>
-              Hình thức khóa:
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setBanType('TEMPORARY')}
+            {error && (
+              <div
                 style={{
-                  padding: '10px',
-                  borderRadius: '10px',
-                  border: banType === 'TEMPORARY' ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: banType === 'TEMPORARY' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                  color: banType === 'TEMPORARY' ? '#f59e0b' : 'var(--text-muted)',
-                  fontWeight: 700,
-                  fontSize: '0.88rem',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
                   gap: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  fontSize: '0.85rem',
+                  marginBottom: '16px'
                 }}
               >
-                <Clock size={16} />
-                Khóa Tạm Thời
-              </button>
-              <button
-                type="button"
-                onClick={() => setBanType('PERMANENT')}
-                style={{
-                  padding: '10px',
-                  borderRadius: '10px',
-                  border: banType === 'PERMANENT' ? '1.5px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: banType === 'PERMANENT' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.02)',
-                  color: banType === 'PERMANENT' ? '#ef4444' : 'var(--text-muted)',
-                  fontWeight: 700,
-                  fontSize: '0.88rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <ShieldAlert size={16} />
-                Khóa Vĩnh Viễn
-              </button>
-            </div>
-          </div>
+                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
+              </div>
+            )}
 
-          {/* Days Selection (if Temporary) */}
-          {banType === 'TEMPORARY' && (
-            <div style={{ marginBottom: '16px', background: 'rgba(245, 158, 11, 0.05)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.15)' }}>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#f59e0b', marginBottom: '8px' }}>
-                Số ngày bị khóa:
+            {/* Ban Type selector */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '8px' }}>
+                {t('admin.banTypeLabel', 'Hình thức khóa:')}
               </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-                {PRESET_DAYS.map((d) => (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setBanType('TEMPORARY')}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: banType === 'TEMPORARY' ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: banType === 'TEMPORARY' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                    color: banType === 'TEMPORARY' ? '#f59e0b' : 'var(--text-muted)',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Clock size={16} />
+                  {t('admin.tempBanLabel', 'Khóa Tạm Thời')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBanType('PERMANENT')}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: banType === 'PERMANENT' ? '1.5px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: banType === 'PERMANENT' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                    color: banType === 'PERMANENT' ? '#ef4444' : 'var(--text-muted)',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <ShieldAlert size={16} />
+                  {t('admin.permBanLabel', 'Khóa Vĩnh Viễn')}
+                </button>
+              </div>
+            </div>
+
+            {/* Days Selection (if Temporary) */}
+            {banType === 'TEMPORARY' && (
+              <div style={{ marginBottom: '16px', background: 'rgba(245, 158, 11, 0.05)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.15)' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#f59e0b', marginBottom: '8px' }}>
+                  {t('admin.banDaysCountLabel', 'Số ngày bị khóa:')}
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                  {PRESET_DAYS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => { setDays(d); setCustomDays(''); }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: days === d ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: days === d ? '#f59e0b' : 'rgba(255, 255, 255, 0.05)',
+                        color: days === d ? '#000' : 'var(--text-secondary)',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {t('admin.daysCount', '{count} ngày').replace('{count}', d)}
+                    </button>
+                  ))}
                   <button
-                    key={d}
                     type="button"
-                    onClick={() => { setDays(d); setCustomDays(''); }}
+                    onClick={() => setDays('CUSTOM')}
                     style={{
                       padding: '6px 14px',
                       borderRadius: '8px',
-                      border: days === d ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
-                      background: days === d ? '#f59e0b' : 'rgba(255, 255, 255, 0.05)',
-                      color: days === d ? '#000' : 'var(--text-secondary)',
+                      border: days === 'CUSTOM' ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
+                      background: days === 'CUSTOM' ? '#f59e0b' : 'rgba(255, 255, 255, 0.05)',
+                      color: days === 'CUSTOM' ? '#000' : 'var(--text-secondary)',
                       fontWeight: 700,
                       fontSize: '0.82rem',
                       cursor: 'pointer',
                       transition: 'all 0.15s'
                     }}
                   >
-                    {d} ngày
+                    {t('admin.customDays', 'Tùy chỉnh')}
                   </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setDays('CUSTOM')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    border: days === 'CUSTOM' ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
-                    background: days === 'CUSTOM' ? '#f59e0b' : 'rgba(255, 255, 255, 0.05)',
-                    color: days === 'CUSTOM' ? '#000' : 'var(--text-secondary)',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  Tùy chỉnh
-                </button>
-              </div>
-
-              {days === 'CUSTOM' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    placeholder="Nhập số ngày (ví dụ 10, 45...)"
-                    className="form-control"
-                    value={customDays}
-                    onChange={(e) => setCustomDays(e.target.value)}
-                    style={{ height: '38px', fontSize: '0.85rem' }}
-                  />
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ngày</span>
                 </div>
-              )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#f59e0b', marginTop: '6px' }}>
-                <Calendar size={13} />
-                <span>Dự kiến tài khoản sẽ tự động mở khóa vào: <strong>{estimatedExpiry}</strong></span>
+                {days === 'CUSTOM' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      placeholder={t('admin.customDaysPlaceholder', 'Nhập số ngày (ví dụ 10, 45...)')}
+                      className="form-control"
+                      value={customDays}
+                      onChange={(e) => setCustomDays(e.target.value)}
+                      style={{ height: '38px', fontSize: '0.85rem' }}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('common.days', 'ngày')}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#f59e0b', marginTop: '6px' }}>
+                  <Calendar size={13} />
+                  <span>
+                    {t('admin.estimatedAutoUnbanAt', 'Dự kiến tài khoản sẽ tự động mở khóa vào: {date}').split('{date}')[0]}
+                    <strong>{estimatedExpiry}</strong>
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Reason Selection */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>
-              Lý do bị khóa <span style={{ color: '#ef4444' }}>*</span>:
-            </label>
-            <select
-              className="form-control"
-              value={selectedReason}
-              onChange={(e) => setSelectedReason(e.target.value)}
-              style={{ height: '40px', fontSize: '0.88rem', marginBottom: selectedReason === 'Lý do khác (Nhập chi tiết)' ? '8px' : '0' }}
-            >
-              {PRESET_REASONS.map((r, i) => (
-                <option key={i} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-
-            {selectedReason === 'Lý do khác (Nhập chi tiết)' && (
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Nhập lý do vi phạm cụ thể..."
-                value={customReason}
-                onChange={(e) => setCustomReason(e.target.value)}
-                style={{ height: '38px', fontSize: '0.85rem' }}
-                required
-              />
             )}
-          </div>
 
-          {/* Description text area */}
-          <div style={{ marginBottom: '18px' }}>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>
-              Mô tả chi tiết vi phạm (người dùng sẽ đọc khi đăng nhập):
-            </label>
-            <textarea
-              className="form-control"
-              rows={3}
-              placeholder="Ví dụ: Bạn đã dùng ngôn từ xúc phạm người chơi khác trong đơn hàng #1234, vui lòng tuân thủ quy chuẩn..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              style={{ fontSize: '0.85rem', resize: 'vertical' }}
-            />
-          </div>
+            {/* Reason Selection */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>
+                {t('admin.banReasonPresetLabel', 'Lý do bị khóa')} <span style={{ color: '#ef4444' }}>*</span>:
+              </label>
+              <select
+                className="form-control"
+                value={selectedReasonKey}
+                onChange={(e) => setSelectedReasonKey(e.target.value)}
+                style={{ height: '40px', fontSize: '0.88rem', marginBottom: selectedReasonKey === 'admin.banReasonOther' ? '8px' : '0' }}
+              >
+                {PRESET_REASON_KEYS.map((r, i) => (
+                  <option key={i} value={r.key}>
+                    {t(r.key, r.fallback)}
+                  </option>
+                ))}
+              </select>
 
-          {/* Warning banner */}
-          <div
-            style={{
-              padding: '10px 12px',
-              borderRadius: '8px',
-              background: 'rgba(239, 68, 68, 0.08)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              fontSize: '0.78rem',
-              color: '#fca5a5',
-              marginBottom: '20px',
-              lineHeight: 1.4
-            }}
-          >
-            ⚠️ <strong>Lưu ý:</strong> Tài khoản của người dùng sẽ bị vô hiệu hóa tức thì. Khi đăng nhập, hệ thống sẽ hiện popup hiển thị chính xác số ngày bị khóa và lý do vi phạm này.
-          </div>
+              {selectedReasonKey === 'admin.banReasonOther' && (
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder={t('admin.customReasonPlaceholder', 'Nhập lý do vi phạm cụ thể...')}
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  style={{ height: '38px', fontSize: '0.85rem' }}
+                  required
+                />
+              )}
+            </div>
+
+            {/* Description text area */}
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '6px' }}>
+                {t('admin.banDescLabel', 'Mô tả chi tiết vi phạm (người dùng sẽ đọc khi đăng nhập):')}
+              </label>
+              <textarea
+                className="form-control"
+                rows={3}
+                placeholder={t('admin.banDescPlaceholder', 'Ví dụ: Bạn đã dùng ngôn từ xúc phạm người chơi khác trong đơn hàng #1234, vui lòng tuân thủ quy chuẩn...')}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                style={{ fontSize: '0.85rem', resize: 'vertical' }}
+              />
+            </div>
+
+            {/* Warning banner */}
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: '8px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                fontSize: '0.78rem',
+                color: '#fca5a5',
+                marginBottom: '20px',
+                lineHeight: 1.4
+              }}
+            >
+              ⚠️ <strong>{t('admin.noticePrefix', 'Lưu ý:')}</strong> {t('admin.banWarningNotice', 'Tài khoản của người dùng sẽ bị vô hiệu hóa tức thì. Khi đăng nhập, hệ thống sẽ hiện popup hiển thị chính xác số ngày bị khóa và lý do vi phạm này.')}
+            </div>
           </div>
 
           {/* Sticky Actions Footer */}
@@ -447,7 +459,7 @@ export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
               disabled={loading}
               style={{ padding: '8px 16px', fontSize: '0.88rem' }}
             >
-              Hủy Bỏ
+              {t('common.cancel', 'Hủy Bỏ')}
             </button>
             <button
               type="submit"
@@ -467,7 +479,7 @@ export const BanUserModal = ({ isOpen, onClose, user, onSuccess }) => {
               }}
             >
               <Lock size={15} />
-              {loading ? 'Đang Xử Lý...' : 'Xác Nhận Khóa Tài Khoản'}
+              {loading ? t('common.processing', 'Đang Xử Lý...') : t('admin.confirmBanBtn', 'Xác Nhận Khóa Tài Khoản')}
             </button>
           </div>
         </form>

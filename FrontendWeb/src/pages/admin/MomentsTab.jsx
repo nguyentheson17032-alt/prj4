@@ -5,12 +5,14 @@ import {
   Heart, Trash2, EyeOff, Crown
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import { GAME_TOPICS_20 } from '../../constants/gamesList';
 import { MetricCard, StatusBadge, parseDateToDateObj, formatOrderDateTime } from './adminHelpers';
 
 export const MomentsTab = () => {
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const [momentsList, setMomentsList] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,7 +38,7 @@ export const MomentsTab = () => {
       setMomentsList(data || []);
     } catch (e) {
       console.error('Error loading moments:', e);
-      addToast('Không thể tải danh sách khoảnh khắc', 'error');
+      addToast(t('admin.loadingMomentsData', 'Không thể tải danh sách khoảnh khắc'), 'error');
     } finally {
       setLoading(false);
     }
@@ -113,8 +115,8 @@ export const MomentsTab = () => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const todayCount = momentsList.filter(m => {
-      const t = parseDateToDateObj(m.rawCreatedAt || m.createdAt)?.getTime() || 0;
-      return t >= todayStart;
+      const tDate = parseDateToDateObj(m.rawCreatedAt || m.createdAt)?.getTime() || 0;
+      return tDate >= todayStart;
     }).length;
 
     return { total, active, hidden, totalLikes, todayCount };
@@ -129,23 +131,28 @@ export const MomentsTab = () => {
       if (selectedMoment?.id === momentId) {
         setSelectedMoment(prev => ({ ...prev, status: newStatus }));
       }
-      addToast(`Đã ${newStatus === 'ACTIVE' ? 'hiển thị' : 'ẩn'} bài viết #${momentId}!`, 'success');
+      addToast(
+        t('admin.toastStatusToggled', 'Đã {status} bài viết #{id}!')
+          .replace('{status}', newStatus === 'ACTIVE' ? t('admin.statusActive', 'hiển thị') : t('admin.statusHidden', 'ẩn'))
+          .replace('{id}', momentId),
+        'success'
+      );
     } catch {
-      addToast('Cập nhật trạng thái thất bại. Vui lòng thử lại!', 'error');
+      addToast(t('admin.toastStatusToggleFailed', 'Cập nhật trạng thái thất bại. Vui lòng thử lại!'), 'error');
     }
   };
 
   const handleDeleteMoment = async (momentId) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn bài đăng khoảnh khắc #${momentId}?`)) return;
+    if (!window.confirm(t('admin.confirmDeleteMoment', 'Bạn có chắc chắn muốn xóa vĩnh viễn bài đăng khoảnh khắc #{id}?').replace('{id}', momentId))) return;
     try {
       await api.deleteMomentAdmin(momentId);
       setMomentsList(prev => prev.filter(m => m.id !== momentId));
       if (selectedMoment?.id === momentId) {
         setSelectedMoment(null);
       }
-      addToast(`Đã xóa khoảnh khắc #${momentId} thành công!`, 'success');
+      addToast(t('admin.toastDeleteMomentSuccess', 'Đã xóa khoảnh khắc #{id} thành công!').replace('{id}', momentId), 'success');
     } catch {
-      addToast('Xóa khoảnh khắc thất bại. Vui lòng thử lại!', 'error');
+      addToast(t('admin.toastDeleteMomentFailed', 'Xóa khoảnh khắc thất bại. Vui lòng thử lại!'), 'error');
     }
   };
 
@@ -167,14 +174,14 @@ export const MomentsTab = () => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-              Quản Lý Khoảnh Khắc Idol
+              {t('admin.momentsManagementTitle', 'Quản Lý Khoảnh Khắc Idol')}
             </h2>
             <span style={{ fontSize: '0.75rem', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', padding: '3px 8px', borderRadius: '8px', fontWeight: 700 }}>
-              {momentsList.length} bài đăng
+              {t('admin.momentsCountBadge', '{count} bài đăng').replace('{count}', momentsList.length)}
             </span>
           </div>
           <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Kiểm duyệt hình ảnh, theo dõi tương tác like và quản lý bài đăng khoảnh khắc trên nền tảng
+            {t('admin.momentsManagementSub', 'Kiểm duyệt hình ảnh, theo dõi tương tác like và quản lý bài đăng khoảnh khắc trên nền tảng')}
           </p>
         </div>
 
@@ -184,17 +191,17 @@ export const MomentsTab = () => {
           style={{ height: '38px', padding: '0 14px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          <span>Làm mới</span>
+          <span>{t('admin.refresh', 'Làm mới')}</span>
         </button>
       </div>
 
       {/* Metrics Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-        <MetricCard label="Tổng Khoảnh Khắc" value={metrics.total} sub="Tổng bài đăng trên hệ thống" icon={Sparkles} color="#6366f1" />
-        <MetricCard label="Đang Hiển Thị" value={metrics.active} sub="Khoảnh khắc công khai feed" icon={CheckCircle2} color="#10b981" />
-        <MetricCard label="Đang Ẩn / Kiểm Duyệt" value={metrics.hidden} sub="Đã ẩn khỏi feed chung" icon={EyeOff} color="#f59e0b" />
-        <MetricCard label="Tổng Lượt Thích" value={metrics.totalLikes} sub="= Tổng số người đã thả tim" icon={Heart} color="#ec4899" />
-        <MetricCard label="Đăng Hôm Nay" value={metrics.todayCount} sub="Luật: 1 bài / Idol / ngày" icon={Clock} color="#06b6d4" />
+        <MetricCard label={t('admin.totalMoments', 'Tổng Khoảnh Khắc')} value={metrics.total} sub={t('admin.totalMomentsSub', 'Tổng bài đăng trên hệ thống')} icon={Sparkles} color="#6366f1" />
+        <MetricCard label={t('admin.activeMoments', 'Đang Hiển Thị')} value={metrics.active} sub={t('admin.activeMomentsSub', 'Khoảnh khắc công khai feed')} icon={CheckCircle2} color="#10b981" />
+        <MetricCard label={t('admin.hiddenMoments', 'Đang Ẩn / Kiểm Duyệt')} value={metrics.hidden} sub={t('admin.hiddenMomentsSub', 'Đã ẩn khỏi feed chung')} icon={EyeOff} color="#f59e0b" />
+        <MetricCard label={t('admin.totalLikes', 'Tổng Lượt Thích')} value={metrics.totalLikes} sub={t('admin.totalLikesSub', '= Tổng số người đã thả tim')} icon={Heart} color="#ec4899" />
+        <MetricCard label={t('admin.postedToday', 'Đăng Hôm Nay')} value={metrics.todayCount} sub={t('admin.ruleOnePerDay', 'Luật: 1 bài / Idol / ngày')} icon={Clock} color="#06b6d4" />
       </div>
 
       {/* Search & Filters Toolbar */}
@@ -206,7 +213,7 @@ export const MomentsTab = () => {
             <input
               type="text"
               className="form-control"
-              placeholder="Tìm theo ID, tên idol, game, nội dung..."
+              placeholder={t('admin.searchMomentsPlaceholder', 'Tìm theo ID, tên idol, game, nội dung...')}
               value={search}
               onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
               style={{ paddingLeft: '36px', height: '38px', fontSize: '0.86rem' }}
@@ -229,7 +236,7 @@ export const MomentsTab = () => {
               onChange={e => { setGameFilter(e.target.value); setCurrentPage(1); }}
               style={{ height: '38px', fontSize: '0.86rem' }}
             >
-              <option value="all">🎮 Tất Cả Game (20)</option>
+              <option value="all">{t('admin.allGames20', '🎮 Tất Cả Game (20)')}</option>
               {GAME_TOPICS_20.map(g => (
                 <option key={g.id} value={g.name}>{g.icon} {g.name}</option>
               ))}
@@ -244,10 +251,10 @@ export const MomentsTab = () => {
               onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
               style={{ height: '38px', fontSize: '0.86rem' }}
             >
-              <option value="all">Tất Cả Trạng Thái</option>
-              <option value="ACTIVE">🟢 Đang hiển thị</option>
-              <option value="HIDDEN">🟡 Đang ẩn</option>
-              <option value="DELETED">🔴 Đã xóa</option>
+              <option value="all">{t('admin.allStatuses', 'Tất Cả Trạng Thái')}</option>
+              <option value="ACTIVE">{t('admin.statusActiveOption', '🟢 Đang hiển thị')}</option>
+              <option value="HIDDEN">{t('admin.statusHidden', '🟡 Đang ẩn')}</option>
+              <option value="DELETED">{t('admin.statusDeleted', '🔴 Đã xóa')}</option>
             </select>
           </div>
 
@@ -259,10 +266,10 @@ export const MomentsTab = () => {
               onChange={e => { setDateFilter(e.target.value); setCurrentPage(1); }}
               style={{ height: '38px', fontSize: '0.86rem' }}
             >
-              <option value="all">Mọi thời gian</option>
-              <option value="today">Hôm nay</option>
-              <option value="last7days">7 ngày qua</option>
-              <option value="last30days">30 ngày qua</option>
+              <option value="all">{t('admin.allDates', 'Mọi thời gian')}</option>
+              <option value="today">{t('admin.todayFilter', 'Hôm nay')}</option>
+              <option value="last7days">{t('admin.last7DaysFilter', '7 ngày qua')}</option>
+              <option value="last30days">{t('admin.last30DaysFilter', '30 ngày qua')}</option>
             </select>
           </div>
 
@@ -274,10 +281,10 @@ export const MomentsTab = () => {
               onChange={e => setSortBy(e.target.value)}
               style={{ height: '38px', fontSize: '0.86rem' }}
             >
-              <option value="newest">🕒 Mới nhất trước</option>
-              <option value="oldest">🕒 Cũ nhất trước</option>
-              <option value="most_liked">❤️ Nhiều like nhất</option>
-              <option value="least_liked">🤍 Ít like nhất</option>
+              <option value="newest">{t('admin.sortNewest', '🕒 Mới nhất trước')}</option>
+              <option value="oldest">{t('admin.sortOldest', '🕒 Cũ nhất trước')}</option>
+              <option value="most_liked">{t('admin.sortMostLiked', '❤️ Nhiều like nhất')}</option>
+              <option value="least_liked">{t('admin.sortLeastLiked', '🤍 Ít like nhất')}</option>
             </select>
           </div>
 
@@ -289,7 +296,7 @@ export const MomentsTab = () => {
               style={{ height: '38px', padding: '0 12px', fontSize: '0.82rem', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
             >
               <RotateCcw size={14} style={{ marginRight: '4px' }} />
-              Đặt lại
+              {t('admin.reset', 'Đặt lại')}
             </button>
           )}
         </div>
@@ -301,14 +308,14 @@ export const MomentsTab = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                <th style={{ padding: '14px 16px', width: '130px' }}>ID & Thời Gian</th>
-                <th style={{ padding: '14px 16px' }}>Idol Đăng Bài</th>
-                <th style={{ padding: '14px 16px' }}>Chủ Đề Game</th>
-                <th style={{ padding: '14px 16px', maxWidth: '280px' }}>Nội Dung</th>
-                <th style={{ padding: '14px 16px' }}>Hình Ảnh</th>
-                <th style={{ padding: '14px 16px', width: '130px' }}>Lượt Thích</th>
-                <th style={{ padding: '14px 16px', width: '120px' }}>Trạng Thái</th>
-                <th style={{ padding: '14px 16px', textAlign: 'right', width: '140px' }}>Thao Tác</th>
+                <th style={{ padding: '14px 16px', width: '130px' }}>{t('admin.colIdAndTime', 'ID & Thời Gian')}</th>
+                <th style={{ padding: '14px 16px' }}>{t('admin.colAuthorIdol', 'Idol Đăng Bài')}</th>
+                <th style={{ padding: '14px 16px' }}>{t('admin.colGameTopic', 'Chủ Đề Game')}</th>
+                <th style={{ padding: '14px 16px', maxWidth: '280px' }}>{t('admin.colContent', 'Nội Dung')}</th>
+                <th style={{ padding: '14px 16px' }}>{t('admin.colImages', 'Hình Ảnh')}</th>
+                <th style={{ padding: '14px 16px', width: '130px' }}>{t('admin.colLikes', 'Lượt Thích')}</th>
+                <th style={{ padding: '14px 16px', width: '120px' }}>{t('admin.colStatus', 'Trạng Thái')}</th>
+                <th style={{ padding: '14px 16px', textAlign: 'right', width: '140px' }}>{t('admin.colActions', 'Thao Tác')}</th>
               </tr>
             </thead>
             <tbody>
@@ -316,15 +323,15 @@ export const MomentsTab = () => {
                 <tr>
                   <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     <div className="spinner-border spinner-border-sm text-primary" role="status" style={{ marginRight: '8px' }}></div>
-                    Đang tải dữ liệu khoảnh khắc...
+                    {t('admin.loadingMomentsData', 'Đang tải dữ liệu khoảnh khắc...')}
                   </td>
                 </tr>
               ) : paginatedMoments.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '50px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     <Sparkles size={32} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Không tìm thấy bài viết khoảnh khắc nào</div>
-                    <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{t('admin.noMomentsFound', 'Không tìm thấy bài viết khoảnh khắc nào')}</div>
+                    <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>{t('admin.noMomentsFoundHint', 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm')}</div>
                   </td>
                 </tr>
               ) : (
@@ -395,7 +402,7 @@ export const MomentsTab = () => {
                       <td style={{ padding: '14px 16px', verticalAlign: 'middle', maxWidth: '280px' }}>
                         <div
                           onClick={() => setSelectedMoment(moment)}
-                          title="Bấm để xem đầy đủ nội dung"
+                          title={t('admin.clickToViewContent', 'Bấm để xem đầy đủ nội dung')}
                           style={{
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -434,11 +441,11 @@ export const MomentsTab = () => {
                               ))}
                             </div>
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                              {images.length} ảnh
+                              {t('admin.imagesCount', '{count} ảnh').replace('{count}', images.length)}
                             </span>
                           </div>
                         ) : (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Không có ảnh</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('admin.noImages', 'Không có ảnh')}</span>
                         )}
                       </td>
 
@@ -458,13 +465,13 @@ export const MomentsTab = () => {
                             fontSize: '0.8rem',
                             cursor: 'pointer'
                           }}
-                          title="Bấm để xem danh sách người đã thích"
+                          title={t('admin.clickToViewLikers', 'Bấm để xem danh sách người đã thích')}
                         >
                           <Heart size={14} fill="#ec4899" />
                           <span>{moment.likeCount || 0}</span>
                         </div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          ={moment.likeCount || 0} người thích
+                          {t('admin.peopleLiked', '={count} người thích').replace('{count}', moment.likeCount || 0)}
                         </div>
                       </td>
 
@@ -480,7 +487,7 @@ export const MomentsTab = () => {
                           <button
                             className="btn btn-outline"
                             onClick={() => setSelectedMoment(moment)}
-                            title="Xem chi tiết khoảnh khắc"
+                            title={t('admin.viewMomentDetailTooltip', 'Xem chi tiết khoảnh khắc')}
                             style={{ width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Eye size={15} />
@@ -490,7 +497,7 @@ export const MomentsTab = () => {
                           <button
                             className="btn btn-outline"
                             onClick={() => handleToggleStatus(moment.id, moment.status)}
-                            title={isHidden ? 'Hiển thị bài viết' : 'Tạm ẩn bài viết'}
+                            title={isHidden ? t('admin.unhideTooltip', 'Hiển thị bài viết') : t('admin.hideTooltip', 'Tạm ẩn bài viết')}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -509,7 +516,7 @@ export const MomentsTab = () => {
                           <button
                             className="btn btn-outline"
                             onClick={() => handleDeleteMoment(moment.id)}
-                            title="Xóa vĩnh viễn"
+                            title={t('admin.deleteTooltip', 'Xóa vĩnh viễn')}
                             style={{
                               width: '32px',
                               height: '32px',
@@ -537,7 +544,10 @@ export const MomentsTab = () => {
         {totalPages > 1 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
             <span style={{ color: 'var(--text-muted)' }}>
-              Hiển thị {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredMoments.length)} trên tổng số {filteredMoments.length}
+              {t('admin.paginationShowing', 'Hiển thị {from} - {to} trên tổng số {total}')
+                .replace('{from}', (currentPage - 1) * pageSize + 1)
+                .replace('{to}', Math.min(currentPage * pageSize, filteredMoments.length))
+                .replace('{total}', filteredMoments.length)}
             </span>
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
@@ -598,10 +608,10 @@ export const MomentsTab = () => {
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>
-                    Chi Tiết Khoảnh Khắc #{selectedMoment.id}
+                    {t('admin.momentDetailTitle', 'Chi Tiết Khoảnh Khắc #{id}').replace('{id}', selectedMoment.id)}
                   </h3>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    Đăng lúc: {formatOrderDateTime(selectedMoment.rawCreatedAt || selectedMoment.createdAt)}
+                    {t('admin.postedAt', 'Đăng lúc: {time}').replace('{time}', formatOrderDateTime(selectedMoment.rawCreatedAt || selectedMoment.createdAt))}
                   </div>
                 </div>
               </div>
@@ -634,7 +644,7 @@ export const MomentsTab = () => {
                       </span>
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Mã tài khoản Idol: #{selectedMoment.playerUserId || selectedMoment.author?.userId || selectedMoment.author?.id || '—'}
+                      {t('admin.idolAccountCode', 'Mã tài khoản Idol: #{id}').replace('{id}', selectedMoment.playerUserId || selectedMoment.author?.userId || selectedMoment.author?.id || '—')}
                     </div>
                   </div>
                 </div>
@@ -651,7 +661,7 @@ export const MomentsTab = () => {
               {/* Content Text */}
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>
-                  Nội Dung Bài Viết:
+                  {t('admin.postContentLabel', 'Nội Dung Bài Viết:')}
                 </label>
                 <div style={{ padding: '14px 16px', background: 'rgba(0,0,0,0.25)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', color: '#f1f5f9', fontSize: '0.94rem', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
                   {selectedMoment.content}
@@ -662,7 +672,7 @@ export const MomentsTab = () => {
               {selectedMoment.images && selectedMoment.images.length > 0 && (
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>
-                    Hình Ảnh Đính Kèm ({selectedMoment.images.length} ảnh):
+                    {t('admin.attachedPhotosLabel', 'Hình Ảnh Đính Kèm ({count} ảnh):').replace('{count}', selectedMoment.images.length)}
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
                     {selectedMoment.images.map((img, idx) => (
@@ -684,22 +694,22 @@ export const MomentsTab = () => {
                 </div>
               )}
 
-              {/* Like Statistics & Likers List: Số lượt like = Số người đã like */}
+              {/* Like Statistics & Likers List */}
               <div style={{ padding: '16px', background: 'rgba(236, 72, 153, 0.05)', borderRadius: '14px', border: '1px solid rgba(236, 72, 153, 0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Heart size={18} fill="#ec4899" color="#ec4899" />
                     <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#f472b6' }}>
-                      Tổng Lượt Thích: {selectedMoment.likeCount || 0}
+                      {t('admin.totalLikes', 'Tổng Lượt Thích')}: {selectedMoment.likeCount || 0}
                     </span>
                   </div>
                   <span style={{ fontSize: '0.74rem', background: 'rgba(236, 72, 153, 0.15)', color: '#fbcfe8', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                    Số lượt like = {selectedMoment.likeCount || 0} người đã like
+                    {t('admin.peopleLiked', '={count} người thích').replace('{count}', selectedMoment.likeCount || 0)}
                   </span>
                 </div>
 
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  Danh sách tài khoản đã thích khoảnh khắc này:
+                  {t('admin.likersListLabel', 'Danh sách tài khoản đã thích khoảnh khắc này:')}
                 </div>
 
                 {Array.isArray(selectedMoment.likedByUsers) && selectedMoment.likedByUsers.length > 0 ? (
@@ -727,8 +737,8 @@ export const MomentsTab = () => {
                 ) : (
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                     {Number(selectedMoment.likeCount) > 0
-                      ? `${selectedMoment.likeCount} thành viên cộng đồng đã thích bài đăng này`
-                      : 'Chưa có thành viên nào thả tim cho bài viết này.'}
+                      ? t('admin.membersLikedThisPost', '{count} thành viên cộng đồng đã thích bài đăng này').replace('{count}', selectedMoment.likeCount)
+                      : t('admin.noLikesYet', 'Chưa có thành viên nào thả tim cho bài viết này.')}
                   </div>
                 )}
               </div>
@@ -750,12 +760,12 @@ export const MomentsTab = () => {
                   {(selectedMoment.status || 'ACTIVE').toUpperCase() === 'HIDDEN' ? (
                     <>
                       <CheckCircle2 size={15} style={{ marginRight: '6px' }} />
-                      <span>Hiển Thị Khoảnh Khắc</span>
+                      <span>{t('admin.unhideMoment', 'Hiển Thị Khoảnh Khắc')}</span>
                     </>
                   ) : (
                     <>
                       <EyeOff size={15} style={{ marginRight: '6px' }} />
-                      <span>Ẩn Khoảnh Khắc</span>
+                      <span>{t('admin.hideMoment', 'Ẩn Khoảnh Khắc')}</span>
                     </>
                   )}
                 </button>
@@ -767,7 +777,7 @@ export const MomentsTab = () => {
                   style={{ fontSize: '0.85rem', color: '#ef4444', borderColor: '#ef4444' }}
                 >
                   <Trash2 size={15} style={{ marginRight: '6px' }} />
-                  <span>Xóa Vĩnh Viễn</span>
+                  <span>{t('admin.deletePermanently', 'Xóa Vĩnh Viễn')}</span>
                 </button>
               </div>
 
@@ -776,7 +786,7 @@ export const MomentsTab = () => {
                 onClick={() => setSelectedMoment(null)}
                 style={{ padding: '8px 20px', fontSize: '0.85rem' }}
               >
-                Đóng
+                {t('common.close', 'Đóng')}
               </button>
             </div>
           </div>

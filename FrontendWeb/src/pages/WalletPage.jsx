@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
+import { localizeTxDescription, localizeTxFeeDetail } from '../utils/transactionLocalization';
 import PlayerIncomeDashboard from '../components/wallet/PlayerIncomeDashboard';
 import { Download, BarChart2 } from 'lucide-react';
 import api from '../api/apiService';
@@ -76,7 +77,22 @@ const renderStatusBadge = (tx, t) => {
             fontWeight: 700
           }}
         >
-          Từ Chối
+          {t ? t('wallet.stRejected', 'Từ Chối') : 'Từ Chối'}
+        </span>
+      );
+    }
+    if (tx.status === 'CANCELED') {
+      return (
+        <span
+          className="badge"
+          style={{
+            background: 'rgba(107, 114, 128, 0.15)',
+            color: '#9ca3af',
+            border: '1px solid rgba(107, 114, 128, 0.35)',
+            fontWeight: 700
+          }}
+        >
+          {t ? t('wallet.stCancelled', 'Đã Hủy') : 'Đã Hủy'}
         </span>
       );
     }
@@ -216,8 +232,36 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
   const [frozenAmount, setFrozenAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mainTab, setMainTab] = useState('TRANSACTIONS'); // 'TRANSACTIONS' | 'IDOL_REPORT'
+  const [reloadKey, setReloadKey] = useState(0);
+  const [cancelingId, setCancelingId] = useState(null);
   const { addToast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const handleCancelWithdraw = async (withdrawId, amount) => {
+    const absAmount = Math.abs(amount || 0);
+    const confirmMsg = t(
+      'wallet.confirmCancelWithdrawPrompt',
+      `Bạn có chắc chắn muốn hủy yêu cầu rút {amount} đ này không? Tiền sẽ được hoàn lại ngay vào số dư ví của bạn.`
+    ).replace('{amount}', absAmount.toLocaleString('vi-VN'));
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setCancelingId(withdrawId);
+      await api.cancelWithdraw(withdrawId);
+      addToast(t('wallet.cancelWithdrawSuccessToast', 'Hủy yêu cầu rút tiền thành công! Số dư đã được hoàn lại vào ví.'), 'success');
+      if (typeof refreshUser === 'function') {
+        refreshUser();
+      }
+      setReloadKey(k => k + 1);
+    } catch (err) {
+      console.error('Error canceling withdrawal:', err);
+      const errMsg = err?.response?.data || err?.message || t('wallet.cancelWithdrawFailed', 'Không thể hủy yêu cầu rút tiền');
+      addToast(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg), 'error');
+    } finally {
+      setCancelingId(null);
+    }
+  };
 
   const handleExportStatement = async () => {
     try {
@@ -538,7 +582,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                 subType: 'DONATE_SENT',
                 amount: -origCoin,
                 originalPrice: origCoin,
-                feeDetail: `Idol nhận: ${recvCoin.toLocaleString('vi-VN')} đ (đã khấu trừ 15% phí hệ thống)`,
+                feeDetail: t('wallet.idolReceiveGiftFeeDetail', 'Idol nhận: {amount} đ (đã khấu trừ 15% phí hệ thống)').replace('{amount}', recvCoin.toLocaleString('vi-VN')),
                 description: d.description || `Tặng quà cho ${d.partnerName || 'Idol'}`,
                 date: formatTransactionDate(donateDateStr),
                 status: d.status || 'COMPLETED',
@@ -553,35 +597,39 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
           withdrawsData.value.forEach(w => {
             const withdrawDateStr = w.createdAt || w.dateTime;
             const withdrawRawDate = parseToTimestamp(withdrawDateStr);
+            const isCanceled = w.status === 'CANCELED';
             const isRefunded = w.status === 'REFUNDED' || w.status === 'REJECTED';
             const isCompleted = w.status === 'COMPLETED';
-            const statusText = isCompleted ? 'COMPLETED' : isRefunded ? 'REJECTED' : 'PENDING';
+            const statusText = isCompleted ? 'COMPLETED' : isRefunded ? 'REJECTED' : isCanceled ? 'CANCELED' : 'PENDING';
             const coinAmount = Number(w.coin || 0);
 
             // Giao dịch yêu cầu rút tiền ban đầu (- tiền)
             list.push({
               id: `RUT-${w.id}`,
+              rawWithdrawId: w.id,
               type: 'WITHDRAW',
               amount: -coinAmount,
               description: `Rút tiền về ${w.bankName || 'Ngân hàng'}`,
-              feeDetail: `Số TK: ${w.bankAccountNumber || '—'} | Chủ TK: ${w.bankAccountName || '—'}${isCompleted ? ' (Đã chuyển khoản thành công)' : isRefunded ? ' (Đã bị từ chối & hoàn tiền về ví)' : ' (Đang chờ Admin duyệt)'}`,
+              feeDetail: `Số TK: ${w.bankAccountNumber || '—'} | Chủ TK: ${w.bankAccountName || '—'}${isCompleted ? ' (Đã chuyển khoản thành công)' : isRefunded ? ' (Đã bị từ chối & hoàn tiền về ví)' : isCanceled ? ' (Đã hủy yêu cầu & hoàn tiền về ví)' : ' (Đang chờ Admin duyệt)'}`,
               date: formatTransactionDate(withdrawDateStr),
-              status: isRefunded ? 'REJECTED' : statusText,
+              status: isRefunded ? 'REJECTED' : isCanceled ? 'CANCELED' : statusText,
               rawDate: withdrawRawDate
             });
 
-            // Nếu bị từ chối & hoàn tiền -> Thêm bản ghi hoàn trả tiền cộng lại vào ví (+ tiền)
-            if (isRefunded) {
+            // Nếu bị từ chối hoặc người dùng tự hủy -> Thêm bản ghi hoàn trả tiền cộng lại vào ví (+ tiền)
+            if (isRefunded || isCanceled) {
               const refundDateStr = w.completedAt || withdrawDateStr;
               const refundRawDate = (w.completedAt ? parseToTimestamp(w.completedAt) : withdrawRawDate) + 1000;
-              const reasonText = w.description ? ` | Lý do từ chối: ${w.description}` : '';
+              const reasonText = w.description ? ` | Lý do: ${w.description}` : '';
               list.push({
                 id: `RUT-${w.id}-REFUND`,
                 type: 'REFUND',
-                subType: 'WITHDRAW_REFUND',
+                subType: isCanceled ? 'WITHDRAW_CANCELED' : 'WITHDRAW_REFUND',
                 amount: +coinAmount,
-                description: `Hoàn tiền rút về ví (Yêu cầu rút #${w.id} bị từ chối)`,
-                feeDetail: `Cộng lại ${coinAmount.toLocaleString('vi-VN')} đ vào số dư khả dụng do lệnh rút về ${w.bankName || 'ngân hàng'} bị từ chối${reasonText}`,
+                description: isCanceled
+                  ? `Hoàn tiền rút về ví (Yêu cầu rút #${w.id} đã tự hủy)`
+                  : `Hoàn tiền rút về ví (Yêu cầu rút #${w.id} bị từ chối)`,
+                feeDetail: `Cộng lại ${coinAmount.toLocaleString('vi-VN')} đ vào số dư khả dụng do lệnh rút về ${w.bankName || 'ngân hàng'} ${isCanceled ? 'đã được bạn tự hủy' : 'bị từ chối'}${reasonText}`,
                 date: formatTransactionDate(refundDateStr),
                 status: 'COMPLETED',
                 rawDate: refundRawDate
@@ -600,11 +648,11 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
       }
     };
     fetchTransactions();
-  }, [user?.id, user?.username]);
+  }, [user?.id, user?.username, reloadKey]);
 
   const filteredTransactions = transactions.filter(t => {
     if (filterType === 'ALL') return true;
-    if (filterType === 'WITHDRAW') return t.type === 'WITHDRAW' || t.subType === 'WITHDRAW_REFUND';
+    if (filterType === 'WITHDRAW') return t.type === 'WITHDRAW' || t.subType === 'WITHDRAW_REFUND' || t.subType === 'WITHDRAW_CANCELED';
     return t.type === filterType;
   });
 
@@ -615,10 +663,10 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
       {/* Header */}
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '8px' }}>
-          Ví PlayZone & <span className="gradient-text">Lịch Sử Giao Dịch</span>
+          {t('wallet.title', 'Ví PlayZone &')} <span className="gradient-text">{t('wallet.titleHighlight', 'Lịch Sử Giao Dịch')}</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Quản lý số dư khả dụng, theo dõi thu nhập tạm giữ và xem minh bạch mọi biến động số dư.
+          {t('wallet.subtitle', 'Quản lý số dư khả dụng, theo dõi thu nhập tạm giữ và xem minh bạch mọi biến động số dư.')}
         </p>
       </div>
 
@@ -759,12 +807,12 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Lịch Sử Biến Động Số Dư</h3>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>{t('wallet.balanceHistoryTitle', 'Lịch Sử Biến Động Số Dư')}</h3>
               <button
                 className="btn btn-outline"
                 style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
                 onClick={handleExportStatement}
-                title="Xuất sao kê giao dịch dạng file CSV / Excel"
+                title={t('wallet.exportStatementTooltip', 'Xuất sao kê giao dịch dạng file CSV / Excel')}
               >
                 <Download size={14} />
                 <span>{t('wallet.exportStatement', 'Xuất CSV')}</span>
@@ -852,7 +900,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                               fontWeight: 700
                             }}
                           >
-                            ⬆ Rút Tiền
+                            {t('wallet.typeWithdraw', '⬆ Rút Tiền')}
                           </span>
                         )}
                         {tx.type === 'PAYMENT' && <span className="badge badge-primary">{t('wallet.typeHire', '- Thuê Duo')}</span>}
@@ -893,7 +941,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                         )}
                       </td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                        <div style={{ fontWeight: 600 }}>{tx.description}</div>
+                        <div style={{ fontWeight: 600 }}>{localizeTxDescription(tx.description, language)}</div>
                         {tx.feeDetail && (
                           <div style={{
                             fontSize: '0.74rem',
@@ -901,7 +949,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                             marginTop: '3px',
                             fontWeight: 500
                           }}>
-                            {tx.feeDetail}
+                            {localizeTxFeeDetail(tx.feeDetail, language)}
                           </div>
                         )}
                       </td>
@@ -924,7 +972,7 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                             color: '#f59e0b',
                             marginTop: '2px'
                           }}>
-                            Đang đóng băng
+                            {t('wallet.stFrozen', 'Đang đóng băng')}
                           </span>
                         ) : tx.amount > 0 && (tx.type === 'RECEIVE' || tx.subType === 'DONATE_RECEIVE') && tx.status === 'COMPLETED' ? (
                           <span style={{
@@ -937,13 +985,39 @@ export const WalletPage = ({ onOpenDeposit, onOpenWithdraw }) => {
                             color: '#38bdf8',
                             marginTop: '2px'
                           }}>
-                            Thực nhận 85%
+                            {t('wallet.actualReceived85', 'Thực nhận 85%')}
                           </span>
                         ) : null}
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{tx.date}</td>
                       <td>
-                        {renderStatusBadge(tx, t)}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {renderStatusBadge(tx, t)}
+                          {tx.type === 'WITHDRAW' && tx.status === 'PENDING' && tx.rawWithdrawId && (
+                            <button
+                              className="btn btn-outline"
+                              disabled={cancelingId === tx.rawWithdrawId}
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: '0.72rem',
+                                borderRadius: '4px',
+                                borderColor: 'rgba(239, 68, 68, 0.4)',
+                                color: '#ef4444',
+                                cursor: cancelingId === tx.rawWithdrawId ? 'not-allowed' : 'pointer',
+                                fontWeight: 600,
+                                lineHeight: 1.2
+                              }}
+                              onClick={() => handleCancelWithdraw(tx.rawWithdrawId, tx.amount)}
+                              title={t('wallet.cancelWithdrawTooltip', 'Hủy yêu cầu rút tiền và hoàn lại số dư ngay lập tức')}
+                            >
+                              {cancelingId === tx.rawWithdrawId ? (
+                                t('wallet.canceling', 'Đang hủy...')
+                              ) : (
+                                t('wallet.cancelWithdrawBtn', 'Hủy lệnh')
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

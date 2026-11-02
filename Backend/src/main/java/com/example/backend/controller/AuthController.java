@@ -271,7 +271,7 @@ public class AuthController {
             return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
                 .body(response);
-        } catch (BadCredentialsException e) {
+        } catch (BadCredentialsException | org.springframework.security.core.userdetails.UsernameNotFoundException | org.springframework.security.authentication.InternalAuthenticationServiceException e) {
             logger.warn("Đăng nhập thất bại cho user: {}", loginRequest.getUsername());
             return ResponseEntity.status(401).body("Tên đăng nhập hoặc mật khẩu không đúng");
         } catch (org.springframework.security.authentication.LockedException | org.springframework.security.authentication.DisabledException e) {
@@ -288,7 +288,7 @@ public class AuthController {
             return ResponseEntity.status(403).body("Tài khoản của bạn đã bị khóa.");
         } catch (Exception e) {
             logger.error("Lỗi khi đăng nhập: {}", e.getMessage());
-            return ResponseEntity.badRequest().body("Lỗi khi đăng nhập: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Tên đăng nhập hoặc mật khẩu không đúng");
         }
     }
 

@@ -42,7 +42,7 @@ export const OrdersPage = () => {
     if (isPlayer) {
       // Tôi là người được thuê (Player/Idol) -> Nhắn tin cho người thuê (Renter)
       const partnerId = order.renter?.id || order.renterId || '';
-      const partnerName = order.renter?.fullName || order.renterName || 'Khách Hàng';
+      const partnerName = order.renter?.fullName || order.renterName || t('orders.clientFallback', 'Khách Hàng');
       const partnerUsername = order.renter?.username || order.renterName || '';
       const partnerAvatar = order.renter?.avatar || order.renterAvatarUrl || getUserAvatar({ username: partnerUsername || partnerName });
       
@@ -50,12 +50,12 @@ export const OrdersPage = () => {
       if (partnerName) params.set('name', partnerName);
       if (partnerUsername) params.set('username', partnerUsername);
       if (partnerAvatar) params.set('avatar', partnerAvatar);
-      params.set('role', `Khách hàng thuê đơn #${order.id}`);
+      params.set('role', t('orders.clientHiringRole', `Khách hàng thuê đơn #${order.id}`).replace('{id}', order.id));
       params.set('isPlayer', 'false');
     } else {
       // Tôi là người đi thuê (Customer) -> Nhắn tin cho người mình thuê (Idol/Player)
       const partnerId = order.playerUserId || order.player?.userId || order.player?.user?.id || order.player?.id || order.playerId || '';
-      const partnerName = order.player?.fullName || order.playerName || 'Idol Duo';
+      const partnerName = order.player?.fullName || order.playerName || t('orders.playerFallback', 'Idol Duo');
       const partnerUsername = order.player?.username || order.playerName || '';
       const partnerAvatar = order.player?.avatar || order.playerAvatarUrl || getUserAvatar({ username: partnerUsername || partnerName });
       
@@ -157,7 +157,7 @@ export const OrdersPage = () => {
     const finished = isOrderFinished(order);
     if (!finished) {
       const remaining = getRemainingTimeText(order.endTime);
-      addToast(`Thời gian thuê chưa kết thúc (${remaining})! Chỉ có thể bấm hoàn thành khi đã hết giờ chơi.`, 'warning');
+      addToast(t('orders.timeNotEndedWarning', `Thời gian thuê chưa kết thúc (${remaining})! Chỉ có thể bấm hoàn thành khi đã hết giờ chơi.`).replace('{remaining}', remaining), 'warning');
       return;
     }
 
@@ -176,7 +176,7 @@ export const OrdersPage = () => {
   const handleReviewed = async (orderId, rating, comment) => {
     try {
       await api.reviewOrder(orderId, rating, comment);
-      addToast('Cảm ơn bạn đã gửi đánh giá cho Player!', 'success');
+      addToast(t('orders.reviewSuccessToast', 'Cảm ơn bạn đã gửi đánh giá cho Player!'), 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? {
         ...o,
         isReviewed: true,
@@ -338,12 +338,12 @@ export const OrdersPage = () => {
               ))
             );
 
-            const displayName = order.player?.fullName || order.playerName || 'Idol PlayZone';
+            const displayName = order.player?.fullName || order.playerName || t('orders.playerFallback', 'Idol PlayZone');
             const displayAvatar = order.player?.avatar || order.playerAvatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${displayName}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
-            const renterDisplayName = order.renter?.fullName || order.renterName || 'Khách Hàng';
+            const renterDisplayName = order.renter?.fullName || order.renterName || t('orders.clientFallback', 'Khách Hàng');
             const renterDisplayAvatar = order.renter?.avatar || order.renterAvatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${renterDisplayName}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
 
-            const displayTime = order.hireTime || order.createdAt || 'Hôm nay';
+            const displayTime = order.hireTime || order.createdAt || t('common.today', 'Hôm nay');
             const displayPrice = order.price || order.finalPrice || order.totalPrice || 0;
 
             return (

@@ -81,20 +81,40 @@ const getStatusBadge = (status, refundPercentage, t) => {
 };
 
 export const OrderDetailModal = ({ isOpen, onClose, order }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   if (!isOpen || !order) return null;
 
   const refundPercent = getRefundPercentage(order);
   const stBadge = getStatusBadge(order.status, refundPercent, t);
+  const isCancelledOrRejected = ['CANCELLED', 'CANCELED', 'REJECTED'].includes((order.status || '').toUpperCase());
+
   const totalPrice = Number(order.totalPrice || order.price || 0);
   const platformFee = Number(order.platformFee !== undefined ? order.platformFee : Math.round(totalPrice * 0.15));
-  const playerReceived = Number(order.playerReceived !== undefined ? order.playerReceived : (totalPrice - platformFee));
+
+  // Determine playerReceived:
+  // If order is cancelled/rejected with full refund (or no cancellation penalty credited to idol), idol receives 0.
+  let playerReceived = 0;
+  if (!isCancelledOrRejected) {
+    if (order.playerReceived !== undefined && order.playerReceived !== null) {
+      playerReceived = Number(order.playerReceived);
+    } else {
+      playerReceived = Math.max(0, totalPrice - platformFee - (refundPercent ? Math.round(totalPrice * (refundPercent / 100)) : 0));
+    }
+  } else if (order.cancellationFee && order.cancellationFee > 0) {
+    playerReceived = Number(order.playerReceived || Math.max(0, Math.round(order.cancellationFee * 0.85)));
+  }
+
   const refundAmount = order.refundAmount != null && order.refundAmount > 0
     ? Number(order.refundAmount)
-    : (refundPercent ? Math.round(totalPrice * (refundPercent / 100)) : 0);
+    : (refundPercent ? Math.round(totalPrice * (refundPercent / 100)) : (isCancelledOrRejected ? totalPrice : 0));
 
-  const renterDisplayName = order.renterName || order.renterUsername || order.renter?.username || (order.renterId ? `User #${order.renterId}` : 'Khách Hàng');
-  const playerDisplayName = order.playerName || order.player?.username || order.player?.fullName || (order.playerId ? `Game thủ #${order.playerId}` : 'Game Thủ');
+  const hoursCount = Number(order.hours || 1);
+  const durationText = language === 'en'
+    ? (hoursCount === 1 ? '1 Hour' : `${hoursCount} Hours`)
+    : `${hoursCount} giờ`;
+
+  const renterDisplayName = order.renterName || order.renterUsername || order.renter?.username || (order.renterId ? `User #${order.renterId}` : t('orders.clientFallback', 'Khách Hàng'));
+  const playerDisplayName = order.playerName || order.player?.username || order.player?.fullName || (order.playerId ? `${t('orders.playerFallback', 'Game thủ')} #${order.playerId}` : t('orders.playerFallback', 'Game Thủ'));
 
   return createPortal(
     <div
@@ -301,7 +321,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.duration', 'Thời Lượng Thuê')}</div>
                 <div style={{ fontWeight: 600, color: '#fff', marginTop: '3px' }}>
-                  {order.hours ? `${order.hours} giờ` : '1 giờ'}
+                  {durationText}
                 </div>
               </div>
               <div>
@@ -374,15 +394,47 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
               </span>
             </div>
 
-            {order.payoutStatus && (
+            {(order.payoutStatus || isCancelledOrRejected) && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '0.8rem' }}>
                 <span style={{ color: 'var(--text-muted, #94a3b8)' }}>{t('orderDetail.payoutStatus', 'Trạng thái quyết toán ví Idol:')}</span>
-                <span style={{ 
-                  fontWeight: 700, 
-                  color: order.payoutStatus === 'RELEASED' ? '#10b981' : order.payoutStatus === 'FROZEN' ? '#ef4444' : '#f59e0b' 
-                }}>
-                  {order.payoutStatus === 'RELEASED' ? t('orderDetail.settled', '✅ Đã quyết toán') : order.payoutStatus === 'FROZEN' ? t('orderDetail.frozen', '❄️ Tạm đóng băng') : t('orderDetail.awaitingRelease', '⏳ Chờ duyệt giải ngân')}
-                </span>
+                {(() => {
+                  const st = (order.status || '').toUpperCase();
+                  if (['CANCELLED', 'CANCELED', 'REJECTED'].includes(st)) {
+                    if (playerReceived <= 0) {
+                      return (
+                        <span style={{ fontWeight: 700, color: '#ef4444' }}>
+                          {t('orderDetail.payoutCancelled', '❌ Đã hủy / Không giải ngân')}
+                        </span>
+                      );
+                    }
+                  }
+                  if (order.payoutStatus === 'RELEASED') {
+                    return (
+                      <span style={{ fontWeight: 700, color: '#10b981' }}>
+                        {t('orderDetail.settled', '✅ Đã quyết toán')}
+                      </span>
+                    );
+                  }
+                  if (order.payoutStatus === 'FROZEN') {
+                    return (
+                      <span style={{ fontWeight: 700, color: '#ef4444' }}>
+                        {t('orderDetail.frozen', '❄️ Tạm đóng băng')}
+                      </span>
+                    );
+                  }
+                  if (order.payoutStatus === 'REFUNDED') {
+                    return (
+                      <span style={{ fontWeight: 700, color: '#a855f7' }}>
+                        {t('orderDetail.payoutRefunded', '💸 Đã hoàn tiền cho khách')}
+                      </span>
+                    );
+                  }
+                  return (
+                    <span style={{ fontWeight: 700, color: '#f59e0b' }}>
+                      {t('orderDetail.awaitingRelease', '⏳ Chờ duyệt giải ngân')}
+                    </span>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -430,7 +482,7 @@ export const OrderDetailModal = ({ isOpen, onClose, order }) => {
               <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#ef4444' }}>
-                  {t('orderDetail.disputeNotice', 'Đơn hàng này có khiếu nại ({status})').replace('{status}', order.reportStatus || 'Đang xử lý')}
+                  {t('orderDetail.disputeNotice', 'Đơn hàng này có khiếu nại ({status})').replace('{status}', order.reportStatus === 'RESOLVED' ? t('admin.statusRefunded', 'Đã hoàn tiền') : order.reportStatus === 'REJECTED' ? t('admin.statusRejected', 'Đã từ chối') : order.reportStatus === 'INVESTIGATING' ? t('admin.investigatingDisputes', 'Đang xác minh') : t('admin.statusPendingAction', 'Đang xử lý'))}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)', marginTop: '2px' }}>
                   {t('orderDetail.disputeHint', 'Vui lòng kiểm tra mục Báo Cáo & Khiếu Nại để xem chi tiết bằng chứng và lịch sử khiếu nại.')}

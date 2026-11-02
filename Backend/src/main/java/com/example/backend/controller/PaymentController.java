@@ -145,9 +145,9 @@ public class PaymentController {
         }
     }
 
-    @Operation(summary = "Process a payment")
+    @Operation(summary = "Process a payment (Admin only)")
     @PostMapping("/{id}/process")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> processPayment(
             @Parameter(description = "Payment ID") @PathVariable Long id,
             @Valid @RequestBody ProcessPaymentRequest request,
@@ -160,10 +160,8 @@ public class PaymentController {
             User currentUser = userService.findByUsername(authentication.getName());
             boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
                     (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
-            boolean isOwner = existingPayment.getUser() != null && currentUser != null &&
-                    existingPayment.getUser().getId().equals(currentUser.getId());
-            if (!isAdmin && !isOwner) {
-                return ResponseEntity.status(403).body("Bạn không có quyền xử lý thanh toán này");
+            if (!isAdmin) {
+                return ResponseEntity.status(403).body("Chỉ quản trị viên (Admin) mới có quyền xử lý duyệt thanh toán này");
             }
 
             Payment payment = paymentService.processPayment(id, request.getTransactionId());
@@ -181,13 +179,20 @@ public class PaymentController {
             }
             return ResponseEntity.ok(payment);
         } catch (PaymentException e) {
-            return ResponseEntity.badRequest().build();
+            log.warn("[PaymentController] PaymentException processing payment #{}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (org.springframework.dao.ConcurrencyFailureException | org.springframework.transaction.TransactionException e) {
+            log.warn("[PaymentController] Concurrency collision in processPayment #{}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body("Giao dịch đang được xử lý đồng thời bởi tác vụ khác. Vui lòng thử lại.");
+        } catch (Exception e) {
+            log.error("[PaymentController] Error processing payment #{}: {}", id, e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Lỗi khi xử lý giao dịch: " + e.getMessage());
         }
     }
 
-    @Operation(summary = "Refund a payment")
+    @Operation(summary = "Refund a payment (Admin only)")
     @PostMapping("/{id}/refund")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> refundPayment(
             @Parameter(description = "Payment ID") @PathVariable Long id,
             @Valid @RequestBody RefundRequest request,
@@ -200,10 +205,18 @@ public class PaymentController {
             User currentUser = userService.findByUsername(authentication.getName());
             boolean isAdmin = currentUser != null && currentUser.getRoles() != null &&
                     (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
-            boolean isOwner = existingPayment.getUser() != null && currentUser != null &&
-                    existingPayment.getUser().getId().equals(currentUser.getId());
-            if (!isAdmin && !isOwner) {
-                return ResponseEntity.status(403).body("Bạn không có quyền yêu cầu hoàn tiền thanh toán này");
+            if (!isAdmin) {
+                return ResponseEntity.status(403).body("Chỉ quản trị viên (Admin) mới có quyền hoàn tiền hoặc từ chối giao dịch này");
+            }
+
+            // Chặn hoàn tiền giao dịch nạp tiền (TOPUP)
+            if (Payment.PaymentType.TOPUP.equals(existingPayment.getType())) {
+                return ResponseEntity.badRequest().body("Không thể hoàn tiền cho giao dịch nạp tiền (TOPUP)");
+            }
+
+            // Với yêu cầu rút tiền (WITHDRAW), chỉ cho phép từ chối/hoàn tiền khi đang PENDING
+            if (Payment.PaymentType.WITHDRAW.equals(existingPayment.getType()) && !Payment.PaymentStatus.PENDING.equals(existingPayment.getStatus())) {
+                return ResponseEntity.badRequest().body("Chỉ có thể từ chối và hoàn tiền cho yêu cầu rút tiền đang chờ duyệt (PENDING)");
             }
 
             Payment payment = paymentService.refundPayment(id, request.getReason());
@@ -221,7 +234,47 @@ public class PaymentController {
             }
             return ResponseEntity.ok(payment);
         } catch (PaymentException e) {
-            return ResponseEntity.badRequest().build();
+            log.warn("[PaymentController] PaymentException refunding payment #{}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (org.springframework.dao.ConcurrencyFailureException | org.springframework.transaction.TransactionException e) {
+            log.warn("[PaymentController] Concurrency collision in refundPayment #{}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body("Giao dịch đang được xử lý đồng thời bởi tác vụ khác. Vui lòng thử lại.");
+        } catch (Exception e) {
+            log.error("[PaymentController] Error refunding payment #{}: {}", id, e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Lỗi khi hoàn tiền/từ chối giao dịch: " + e.getMessage());
+        }
+    }
+
+    @Operation(summary = "Cancel a pending withdrawal request by user")
+    @PostMapping("/{id}/cancel-withdraw")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> cancelWithdraw(
+            @Parameter(description = "Payment ID") @PathVariable Long id,
+            Authentication authentication) {
+        try {
+            User currentUser = userService.findByUsername(authentication.getName());
+            if (currentUser == null) {
+                return ResponseEntity.status(401).body("Vui lòng đăng nhập lại");
+            }
+            boolean isAdmin = currentUser.getRoles() != null &&
+                    (currentUser.getRoles().contains("ROLE_ADMIN") || currentUser.getRoles().contains("ADMIN"));
+
+            Payment saved = paymentService.cancelWithdraw(id, currentUser.getId(), isAdmin);
+            return ResponseEntity.ok(saved);
+        } catch (PaymentException e) {
+            log.warn("[PaymentController] PaymentException canceling withdrawal #{}: {}", id, e.getMessage());
+            if ("Bạn không có quyền hủy yêu cầu rút tiền này".equals(e.getMessage())) {
+                return ResponseEntity.status(403).body(e.getMessage());
+            }
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (com.example.backend.exception.ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (org.springframework.dao.ConcurrencyFailureException | org.springframework.transaction.TransactionException e) {
+            log.warn("[PaymentController] Concurrency collision in cancelWithdraw #{}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body("Yêu cầu rút tiền đang được xử lý đồng thời bởi tác vụ khác. Vui lòng thử lại.");
+        } catch (Exception e) {
+            log.error("[PaymentController] Error canceling withdrawal #{}: {}", id, e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Lỗi khi hủy yêu cầu rút tiền: " + e.getMessage());
         }
     }
 

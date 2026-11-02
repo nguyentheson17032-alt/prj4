@@ -24,10 +24,11 @@ const client = axios.create({
   }
 });
 
-// Attach in-memory JWT token if present (optional/fallback; HttpOnly cookie handles auth automatically)
+// Attach in-memory JWT token if present, fallback to localStorage (for preview panes/iframes/cross-origin)
 client.interceptors.request.use((config) => {
-  if (inMemoryToken) {
-    config.headers.Authorization = `Bearer ${inMemoryToken}`;
+  const token = inMemoryToken || localStorage.getItem('jwt_token') || localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -145,6 +146,34 @@ export const normalizeOrder = (o) => {
   };
 };
 
+export const formatRelativeTime = (rawDate, lang = 'vi') => {
+  if (!rawDate) return lang === 'en' ? 'Just now' : 'Vừa xong';
+  try {
+    const d = new Date(rawDate);
+    if (isNaN(d.getTime())) return String(rawDate);
+    const diffMs = Date.now() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (lang === 'en') {
+      if (diffMin < 1) return 'Just now';
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return d.toLocaleDateString('en-US');
+    }
+
+    if (diffMin < 1) return 'Vừa xong';
+    if (diffMin < 60) return `${diffMin} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return d.toLocaleDateString('vi-VN');
+  } catch (_) {
+    return String(rawDate);
+  }
+};
+
 export const normalizeMoment = (m) => {
   if (!m) return null;
   const authorName = m.author?.name || m.authorName || m.gamePlayerUsername || m.author?.fullName || 'Idol PlayZone';
@@ -160,27 +189,7 @@ export const normalizeMoment = (m) => {
     return `${BASE_URL}/api/moments/moment-images/${img}`;
   }).filter(Boolean);
 
-  let formattedDate = 'Vừa xong';
-  if (m.createdAt) {
-    try {
-      const d = new Date(m.createdAt);
-      if (!isNaN(d.getTime())) {
-        const diffMs = Date.now() - d.getTime();
-        const diffMin = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMin / 60);
-        const diffDays = Math.floor(diffHours / 24);
-        if (diffMin < 1) formattedDate = 'Vừa xong';
-        else if (diffMin < 60) formattedDate = `${diffMin} phút trước`;
-        else if (diffHours < 24) formattedDate = `${diffHours} giờ trước`;
-        else if (diffDays < 7) formattedDate = `${diffDays} ngày trước`;
-        else formattedDate = d.toLocaleDateString('vi-VN');
-      } else {
-        formattedDate = m.createdAt;
-      }
-    } catch (_) {
-      formattedDate = m.createdAt;
-    }
-  }
+  const formattedDate = formatRelativeTime(m.createdAt, 'vi');
 
   const likedByUserIds = Array.isArray(m.likedByUserIds) ? m.likedByUserIds.map(Number) : [];
   const likedByUsers = Array.isArray(m.likedByUsers) ? m.likedByUsers : [];
@@ -245,6 +254,9 @@ export const api = {
       const res = await client.post('/api/auth/login', { username, password });
       if (res.data?.token) {
         setAuthToken(res.data.token);
+        try {
+          localStorage.setItem('jwt_token', res.data.token);
+        } catch (e) {}
       }
       return { success: true, data: res.data };
     } catch (err) {
@@ -317,6 +329,10 @@ export const api = {
 
   async logout() {
     setAuthToken(null);
+    try {
+      localStorage.removeItem('jwt_token');
+      localStorage.removeItem('token');
+    } catch (e) {}
     try {
       await client.post('/api/auth/logout');
     } catch (e) {
@@ -1072,6 +1088,11 @@ export const api = {
     } catch (e) {
       return [];
     }
+  },
+
+  async cancelWithdraw(id) {
+    const res = await client.post(`/api/payments/${id}/cancel-withdraw`);
+    return res.data;
   },
 
   // Donate / Gift

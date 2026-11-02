@@ -80,12 +80,10 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        // Clean up legacy tokens from localStorage if any, keeping only in memory during migration
+        // Setup tokens in memory and API service for session persistence across reloads & panes
         if (legacyToken) {
           api.setAuthToken(legacyToken);
           setToken(legacyToken);
-          localStorage.removeItem('jwt_token');
-          localStorage.removeItem('token');
         }
 
         // Validate session with backend using HttpOnly cookie khi truoc do da co session
@@ -126,6 +124,11 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       setToken(userToken);
       api.setAuthToken(userToken);
+      if (userToken) {
+        try {
+          localStorage.setItem('jwt_token', userToken);
+        } catch (e) {}
+      }
       localStorage.setItem('current_user', JSON.stringify(userData));
       // NOTE: Token is stored securely via HttpOnly cookie set by Backend, NOT in localStorage to protect against XSS
       localStorage.setItem('roles', JSON.stringify(userData.roles || ['ROLE_USER']));
@@ -188,17 +191,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const withdrawMoney = async ({ amount, bankAccountNumber, bankAccountName, bankName }) => {
-    if (!user) throw new Error('Vui lòng đăng nhập để rút tiền');
+    if (!user) throw new Error('LOGIN_REQUIRED');
     const numericAmount = Number(amount);
     const currentBalance = Number(user.balance || user.walletBalance || user.coin || 0);
 
-    if (!numericAmount || numericAmount <= 0) throw new Error('Số tiền rút không hợp lệ');
+    if (!numericAmount || numericAmount <= 0) throw new Error('INVALID_AMOUNT');
     if (numericAmount > currentBalance) {
-      throw new Error(`Số tiền rút không được vượt quá số dư khả dụng (${currentBalance.toLocaleString('vi-VN')} đ)`);
+      throw new Error('OVER_BALANCE');
     }
-    if (!bankAccountNumber?.trim()) throw new Error('Vui lòng nhập số tài khoản ngân hàng');
-    if (!bankAccountName?.trim()) throw new Error('Vui lòng nhập tên chủ tài khoản');
-    if (!bankName?.trim()) throw new Error('Vui lòng chọn hoặc nhập tên ngân hàng');
+    if (!bankAccountNumber?.trim()) throw new Error('MISSING_ACCOUNT_NUMBER');
+    if (!bankAccountName?.trim()) throw new Error('MISSING_ACCOUNT_NAME');
+    if (!bankName?.trim()) throw new Error('MISSING_BANK_NAME');
 
     const res = await api.withdraw({
       coin: numericAmount,

@@ -83,13 +83,26 @@ public class PaymentService {
                 throw new PaymentException("Payment is not in pending status");
             }
 
+            LocalDateTime now = LocalDateTime.now();
+            int updated = paymentRepository.updatePaymentStatusAndTransactionIdIfExpected(
+                    paymentId,
+                    Payment.PaymentStatus.COMPLETED,
+                    transactionId,
+                    now,
+                    Payment.PaymentStatus.PENDING
+            );
+
+            if (updated == 0) {
+                logger.warn("Payment {} status changed concurrently or already processed", paymentId);
+                throw new PaymentException("Giao dịch này không ở trạng thái chờ duyệt hoặc đã được xử lý bởi tác vụ khác");
+            }
+
             payment.setTransactionId(transactionId);
             payment.setStatus(Payment.PaymentStatus.COMPLETED);
-            payment.setCompletedAt(LocalDateTime.now());
+            payment.setCompletedAt(now);
 
-            Payment savedPayment = paymentRepository.save(payment);
             logger.info("Payment {} processed successfully", paymentId);
-            return savedPayment;
+            return payment;
         } catch (Exception e) {
             logger.error("Error processing payment: {}", e.getMessage());
             throw e;
@@ -108,31 +121,145 @@ public class PaymentService {
                 throw new PaymentException("Payment cannot be refunded or rejected in current status");
             }
 
-            // Hoàn xu cho người dùng
-            User user = payment.getUser();
-            if (payment.getCoin() != null && user != null) {
-                user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + payment.getCoin());
-                userRepository.save(user);
-                logger.info("Refunded {} coins to user {}", payment.getCoin(), user.getId());
+            // Bảo vệ chặt chẽ: Tuyệt đối không cho phép hoàn tiền giao dịch nạp tiền (TOPUP)
+            if (Payment.PaymentType.TOPUP.equals(payment.getType())) {
+                logger.warn("Cannot refund TOPUP payment {}", paymentId);
+                throw new PaymentException("Cannot refund TOPUP payment");
             }
 
-            // Nếu là giao dịch thuê player, trừ xu của player
+            // Với giao dịch rút tiền (WITHDRAW), chỉ cho phép từ chối/hoàn coin khi đang ở trạng thái PENDING
+            if (Payment.PaymentType.WITHDRAW.equals(payment.getType()) && !Payment.PaymentStatus.PENDING.equals(payment.getStatus())) {
+                logger.warn("Cannot refund non-pending WITHDRAW payment {}, current status: {}", paymentId, payment.getStatus());
+                throw new PaymentException("Cannot refund already completed or non-pending withdrawal");
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            int updated;
+            if (Payment.PaymentType.WITHDRAW.equals(payment.getType())) {
+                updated = paymentRepository.updatePaymentStatusAndDescriptionIfExpected(
+                        paymentId,
+                        Payment.PaymentStatus.REFUNDED,
+                        reason,
+                        now,
+                        Payment.PaymentStatus.PENDING
+                );
+            } else {
+                updated = paymentRepository.updatePaymentStatusAndDescriptionIfExpectedIn(
+                        paymentId,
+                        Payment.PaymentStatus.REFUNDED,
+                        reason,
+                        now,
+                        List.of(Payment.PaymentStatus.COMPLETED, Payment.PaymentStatus.PENDING)
+                );
+            }
+
+            if (updated == 0) {
+                logger.warn("Payment {} could not be refunded: state changed concurrently", paymentId);
+                throw new PaymentException("Yêu cầu rút tiền này đã được xử lý hoặc đã bị hủy bởi một tác vụ khác");
+            }
+
+            // Nếu là giao dịch thuê player, trừ xu của player trước bằng lệnh trừ nguyên tử deductCoinSafely
             if (Payment.PaymentType.HIRE.equals(payment.getType()) && payment.getPlayer() != null) {
                 User player = payment.getPlayer();
-                player.setCoin(player.getCoin() - payment.getCoin());
-                userRepository.save(player);
-                logger.info("Deducted {} coins from player {}", payment.getCoin(), player.getId());
+                int deducted = userRepository.deductCoinSafely(player.getId(), payment.getCoin());
+                if (deducted == 0) {
+                    logger.warn("Cannot refund HIRE payment {}: Player #{} has insufficient balance to deduct {} coins",
+                            paymentId, player.getId(), payment.getCoin());
+                    throw new PaymentException("Không thể hoàn tiền: Số dư ví của Idol không đủ để thu hồi (Yêu cầu: " + 
+                            payment.getCoin() + " đ, hiện có: " + (player.getCoin() != null ? player.getCoin() : 0) + " đ)");
+                }
+                player.setCoin((player.getCoin() != null ? player.getCoin() : 0L) - payment.getCoin());
+                logger.info("Deducted {} coins atomically from player {}", payment.getCoin(), player.getId());
+            }
+
+            // Hoàn xu cho người dùng bằng lệnh cộng nguyên tử addCoinSafely (chỉ sau khi đã khấu trừ thành công từ player nếu là HIRE)
+            User user = payment.getUser();
+            if (payment.getCoin() != null && user != null) {
+                userRepository.addCoinSafely(user.getId(), payment.getCoin());
+                user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + payment.getCoin());
+                logger.info("Refunded {} coins atomically to user {}", payment.getCoin(), user.getId());
             }
 
             payment.setStatus(Payment.PaymentStatus.REFUNDED);
             payment.setDescription(reason);
-            payment.setCompletedAt(LocalDateTime.now());
+            payment.setCompletedAt(now);
 
-            Payment savedPayment = paymentRepository.save(payment);
             logger.info("Payment {} refunded successfully", paymentId);
-            return savedPayment;
+            return payment;
         } catch (Exception e) {
             logger.error("Error refunding payment: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public Payment cancelWithdraw(Long paymentId, Long userId, boolean isAdmin) {
+        logger.info("Canceling withdrawal payment {} by user {} (isAdmin={})", paymentId, userId, isAdmin);
+        try {
+            Payment payment = paymentRepository.findById(paymentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
+
+            boolean isOwner = payment.getUser() != null && payment.getUser().getId().equals(userId);
+            if (!isAdmin && !isOwner) {
+                logger.warn("User {} is not allowed to cancel withdrawal payment {}", userId, paymentId);
+                throw new PaymentException("Bạn không có quyền hủy yêu cầu rút tiền này");
+            }
+
+            if (!Payment.PaymentType.WITHDRAW.equals(payment.getType())) {
+                logger.warn("Payment {} is not a withdrawal (type: {})", paymentId, payment.getType());
+                throw new PaymentException("Chỉ có thể hủy yêu cầu rút tiền (WITHDRAW)");
+            }
+
+            if (!Payment.PaymentStatus.PENDING.equals(payment.getStatus())) {
+                logger.warn("Payment {} is not pending (status: {})", paymentId, payment.getStatus());
+                throw new PaymentException("Chỉ có thể hủy yêu cầu rút tiền đang chờ duyệt (PENDING)");
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            String cancelDesc = "Người dùng đã tự hủy yêu cầu rút tiền";
+            int updated = paymentRepository.updatePaymentStatusAndDescriptionIfExpected(
+                    paymentId,
+                    Payment.PaymentStatus.CANCELED,
+                    cancelDesc,
+                    now,
+                    Payment.PaymentStatus.PENDING
+            );
+
+            if (updated == 0) {
+                logger.warn("Concurrent cancel or state changed for payment {}", paymentId);
+                throw new PaymentException("Yêu cầu rút tiền này đã được xử lý hoặc đã bị hủy bởi một tác vụ khác");
+            }
+
+            // Hoàn lại coin cho user bằng lệnh cộng nguyên tử addCoinSafely
+            User user = payment.getUser();
+            if (payment.getCoin() != null && user != null) {
+                userRepository.addCoinSafely(user.getId(), payment.getCoin());
+                user.setCoin((user.getCoin() != null ? user.getCoin() : 0L) + payment.getCoin());
+                logger.info("Refunded {} coins atomically to user #{} for canceled withdrawal #{}",
+                        payment.getCoin(), user.getId(), paymentId);
+            }
+
+            payment.setStatus(Payment.PaymentStatus.CANCELED);
+            payment.setDescription(cancelDesc);
+            payment.setCompletedAt(now);
+
+            if (notificationService != null && user != null) {
+                try {
+                    notificationService.createNotification(
+                        user.getId(),
+                        "Đã hủy yêu cầu rút tiền",
+                        "Bạn đã hủy yêu cầu rút " + (payment.getCoin() != null ? payment.getCoin() : 0) + " đ. Số tiền đã được hoàn lại vào ví.",
+                        "withdraw_canceled",
+                        "/wallet",
+                        payment.getId().toString()
+                    );
+                } catch (Exception ignored) {}
+            }
+
+            logger.info("Withdrawal payment {} canceled successfully", paymentId);
+            return payment;
+        } catch (Exception e) {
+            logger.error("Error canceling withdrawal {}: {}", paymentId, e.getMessage());
             throw e;
         }
     }

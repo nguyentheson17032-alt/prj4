@@ -84,11 +84,31 @@ export const AuthModal = ({ isOpen, onClose }) => {
     setShowRegisterPassword(false);
   };
 
+  const getFriendlyLoginError = (rawError) => {
+    if (!rawError) return t('auth.loginFailed', 'Đăng nhập thất bại, vui lòng kiểm tra lại thông tin.');
+    const err = String(rawError).toLowerCase();
+    if (
+      err.includes('không đúng') ||
+      err.includes('not found') ||
+      err.includes('bad credentials') ||
+      err.includes('tên đăng nhập hoặc mật khẩu') ||
+      err.includes('incorrect') ||
+      err.includes('invalid') ||
+      err.includes('401')
+    ) {
+      return t('auth.invalidCredentials', 'Tên đăng nhập hoặc mật khẩu không chính xác.');
+    }
+    if (err.includes('bị khóa') || err.includes('banned') || err.includes('locked')) {
+      return t('auth.accountBanned', 'Tài khoản của bạn đã bị khóa hoặc tạm khóa.');
+    }
+    return t('auth.loginFailed', 'Đăng nhập thất bại, vui lòng kiểm tra lại thông tin.');
+  };
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setLoginError('');
     if (!username.trim() || !password.trim()) {
-      setLoginError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+      setLoginError(t('auth.enterUsernameAndPassword', 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.'));
       return;
     }
 
@@ -106,11 +126,11 @@ export const AuthModal = ({ isOpen, onClose }) => {
       );
 
       if (isAdmin) {
-        addToast('Đăng nhập Quản Trị Viên thành công! Đang chuyển vào Admin Dashboard...', 'success');
+        addToast(t('auth.adminLoginSuccessToast', 'Đăng nhập Quản Trị Viên thành công! Đang chuyển vào Admin Dashboard...'), 'success');
         onClose();
         navigate('/admin');
       } else {
-        addToast(`Đăng nhập thành công! Chào mừng ${loggedUser.fullName || loggedUser.username}.`, 'success');
+        addToast(t('auth.loginSuccessToast', 'Đăng nhập thành công! Chào mừng {name}.').replace('{name}', loggedUser.fullName || loggedUser.username), 'success');
         onClose();
       }
     } else {
@@ -118,8 +138,7 @@ export const AuthModal = ({ isOpen, onClose }) => {
         setBanDetails(res.banDetails);
         setBannedModalOpen(true);
       }
-      const msg = res.error || 'Đăng nhập thất bại, vui lòng kiểm tra lại thông tin.';
-      setLoginError(msg);
+      setLoginError(getFriendlyLoginError(res.error));
     }
   };
 
@@ -127,9 +146,9 @@ export const AuthModal = ({ isOpen, onClose }) => {
     e.preventDefault();
     setRegisterError('');
 
-    if (!username.trim()) { setRegisterError('Tên đăng nhập không được để trống.'); return; }
-    if (!email.trim()) { setRegisterError('Email không được để trống.'); return; }
-    if (!password.trim()) { setRegisterError('Mật khẩu không được để trống.'); return; }
+    if (!username.trim()) { setRegisterError(t('auth.usernameRequired', 'Tên đăng nhập không được để trống.')); return; }
+    if (!email.trim()) { setRegisterError(t('auth.emailRequired', 'Email không được để trống.')); return; }
+    if (!password.trim()) { setRegisterError(t('auth.passwordRequired', 'Mật khẩu không được để trống.')); return; }
 
     setIsLoading(true);
     const res = await register({
@@ -143,10 +162,10 @@ export const AuthModal = ({ isOpen, onClose }) => {
     setIsLoading(false);
 
     if (res.success) {
-      addToast('Đăng ký tài khoản thành công! Vui lòng đăng nhập.', 'success');
+      addToast(t('auth.registerSuccessToast', 'Đăng ký tài khoản thành công! Vui lòng đăng nhập.'), 'success');
       switchMode('LOGIN');
     } else {
-      const msg = res.error || 'Đăng ký thất bại.';
+      const msg = res.error || t('auth.loginFailed', 'Đăng ký thất bại.');
       setRegisterError(msg);
     }
   };
@@ -239,32 +258,34 @@ export const AuthModal = ({ isOpen, onClose }) => {
                 <ArrowRight size={18} />
               </button>
 
-              {/* Quick account suggestions */}
-              <div style={{ marginTop: '16px', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'center', fontWeight: 600 }}>
-                  {t('auth.quickSuggestions', '⚡ Gợi ý tài khoản đăng nhập nhanh:')}
+              {/* Quick account suggestions - Only shown in development/local test environment */}
+              {(import.meta.env.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
+                <div style={{ marginTop: '16px', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'center', fontWeight: 600 }}>
+                    {t('auth.quickSuggestions', '⚡ Gợi ý tài khoản đăng nhập nhanh:')}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      style={{ padding: '8px 10px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.3)', color: '#f43f5e', cursor: 'pointer', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}
+                      onClick={() => { setUsername('admin'); setPassword('Admin@123456'); setLoginError(''); }}
+                      title={t('auth.quickAdminTooltip', 'Bấm để tự động điền tài khoản Quản Trị Viên')}
+                    >
+                      <span>{t('auth.quickAdmin', '🛡️ Quản Trị Viên (Admin)')}</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>admin / Admin@123456</span>
+                    </button>
+                    <button
+                      type="button"
+                      style={{ padding: '8px 10px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', cursor: 'pointer', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}
+                      onClick={() => { setUsername('user123'); setPassword('User@123456'); setLoginError(''); }}
+                      title={t('auth.quickUserTooltip', 'Bấm để tự động điền tài khoản Thành Viên')}
+                    >
+                      <span>{t('auth.quickUser', '🎮 Thành Viên (User)')}</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>user123 / User@123456</span>
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <button
-                    type="button"
-                    style={{ padding: '8px 10px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.3)', color: '#f43f5e', cursor: 'pointer', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}
-                    onClick={() => { setUsername('admin'); setPassword('Admin@123456'); setLoginError(''); }}
-                    title={t('auth.quickAdminTooltip', 'Bấm để tự động điền tài khoản Quản Trị Viên')}
-                  >
-                    <span>{t('auth.quickAdmin', '🛡️ Quản Trị Viên (Admin)')}</span>
-                    <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>admin / Admin@123456</span>
-                  </button>
-                  <button
-                    type="button"
-                    style={{ padding: '8px 10px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', cursor: 'pointer', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}
-                    onClick={() => { setUsername('user123'); setPassword('User@123456'); setLoginError(''); }}
-                    title={t('auth.quickUserTooltip', 'Bấm để tự động điền tài khoản Thành Viên')}
-                  >
-                    <span>{t('auth.quickUser', '🎮 Thành Viên (User)')}</span>
-                    <span style={{ fontSize: '0.68rem', opacity: 0.8, fontWeight: 500 }}>user123 / User@123456</span>
-                  </button>
-                </div>
-              </div>
+              )}
             </form>
 
           ) : mode === 'REGISTER' ? (
@@ -362,7 +383,7 @@ export const AuthModal = ({ isOpen, onClose }) => {
                 className="btn btn-primary"
                 style={{ width: '100%' }}
                 onClick={() => {
-                  addToast('Đã gửi liên kết khôi phục mật khẩu vào email của bạn!', 'success');
+                  addToast(t('auth.recoverySentToast', 'Đã gửi liên kết khôi phục mật khẩu vào email của bạn!'), 'success');
                   switchMode('LOGIN');
                 }}
               >

@@ -17,14 +17,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
-import { GAME_TOPICS_20 } from '../../constants/gamesList';
+import { GAME_TOPICS_20, getLocalizedGameName, getCanonicalGameName } from '../../constants/gamesList';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/modals.css';
 
 export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday = false }) => {
   const { user, isPlayer } = useAuth();
   const { addToast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
 
   const [content, setContent] = useState('');
@@ -47,7 +47,11 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
         if (Array.isArray(list) && list.length > 0) {
           // Merge names with our 20 games to keep icons
           const merged = list.slice(0, 20).map((g, idx) => {
-            const fallback = GAME_TOPICS_20.find(f => f.name.toLowerCase() === (g.name || '').toLowerCase());
+            const fallback = GAME_TOPICS_20.find(f =>
+              f.name.toLowerCase() === (g.name || '').toLowerCase() ||
+              getLocalizedGameName(f.name, 'en').toLowerCase() === (g.name || '').toLowerCase() ||
+              getLocalizedGameName(f.name, 'vi').toLowerCase() === (g.name || '').toLowerCase()
+            );
             return {
               id: g.id || idx + 1,
               name: g.name,
@@ -81,12 +85,12 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
     const validImageFiles = fileList.filter(f => f.type.startsWith('image/'));
 
     if (validImageFiles.length === 0) {
-      addToast('Vui lòng chọn tệp định dạng ảnh (JPG, PNG, WEBP, GIF)!', 'error');
+      addToast(t('createMoment.invalidImageToast', 'Vui lòng chọn tệp định dạng ảnh (JPG, PNG, WEBP, GIF)!'), 'error');
       return;
     }
 
     if (previews.length + validImageFiles.length > 10) {
-      addToast('Tối đa 10 ảnh cho mỗi bài viết khoảnh khắc!', 'warning');
+      addToast(t('createMoment.maxImagesToast', 'Tối đa 10 ảnh cho mỗi bài viết khoảnh khắc!'), 'warning');
     }
 
     const availableSlots = 10 - previews.length;
@@ -126,7 +130,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
   const handleAddUrlImage = () => {
     if (!urlInput.trim()) return;
     if (previews.length >= 10) {
-      addToast('Tối đa 10 ảnh cho mỗi bài viết!', 'warning');
+      addToast(t('createMoment.maxImagesToast', 'Tối đa 10 ảnh cho mỗi bài viết!'), 'warning');
       return;
     }
 
@@ -136,7 +140,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
         id: Math.random().toString(36).substr(2, 9),
         url: urlInput.trim(),
         isLocal: false,
-        name: 'Đường dẫn liên kết',
+        name: t('createMoment.linkUrl', 'Đường dẫn liên kết'),
         size: 'URL Web'
       }
     ]);
@@ -156,11 +160,11 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (hasPostedToday) {
-      addToast('Hôm nay bạn đã đăng 1 khoảnh khắc rồi. Vui lòng quay lại vào ngày mai!', 'warning');
+      addToast(t('createMoment.alreadyPostedTodayToast', 'Hôm nay bạn đã đăng 1 khoảnh khắc rồi. Vui lòng quay lại vào ngày mai!'), 'warning');
       return;
     }
     if (!content.trim()) {
-      addToast('Vui lòng nhập nội dung khoảnh khắc!', 'error');
+      addToast(t('createMoment.enterContentToast', 'Vui lòng nhập nội dung khoảnh khắc!'), 'error');
       return;
     }
 
@@ -180,7 +184,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
       // 3. Create moment
       const newMoment = await api.createMoment({
         content: content.trim(),
-        gameName: selectedGame,
+        gameName: getCanonicalGameName(selectedGame) || selectedGame,
         images: allImageUrls,
         author: {
           id: user?.id || 1,
@@ -191,7 +195,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
         }
       });
 
-      addToast('🎉 Đã chia sẻ khoảnh khắc thành công!', 'success');
+      addToast(t('createMoment.successToast', '🎉 Đã chia sẻ khoảnh khắc thành công!'), 'success');
       if (onCreated) {
         onCreated(newMoment);
       }
@@ -209,7 +213,9 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
     }
   };
 
-  const quickTags = ['#LeoRank', '#Highlight', '#PentaKill', '#TìmDuo', '#TamSu'];
+  const quickTags = language === 'en'
+    ? ['#RankClimb', '#Highlight', '#PentaKill', '#FindDuo', '#Chill']
+    : ['#LeoRank', '#Highlight', '#PentaKill', '#TìmDuo', '#TamSu'];
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 10000, backdropFilter: 'blur(8px)' }}>
@@ -260,14 +266,14 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 {t('createMoment.title', 'Đăng Khoảnh Khắc Mới')}
               </h2>
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Chia sẻ chiến tích, highlight leo rank cùng người hâm mộ
+                {t('createMoment.subtitle', 'Chia sẻ chiến tích, highlight leo rank cùng người hâm mộ')}
               </p>
             </div>
           </div>
           <button
             className="modal-close-btn"
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label={t('common.close', 'Đóng')}
             style={{
               background: 'rgba(255,255,255,0.06)',
               border: 'none',
@@ -305,10 +311,10 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
               <AlertCircle size={32} />
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff', marginBottom: '8px' }}>
-              Dành Riêng Cho Idol & Player
+              {t('createMoment.idolOnlyTitle', 'Dành Riêng Cho Idol & Player')}
             </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', maxWidth: '420px', margin: '0 auto 24px auto', lineHeight: 1.6 }}>
-              Tính năng <strong>Đăng Khoảnh Khắc</strong> và tải ảnh Album chỉ dành cho tài khoản <strong>Player / Idol</strong>. Thành viên thông thường có thể xem ảnh trong hồ sơ của Idol!
+              {t('createMoment.idolOnlyDesc', 'Tính năng Đăng Khoảnh Khắc và tải ảnh Album chỉ dành cho tài khoản Player / Idol. Thành viên thông thường có thể xem ảnh trong hồ sơ của Idol!')}
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
               <button
@@ -316,7 +322,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 className="btn btn-secondary"
                 onClick={onClose}
               >
-                Đã Hiểu
+                {t('createMoment.understood', 'Đã Hiểu')}
               </button>
               <button
                 type="button"
@@ -327,7 +333,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 }}
               >
                 <Crown size={16} />
-                <span>Đăng Ký Làm Idol Ngay</span>
+                <span>{t('createMoment.registerIdolNow', 'Đăng Ký Làm Idol Ngay')}</span>
               </button>
             </div>
           </div>
@@ -387,7 +393,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                   </span>
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  Khoảnh khắc sẽ tự động xuất hiện trong <strong style={{ color: '#cbd5e1' }}>Album Ảnh</strong> cá nhân &amp; Feed Cộng Đồng
+                  {t('createMoment.feedNotice', 'Khoảnh khắc sẽ tự động xuất hiện trong Album Ảnh cá nhân & Feed Cộng Đồng')}
                 </div>
               </div>
             </div>
@@ -409,9 +415,9 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
               >
                 <AlertCircle size={22} style={{ flexShrink: 0, color: '#f59e0b' }} />
                 <div>
-                  <div style={{ fontWeight: 700, color: '#fcd34d' }}>Hôm nay bạn đã hoàn thành đăng khoảnh khắc!</div>
+                  <div style={{ fontWeight: 700, color: '#fcd34d' }}>{t('createMoment.dailyCompleted', 'Hôm nay bạn đã hoàn thành đăng khoảnh khắc!')}</div>
                   <div style={{ fontSize: '0.78rem', color: '#fef3c7', marginTop: '2px' }}>
-                    Quy định: Mỗi Idol được đăng 1 khoảnh khắc mỗi ngày (hạn ngạch: 1/1). Hãy chuẩn bị hình ảnh thật đẹp để đăng vào ngày mai nhé!
+                    {t('createMoment.dailyRuleNotice', 'Quy định: Mỗi Idol được đăng 1 khoảnh khắc mỗi ngày (hạn ngạch: 1/1). Hãy chuẩn bị hình ảnh thật đẹp để đăng vào ngày mai nhé!')}
                   </div>
                 </div>
               </div>
@@ -430,7 +436,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 }}
               >
                 <Sparkles size={14} color="var(--primary)" />
-                <span><strong>Quy định:</strong> Mỗi Idol được đăng 1 khoảnh khắc mỗi ngày (hạn ngạch: 1 bài / 1 ngày).</span>
+                <span>{t('createMoment.dailyRule', 'Quy định: Mỗi Idol được đăng 1 khoảnh khắc mỗi ngày (hạn ngạch: 1 bài / 1 ngày).')}</span>
               </div>
             )}
 
@@ -449,10 +455,10 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Gamepad2 size={16} color="var(--primary)" />
-                  <span>Chủ Đề Game:</span>
+                  <span>{t('createMoment.gameTopic', 'Chủ Đề Game:')}</span>
                 </span>
                 <span style={{ fontSize: '0.76rem', color: '#a5b4fc', background: 'rgba(99, 102, 241, 0.1)', padding: '2px 8px', borderRadius: '8px' }}>
-                  Chọn 1 trong 20 game
+                  {t('createMoment.pickOneOf20', 'Chọn 1 trong 20 game')}
                 </span>
               </label>
 
@@ -473,7 +479,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
               >
                 {games.map((g) => (
                   <option key={g.name} value={g.name} style={{ background: '#181926', color: '#fff' }}>
-                    {g.icon ? `${g.icon} ` : ''}{g.name}
+                    {g.icon ? `${g.icon} ` : ''}{getLocalizedGameName(g.name, language)}
                   </option>
                 ))}
               </select>
@@ -483,17 +489,17 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
             <div className="form-group" style={{ margin: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <label className="form-label" style={{ fontWeight: 600, fontSize: '0.88rem', margin: 0 }}>
-                  Nội Dung Bài Đăng:
+                  {t('createMoment.contentLabel', 'Nội Dung Bài Đăng:')}
                 </label>
                 <span style={{ fontSize: '0.78rem', color: content.length > 900 ? '#f87171' : 'var(--text-muted)' }}>
-                  {content.length}/1000 ký tự
+                  {content.length}/1000 {t('common.characters', 'ký tự')}
                 </span>
               </div>
               <textarea
                 className="form-control"
                 rows="4"
                 maxLength={1000}
-                placeholder="Hôm nay leo rank thế nào? Chia sẻ highlight penta-kill, tìm bạn duo, hay khoảnh khắc gaming đáng nhớ cùng mọi người nào!..."
+                placeholder={t('createMoment.contentPlaceholder', 'Hôm nay leo rank thế nào? Chia sẻ highlight penta-kill, tìm bạn duo, hay khoảnh khắc gaming đáng nhớ cùng mọi người nào!...')}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 required
@@ -547,7 +553,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 600, fontSize: '0.88rem' }}>
                   <ImageIcon size={16} color="var(--primary)" />
-                  <span>Thêm Ảnh Từ Máy Tính ({previews.length}/10):</span>
+                  <span>{t('createMoment.addPhotosComputer', 'Thêm Ảnh Từ Máy Tính ({count}/10):').replace('{count}', previews.length)}</span>
                 </label>
                 <button
                   type="button"
@@ -564,7 +570,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                   }}
                 >
                   <LinkIcon size={12} />
-                  <span>{showUrlInput ? 'Ẩn nhập link ảnh' : '+ Dán link ảnh URL'}</span>
+                  <span>{showUrlInput ? t('createMoment.hideUrlInput', 'Ẩn nhập link ảnh') : t('createMoment.showUrlInput', '+ Dán link ảnh URL')}</span>
                 </button>
               </div>
 
@@ -610,10 +616,10 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                   <UploadCloud size={24} />
                 </div>
                 <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#f8fafc', marginBottom: '4px' }}>
-                  Kéo thả ảnh vào đây hoặc <span style={{ color: 'var(--primary)', textDecoration: 'underline' }}>bấm để chọn từ máy</span>
+                  {t('createMoment.dragDropHint', 'Kéo thả ảnh vào đây hoặc bấm để chọn từ máy')}
                 </div>
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                  Hỗ trợ JPG, PNG, WEBP, GIF. Tối đa 10 ảnh chất lượng cao.
+                  {t('createMoment.dragDropTypes', 'Hỗ trợ JPG, PNG, WEBP, GIF. Tối đa 10 ảnh chất lượng cao.')}
                 </div>
               </div>
 
@@ -623,7 +629,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                   <input
                     type="url"
                     className="form-control"
-                    placeholder="Dán link ảnh (https://...)..."
+                    placeholder={t('createMoment.urlPlaceholder', 'Dán link ảnh (https://...)...')}
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUrlImage())}
@@ -635,7 +641,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                     onClick={handleAddUrlImage}
                     style={{ padding: '0 16px', whiteSpace: 'nowrap' }}
                   >
-                    Thêm
+                    {t('common.add', 'Thêm')}
                   </button>
                 </div>
               )}
@@ -685,7 +691,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                             fontWeight: 700
                           }}
                         >
-                          Ảnh chính
+                          {t('createMoment.coverPhoto', 'Ảnh chính')}
                         </span>
                       )}
                       <button
@@ -712,7 +718,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = '#ef4444'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.75)'; }}
-                        title="Xóa ảnh này"
+                        title={t('createMoment.removePhotoTooltip', 'Xóa ảnh này')}
                       >
                         <X size={12} />
                       </button>
@@ -746,7 +752,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                       }}
                     >
                       <Plus size={20} />
-                      <span style={{ fontSize: '0.7rem', marginTop: '2px' }}>Thêm ảnh</span>
+                      <span style={{ fontSize: '0.7rem', marginTop: '2px' }}>{t('createMoment.addMorePhotos', 'Thêm ảnh')}</span>
                     </div>
                   )}
                 </div>
@@ -777,7 +783,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 type="submit"
                 className="btn btn-primary"
                 disabled={isSubmitting || hasPostedToday}
-                title={hasPostedToday ? 'Bạn đã đăng 1 khoảnh khắc hôm nay. Hạn ngạch: 1/1 ngày.' : ''}
+                title={hasPostedToday ? t('createMoment.alreadyPostedTodayTooltip', 'Bạn đã đăng 1 khoảnh khắc hôm nay. Hạn ngạch: 1/1 ngày.') : ''}
                 style={{
                   padding: '10px 24px',
                   borderRadius: '12px',
@@ -797,7 +803,7 @@ export const CreateMomentModal = ({ isOpen, onClose, onCreated, hasPostedToday =
                 ) : hasPostedToday ? (
                   <>
                     <CheckCircle2 size={16} />
-                    <span>Đã Đăng Hôm Nay (1/1)</span>
+                    <span>{t('createMoment.postedTodayBtn', 'Đã Đăng Hôm Nay (1/1)')}</span>
                   </>
                 ) : (
                   <>

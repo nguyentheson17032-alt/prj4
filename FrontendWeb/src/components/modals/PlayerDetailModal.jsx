@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, Trophy, Star, ShoppingBag, DollarSign, Gamepad2, Server, Award, Info, Sparkles } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const getPrimaryGame = (games) => {
   if (!games || games.length === 0) return null;
@@ -26,6 +27,7 @@ export const getPrimaryGame = (games) => {
 };
 
 export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
+  const { t } = useLanguage();
   if (!isOpen || !player) return null;
 
   const sortedGames = [...(player.games || [])].sort((a, b) => {
@@ -89,7 +91,7 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
         >
           <button
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label={t('common.close', 'Đóng')}
             style={{
               background: 'rgba(0, 0, 0, 0.45)',
               border: 'none',
@@ -139,7 +141,7 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
                   border: `1px solid ${isBanned ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
                 }}
               >
-                {isBanned ? '🔒 Đang Bị Khóa' : player.status === 'PENDING' ? '⏳ Chờ Duyệt' : '🟢 Đang Sẵn Sàng'}
+                {isBanned ? t('admin.statusBannedOption', '🔒 Đang Bị Khóa') : player.status === 'PENDING' ? t('admin.statusPendingOption', '⏳ Chờ Duyệt') : t('admin.statusAvailableOption', '🟢 Đang Sẵn Sàng')}
               </span>
               <span
                 style={{
@@ -152,7 +154,7 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
                   border: '1px solid rgba(99, 102, 241, 0.3)'
                 }}
               >
-                🎮 {player.games.length} Game Đăng Ký
+                {t('admin.gamesRegisteredCount', '🎮 {count} Game Đăng Ký').replace('{count}', player.games.length)}
               </span>
             </div>
           </div>
@@ -178,7 +180,7 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
                 <Star size={14} style={{ color: '#fbbf24' }} />
-                <span>Đánh giá</span>
+                <span>{t('admin.colRating', 'Đánh giá')}</span>
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fbbf24' }}>
                 ⭐ {player.avgRating > 0 ? player.avgRating.toFixed(1) : '0.0'}
@@ -193,17 +195,17 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
                 <ShoppingBag size={14} style={{ color: '#38bdf8' }} />
-                <span>Tổng đơn thuê</span>
+                <span>{t('admin.colTotalOrders', 'Tổng đơn thuê')}</span>
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
-                {player.totalOrders || 0} <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-muted)' }}>đơn</span>
+                {player.totalOrders || 0} <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-muted)' }}>{t('admin.ordersUnit', 'đơn')}</span>
               </div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
                 <DollarSign size={14} style={{ color: '#10b981' }} />
-                <span>Tổng doanh thu</span>
+                <span>{t('admin.colRevenue', 'Tổng doanh thu')}</span>
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#10b981' }}>
                 {(player.totalRevenue || 0).toLocaleString('vi-VN')} đ
@@ -216,10 +218,10 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Gamepad2 size={18} style={{ color: 'var(--primary)' }} />
-                <span>Danh Sách Game Đã Đăng Ký ({sortedGames.length})</span>
+                <span>{t('admin.registeredGamesCountTitle', 'Danh Sách Game Đã Đăng Ký ({count})').replace('{count}', sortedGames.length)}</span>
               </h4>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Sắp xếp theo: Đơn thuê nhiều nhất &gt; Sao &gt; Tên A-Z
+                {t('admin.sortedByCriteria', 'Sắp xếp theo: Đơn thuê nhiều nhất > Sao > Tên A-Z')}
               </span>
             </div>
 
@@ -279,7 +281,7 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
                           }}
                         >
                           <Sparkles size={11} />
-                          <span>Game hiển thị ưu tiên</span>
+                          <span>{t('admin.primaryGameBadge', 'Game hiển thị ưu tiên')}</span>
                         </span>
                       )}
                     </div>
@@ -287,27 +289,27 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
                     {/* Stats for this game */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Giá thuê: <strong style={{ color: '#10b981' }}>{(g.pricePerHour || 0).toLocaleString('vi-VN')} đ/h</strong>
+                        {t('admin.hirePriceColon', 'Giá thuê:')} <strong style={{ color: '#10b981' }}>{(g.pricePerHour || 0).toLocaleString('vi-VN')} {t('admin.pricePerHourUnit', 'đ/h')}</strong>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Đơn thuê: <strong style={{ color: '#f8fafc' }}>{g.totalOrders || 0} đơn</strong>
+                        {t('admin.ordersColon', 'Đơn thuê:')} <strong style={{ color: '#f8fafc' }}>{g.totalOrders || 0} {t('admin.ordersUnit', 'đơn')}</strong>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Đánh giá: <strong style={{ color: '#fbbf24' }}>⭐ {(g.rating || 0).toFixed(1)}</strong>
+                        {t('admin.colRating', 'Đánh giá')}: <strong style={{ color: '#fbbf24' }}>⭐ {(g.rating || 0).toFixed(1)}</strong>
                       </div>
                       {(g.totalRevenue !== undefined && g.totalRevenue > 0) && (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          Thu nhập: <strong style={{ color: '#10b981' }}>{(g.totalRevenue).toLocaleString('vi-VN')} đ</strong>
+                          {t('admin.incomeColon', 'Thu nhập:')} <strong style={{ color: '#10b981' }}>{(g.totalRevenue).toLocaleString('vi-VN')} đ</strong>
                         </div>
                       )}
                       {g.server && (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          Máy chủ: <strong style={{ color: '#cbd5e1' }}>{g.server}</strong>
+                          {t('admin.serverColon', 'Máy chủ:')} <strong style={{ color: '#cbd5e1' }}>{g.server}</strong>
                         </div>
                       )}
                       {g.role && (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          Vai trò: <strong style={{ color: '#cbd5e1' }}>{g.role}</strong>
+                          {t('admin.roleColon', 'Vai trò:')} <strong style={{ color: '#cbd5e1' }}>{g.role}</strong>
                         </div>
                       )}
                     </div>
@@ -341,7 +343,7 @@ export const PlayerDetailModal = ({ isOpen, onClose, player }) => {
               className="btn btn-secondary"
               style={{ padding: '8px 24px', fontSize: '0.88rem', borderRadius: '10px' }}
             >
-              Đóng
+              {t('common.close', 'Đóng')}
             </button>
           </div>
         </div>

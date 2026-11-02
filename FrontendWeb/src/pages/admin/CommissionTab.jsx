@@ -4,12 +4,14 @@ import {
   RefreshCw, Eye, X
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import { getUserAvatar } from '../../utils/avatarUtils';
 import { MetricCard, StatusBadge } from './adminHelpers';
 
 export const CommissionTab = () => {
   const { addToast } = useToast();
+  const { t, language } = useLanguage();
   const [stats, setStats] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export const CommissionTab = () => {
       setTransactions(tData);
     } catch (err) {
       console.error('Lỗi tải dữ liệu chiết khấu:', err);
-      addToast('Không thể tải dữ liệu chiết khấu sàn', 'error');
+      addToast(t('admin.toastCommissionLoadError', 'Không thể tải dữ liệu chiết khấu sàn'), 'error');
     } finally {
       setLoading(false);
     }
@@ -70,12 +72,21 @@ export const CommissionTab = () => {
             <div style={{ padding: '6px', borderRadius: '8px', background: 'var(--primary)', color: '#fff', display: 'flex' }}>
               <Percent size={18} />
             </div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Chính Sách Chiết Khấu Sàn: 15% Cố Định</h3>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>
+              {t('admin.commissionPolicyTitle', 'Chính Sách Chiết Khấu Sàn: 15% Cố Định')}
+            </h3>
           </div>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5 }}>
-            Áp dụng tự động cho <strong>toàn bộ giao dịch Thuê Player và Donate quà tặng</strong>.
-            Người dùng chi trả 100%, <strong>Game thủ (Idol) thực nhận 85%</strong> và <strong>Nền tảng thu 15%</strong> làm phí vận hành và dịch vụ.
-          </p>
+          {language === 'en' ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5 }}>
+              Automatically applied to <strong>all Player Hire and Gift Donate transactions</strong>.
+              Users pay 100%, <strong>Game Players (Idols) receive 85%</strong> and <strong>Platform retains 15%</strong> as operational and service fees.
+            </p>
+          ) : (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5 }}>
+              Áp dụng tự động cho <strong>toàn bộ giao dịch Thuê Player và Donate quà tặng</strong>.
+              Người dùng chi trả 100%, <strong>Game thủ (Idol) thực nhận 85%</strong> và <strong>Nền tảng thu 15%</strong> làm phí vận hành và dịch vụ.
+            </p>
+          )}
         </div>
 
         <div style={{
@@ -87,12 +98,12 @@ export const CommissionTab = () => {
           minWidth: '240px'
         }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '6px' }}>
-            💡 Ví dụ minh họa
+            {t('admin.exampleIllustration', '💡 Ví dụ minh họa')}
           </div>
           <div style={{ fontSize: '0.86rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div>Tổng giao dịch: <strong>1.000.000 đ</strong></div>
-            <div style={{ color: '#10b981', fontWeight: 700 }}>→ Sàn thu (15%): +150.000 đ</div>
-            <div style={{ color: '#38bdf8', fontWeight: 700 }}>→ Idol nhận (85%): +850.000 đ</div>
+            <div>{t('admin.exampleTotalTx', 'Tổng giao dịch:')} <strong>1.000.000 đ</strong></div>
+            <div style={{ color: '#10b981', fontWeight: 700 }}>{t('admin.examplePlatformFee', '→ Sàn thu (15%):')} +150.000 đ</div>
+            <div style={{ color: '#38bdf8', fontWeight: 700 }}>{t('admin.exampleIdolNet', '→ Idol nhận (85%):')} +850.000 đ</div>
           </div>
         </div>
       </div>
@@ -100,30 +111,30 @@ export const CommissionTab = () => {
       {/* Metrics Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' }}>
         <MetricCard
-          label="Tổng Chiết Khấu Thu Được (15%)"
+          label={t('admin.totalCommissionRevenue', 'Tổng Chiết Khấu Thu Được (15%)')}
           value={`${(stats?.totalCommissionRevenue || 0).toLocaleString('vi-VN')} đ`}
-          sub={`Từ ${stats?.totalTransactions || 0} giao dịch hoàn tất`}
+          sub={t('admin.fromCompletedTx', 'Từ {count} giao dịch hoàn tất').replace('{count}', stats?.totalTransactions || 0)}
           icon={Percent}
           color="#10b981"
         />
         <MetricCard
-          label="Chiết Khấu Thuê Player (15%)"
+          label={t('admin.hireCommission', 'Chiết Khấu Thuê Player (15%)')}
           value={`${(stats?.hireCommissionRevenue || 0).toLocaleString('vi-VN')} đ`}
-          sub={`${stats?.hireTransactions || 0} đơn thuê hoàn thành`}
+          sub={t('admin.hireCompletedOrders', '{count} đơn thuê hoàn thành').replace('{count}', stats?.hireTransactions || 0)}
           icon={ShoppingBag}
           color="#6366f1"
         />
         <MetricCard
-          label="Chiết Khấu Donate Tặng Quà (15%)"
+          label={t('admin.donateCommission', 'Chiết Khấu Donate Tặng Quà (15%)')}
           value={`${(stats?.donateCommissionRevenue || 0).toLocaleString('vi-VN')} đ`}
-          sub={`${stats?.donateTransactions || 0} lượt tặng quà thành công`}
+          sub={t('admin.donateSuccessfulGifts', '{count} lượt tặng quà thành công').replace('{count}', stats?.donateTransactions || 0)}
           icon={Sparkles}
           color="#ec4899"
         />
         <MetricCard
-          label="Tổng Giá Trị Giao Dịch (GMV)"
+          label={t('admin.totalTransactionVolume', 'Tổng Giá Trị Giao Dịch (GMV)')}
           value={`${(stats?.totalTransactionVolume || 0).toLocaleString('vi-VN')} đ`}
-          sub={`Idol đã nhận 85%: ${(stats?.totalPlayerEarnings || 0).toLocaleString('vi-VN')} đ`}
+          sub={t('admin.idolReceived85', 'Idol đã nhận 85%: {amount} đ').replace('{amount}', (stats?.totalPlayerEarnings || 0).toLocaleString('vi-VN'))}
           icon={DollarSign}
           color="#06b6d4"
         />
@@ -135,9 +146,9 @@ export const CommissionTab = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {[
-              { id: 'ALL', label: 'Tất Cả Giao Dịch' },
-              { id: 'HIRE', label: '🎮 Thuê Player' },
-              { id: 'DONATE', label: '🎁 Donate Quà Tặng' },
+              { id: 'ALL', label: t('admin.allTransactions', 'Tất Cả Giao Dịch') },
+              { id: 'HIRE', label: t('admin.hirePlayer', '🎮 Thuê Player') },
+              { id: 'DONATE', label: t('admin.donateGift', '🎁 Donate Quà Tặng') },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -165,7 +176,7 @@ export const CommissionTab = () => {
               <input
                 className="form-control"
                 style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '220px' }}
-                placeholder="Tìm mã GD, người gửi, Idol..."
+                placeholder={t('admin.searchCommissionPlaceholder', 'Tìm mã GD, người gửi, Idol...')}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -174,10 +185,10 @@ export const CommissionTab = () => {
               onClick={fetchCommissionData}
               className="btn btn-outline"
               style={{ height: '36px', padding: '0 12px', fontSize: '0.82rem' }}
-              title="Làm mới"
+              title={t('admin.refresh', 'Làm mới')}
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              <span style={{ marginLeft: '6px' }}>Làm mới</span>
+              <span style={{ marginLeft: '6px' }}>{t('admin.refresh', 'Làm mới')}</span>
             </button>
           </div>
         </div>
@@ -187,37 +198,37 @@ export const CommissionTab = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Mã GD</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Thời Gian</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Loại Giao Dịch</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Người Chi Trả</th>
-                <th style={{ padding: '12px 14px', textAlign: 'left' }}>Game Thủ (Idol)</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Giá Gốc (100%)</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Phí Sàn (15%)</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Idol Nhận (85%)</th>
-                <th style={{ padding: '12px 14px', textAlign: 'center' }}>Trạng Thái</th>
-                <th style={{ padding: '12px 14px', textAlign: 'center' }}>Chi Tiết</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.txCode', 'Mã GD')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.time', 'Thời Gian')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.txType', 'Loại Giao Dịch')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.payer', 'Người Chi Trả')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.player', 'Game Thủ (Idol)')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'right' }}>{t('admin.originalPrice100', 'Giá Gốc (100%)')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'right' }}>{t('admin.platformFee15', 'Phí Sàn (15%)')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'right' }}>{t('admin.idolNet85', 'Idol Nhận (85%)')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'center' }}>{t('admin.status', 'Trạng Thái')}</th>
+                <th style={{ padding: '12px 14px', textAlign: 'center' }}>{t('admin.detail', 'Chi Tiết')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Đang tải dữ liệu chiết khấu...
+                    {t('admin.loadingCommissionData', 'Đang tải dữ liệu chiết khấu...')}
                   </td>
                 </tr>
               ) : filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Không tìm thấy giao dịch chiết khấu nào phù hợp
+                    {t('admin.noCommissionFound', 'Không tìm thấy giao dịch chiết khấu nào phù hợp')}
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map(t => {
-                  const isHire = t.type === 'HIRE';
+                filteredTransactions.map(tItem => {
+                  const isHire = tItem.type === 'HIRE';
                   return (
                     <tr
-                      key={t.transactionCode || t.id}
+                      key={tItem.transactionCode || tItem.id}
                       style={{
                         borderBottom: '1px solid var(--border-color)',
                         transition: 'background 0.15s ease'
@@ -226,10 +237,10 @@ export const CommissionTab = () => {
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <td style={{ padding: '14px', fontWeight: 800, color: 'var(--primary)' }}>
-                        #{t.transactionCode || t.id}
+                        #{tItem.transactionCode || tItem.id}
                       </td>
                       <td style={{ padding: '14px', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                        {t.createdAt || '—'}
+                        {tItem.createdAt || '—'}
                       </td>
                       <td style={{ padding: '14px', whiteSpace: 'nowrap' }}>
                         <span style={{
@@ -244,50 +255,50 @@ export const CommissionTab = () => {
                           gap: '5px'
                         }}>
                           {isHire ? <ShoppingBag size={12} /> : <Sparkles size={12} />}
-                          {t.typeLabel || (isHire ? 'Thuê Player' : 'Donate')}
+                          {isHire ? t('admin.hirePlayerShort', 'Thuê Player') : t('admin.donateShort', 'Donate')}
                         </span>
                       </td>
                       <td style={{ padding: '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <img
-                            src={getUserAvatar({ avatar: t.senderAvatar, username: t.senderUsername })}
+                            src={getUserAvatar({ avatar: tItem.senderAvatar, username: tItem.senderUsername })}
                             alt=""
                             style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
                           />
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.84rem' }}>{t.senderFullName || t.senderUsername || 'Khách'}</div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@{t.senderUsername || 'user'}</div>
+                            <div style={{ fontWeight: 600, fontSize: '0.84rem' }}>{tItem.senderFullName || tItem.senderUsername || t('admin.clientGuest', 'Khách')}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@{tItem.senderUsername || 'user'}</div>
                           </div>
                         </div>
                       </td>
                       <td style={{ padding: '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <img
-                            src={getUserAvatar({ avatar: t.receiverAvatar, username: t.receiverUsername })}
+                            src={getUserAvatar({ avatar: tItem.receiverAvatar, username: tItem.receiverUsername })}
                             alt=""
                             style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
                           />
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#fbbf24' }}>{t.receiverFullName || t.receiverUsername || 'Player'}</div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@{t.receiverUsername || 'player'}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#fbbf24' }}>{tItem.receiverFullName || tItem.receiverUsername || t('admin.playerFallback', 'Player')}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>@{tItem.receiverUsername || 'player'}</div>
                           </div>
                         </div>
                       </td>
                       <td style={{ padding: '14px', textAlign: 'right', fontWeight: 600 }}>
-                        {(t.originalAmount || 0).toLocaleString('vi-VN')} đ
+                        {(tItem.originalAmount || 0).toLocaleString('vi-VN')} đ
                       </td>
                       <td style={{ padding: '14px', textAlign: 'right', fontWeight: 800, color: '#10b981' }}>
-                        +{(t.platformFee || 0).toLocaleString('vi-VN')} đ
+                        +{(tItem.platformFee || 0).toLocaleString('vi-VN')} đ
                       </td>
                       <td style={{ padding: '14px', textAlign: 'right', fontWeight: 800, color: '#38bdf8' }}>
-                        {(t.playerReceived || 0).toLocaleString('vi-VN')} đ
+                        {(tItem.playerReceived || 0).toLocaleString('vi-VN')} đ
                       </td>
                       <td style={{ padding: '14px', textAlign: 'center' }}>
-                        <StatusBadge status={t.status || 'COMPLETED'} />
+                        <StatusBadge status={tItem.status || 'COMPLETED'} />
                       </td>
                       <td style={{ padding: '14px', textAlign: 'center' }}>
                         <button
-                          onClick={() => setSelectedTx(t)}
+                          onClick={() => setSelectedTx(tItem)}
                           style={{
                             border: '1px solid var(--border-color)',
                             background: 'var(--bg-tertiary)',
@@ -305,7 +316,7 @@ export const CommissionTab = () => {
                           onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-tertiary)'; }}
                         >
                           <Eye size={13} />
-                          <span>Chi tiết</span>
+                          <span>{t('admin.detail', 'Chi tiết')}</span>
                         </button>
                       </td>
                     </tr>
@@ -335,8 +346,10 @@ export const CommissionTab = () => {
                   <Percent size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Chi Tiết Chiết Khấu #{selectedTx.transactionCode}</h3>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{selectedTx.createdAt || 'Hôm nay'}</div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>
+                    {t('admin.commissionDetailTitle', 'Chi Tiết Chiết Khấu #{code}').replace('{code}', selectedTx.transactionCode)}
+                  </h3>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{selectedTx.createdAt || t('admin.today', 'Hôm nay')}</div>
                 </div>
               </div>
               <button
@@ -350,7 +363,9 @@ export const CommissionTab = () => {
             {/* Parties Info */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
               <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Người Trả / Khách</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  {t('admin.payerClient', 'Người Trả / Khách')}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <img src={getUserAvatar({ avatar: selectedTx.senderAvatar, username: selectedTx.senderUsername })} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
                   <div>
@@ -361,7 +376,9 @@ export const CommissionTab = () => {
               </div>
 
               <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Game Thủ (Idol)</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  {t('admin.playerOrIdol', 'Game Thủ (Idol)')}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <img src={getUserAvatar({ avatar: selectedTx.receiverAvatar, username: selectedTx.receiverUsername })} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
                   <div>
@@ -381,30 +398,30 @@ export const CommissionTab = () => {
               marginBottom: '20px'
             }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>
-                Hạch Toán Chiết Khấu (Tỷ lệ 15%)
+                {t('admin.commissionBreakdownTitle', 'Hạch Toán Chiết Khấu (Tỷ lệ 15%)')}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.88rem' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Tổng giá trị giao dịch gốc (100%):</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{t('admin.grossTxValue', 'Tổng giá trị giao dịch gốc (100%):')}</span>
                 <span style={{ fontWeight: 700 }}>{(selectedTx.originalAmount || 0).toLocaleString('vi-VN')} đ</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.88rem', color: '#10b981' }}>
-                <span>Phí chiết khấu sàn thu (15%):</span>
+                <span>{t('admin.commissionRetained', 'Phí chiết khấu sàn thu (15%):')}</span>
                 <span style={{ fontWeight: 800 }}>-{(selectedTx.platformFee || 0).toLocaleString('vi-VN')} đ</span>
               </div>
 
               <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '8px 0' }} />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '1rem', color: '#38bdf8' }}>
-                <span style={{ fontWeight: 700 }}>Idol thực nhận vào ví (85%):</span>
+                <span style={{ fontWeight: 700 }}>{t('admin.netToWallet', 'Idol thực nhận vào ví (85%):')}</span>
                 <span style={{ fontWeight: 900 }}>{(selectedTx.playerReceived || 0).toLocaleString('vi-VN')} đ</span>
               </div>
             </div>
 
             {/* Note & Description */}
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
-              <strong>Mô tả:</strong> {selectedTx.description || 'Giao dịch qua cổng PlayZone'}
+              <strong>{t('admin.description', 'Mô tả:')}</strong> {selectedTx.description || t('admin.defaultTxDesc', 'Giao dịch qua cổng PlayZone')}
             </div>
 
             <button
@@ -412,7 +429,7 @@ export const CommissionTab = () => {
               className="btn btn-primary"
               style={{ width: '100%', height: '40px', fontSize: '0.88rem' }}
             >
-              Đóng
+              {t('common.close', 'Đóng')}
             </button>
           </div>
         </div>

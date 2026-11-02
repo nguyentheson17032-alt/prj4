@@ -55,3 +55,6 @@ uploads/
 *.env
 !.env.example
 
+
+# Scratch scripts
+scratch/

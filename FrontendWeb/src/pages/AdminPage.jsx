@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getUserAvatar } from '../utils/avatarUtils';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import api from '../api/apiService';
 import {
   NAV_ITEMS,
@@ -44,6 +45,7 @@ export {
 // ─────────────────────────────────────────────
 export const AdminPage = () => {
   const { user, isAdmin, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -110,12 +112,12 @@ export const AdminPage = () => {
           <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(244,63,94,0.15)', color: '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
             <ShieldCheck size={32} />
           </div>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '10px' }}>Khu Vực Quản Trị</h2>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '10px' }}>{t('admin.adminArea', 'Khu Vực Quản Trị')}</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
-            Trang này chỉ dành cho <strong>Quản Trị Viên</strong>.
+            {t('admin.adminOnlyDesc', 'Trang này chỉ dành cho Quản Trị Viên.')}
           </p>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <Link to="/" className="btn btn-outline"><span>Về Trang Chủ</span></Link>
+            <Link to="/" className="btn btn-outline"><span>{t('admin.backToHome', 'Về Trang Chủ')}</span></Link>
           </div>
         </div>
       </div>
@@ -152,7 +154,7 @@ export const AdminPage = () => {
             return (
               <button key={item.id}
                 onClick={() => { setActiveSection(item.id); navigate(`/admin${item.id === 'overview' ? '' : '/' + item.id}`); }}
-                title={sidebarCollapsed ? item.label : ''}
+                title={sidebarCollapsed ? t(item.labelKey, item.label) : ''}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   padding: '10px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer',
@@ -162,7 +164,7 @@ export const AdminPage = () => {
                   transition: 'all 0.15s', textAlign: 'left', width: '100%', whiteSpace: 'nowrap'
                 }}>
                 <Icon size={18} style={{ flexShrink: 0 }} />
-                {!sidebarCollapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+                {!sidebarCollapsed && <span style={{ flex: 1 }}>{t(item.labelKey, item.label)}</span>}
                 {!sidebarCollapsed && badge > 0 && (
                   <span style={{ background: '#f43f5e', color: '#fff', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>{badge}</span>
                 )}
@@ -173,17 +175,17 @@ export const AdminPage = () => {
 
         {/* Bottom actions */}
         <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <button onClick={() => navigate('/')} title="Về PlayZone" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', whiteSpace: 'nowrap', width: '100%' }}>
+          <button onClick={() => navigate('/')} title={t('admin.backToPlayzone', 'Về PlayZone')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', whiteSpace: 'nowrap', width: '100%' }}>
             <Home size={18} style={{ flexShrink: 0 }} />
-            {!sidebarCollapsed && <span>Về PlayZone</span>}
+            {!sidebarCollapsed && <span>{t('admin.backToPlayzone', 'Về PlayZone')}</span>}
           </button>
-          <button onClick={toggleTheme} title="Đổi theme" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', whiteSpace: 'nowrap', width: '100%' }}>
+          <button onClick={toggleTheme} title={isDark ? t('admin.lightMode', 'Light mode') : t('admin.darkMode', 'Dark mode')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', whiteSpace: 'nowrap', width: '100%' }}>
             {isDark ? <Sun size={18} style={{ flexShrink: 0 }} /> : <Moon size={18} style={{ flexShrink: 0 }} />}
-            {!sidebarCollapsed && <span>{isDark ? 'Light mode' : 'Dark mode'}</span>}
+            {!sidebarCollapsed && <span>{isDark ? t('admin.lightMode', 'Light mode') : t('admin.darkMode', 'Dark mode')}</span>}
           </button>
-          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title="Thu gọn" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', width: '100%' }}>
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? t('admin.expand', 'Mở rộng') : t('admin.collapse', 'Thu gọn')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', width: '100%' }}>
             {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            {!sidebarCollapsed && <span>Thu gọn</span>}
+            {!sidebarCollapsed && <span>{sidebarCollapsed ? t('admin.expand', 'Mở rộng') : t('admin.collapse', 'Thu gọn')}</span>}
           </button>
         </div>
       </aside>
@@ -206,12 +208,12 @@ export const AdminPage = () => {
         }}>
           <div style={{ flex: 1 }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              {NAV_ITEMS.find(n => n.id === activeSection)?.label || 'Tổng Quan'}
+              {t(NAV_ITEMS.find(n => n.id === activeSection)?.labelKey, NAV_ITEMS.find(n => n.id === activeSection)?.label || 'Tổng Quan')}
             </span>
           </div>
-          <button onClick={loadData} className="btn btn-outline" style={{ fontSize: '0.82rem', height: '34px', padding: '0 12px' }} title="Làm mới">
+          <button onClick={loadData} className="btn btn-outline" style={{ fontSize: '0.82rem', height: '34px', padding: '0 12px' }} title={t('admin.refresh', 'Làm mới')}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            {!sidebarCollapsed && <span style={{ marginLeft: '6px' }}>Làm mới</span>}
+            {!sidebarCollapsed && <span style={{ marginLeft: '6px' }}>{t('admin.refresh', 'Làm mới')}</span>}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <img src={getUserAvatar(user)} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />

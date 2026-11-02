@@ -248,13 +248,13 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
       )
     );
     if (isOwner) {
-      addToast('Bạn không thể tự tặng quà cho chính mình!', 'warning');
+      addToast(t('donate.cannotGiftSelf', 'Bạn không thể tự tặng quà cho chính mình!'), 'warning');
       onClose();
       return;
     }
 
     if (!isBalanceEnough) {
-      addToast('Số dư ví không đủ để tặng món quà này, vui lòng nạp thêm!', 'error');
+      addToast(t('donate.insufficientBalance', 'Số dư ví không đủ để tặng món quà này, vui lòng nạp thêm!'), 'error');
       if (onOpenDeposit) onOpenDeposit();
       return;
     }
@@ -262,7 +262,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
     setIsSubmitting(true);
     try {
       const targetPlayerId = player.id || player.userId;
-      const giftMessage = message.trim() || `Tặng ${selectedGift.name} kèm lời chúc tốt đẹp nhất!`;
+      const giftMessage = message.trim() || t('donate.defaultMessage', 'Tặng {gift} kèm lời chúc tốt đẹp nhất!').replace('{gift}', getGiftName(selectedGift.id, selectedGift.name));
 
       // 1. Gọi backend API donate thực sự lưu vào database
       await api.donateToPlayer(targetPlayerId, selectedGift.price, giftMessage);
@@ -283,7 +283,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
       });
 
       // 4. Toast thông báo thành công
-      addToast(`Đã tặng ${selectedGift.name} (${selectedGift.price.toLocaleString('vi-VN')} đ) cho ${playerName}!`, 'success');
+      addToast(t('donate.successToast', 'Đã tặng {gift} ({price} đ) cho {player}!').replace('{gift}', getGiftName(selectedGift.id, selectedGift.name)).replace('{price}', selectedGift.price.toLocaleString('vi-VN')).replace('{player}', playerName), 'success');
 
       // 5. Reset form và đóng modal
       setMessage('');
@@ -329,7 +329,7 @@ export const DonateModal = ({ player, isOpen, onClose, onOpenDeposit }) => {
                   onOpenDeposit();
                 }}
               >
-                + Nạp Thêm
+                {t('donate.topupMore', '+ Nạp Thêm')}
               </span>
             )}
           </div>

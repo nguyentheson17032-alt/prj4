@@ -82,27 +82,32 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
     e?.preventDefault();
 
     if (currentBalance <= 0) {
-      addToast('Số dư khả dụng của bạn hiện là 0 đ, không thể rút tiền.', 'error');
+      addToast(t('withdraw.zeroBalanceToast', 'Số dư khả dụng của bạn hiện là 0 đ, không thể rút tiền.'), 'error');
       return;
     }
 
     if (!numAmount || numAmount <= 0) {
-      addToast('Vui lòng nhập số tiền hợp lệ muốn rút', 'error');
+      addToast(t('withdraw.invalidAmountToast', 'Số tiền rút không hợp lệ'), 'error');
       return;
     }
 
     if (numAmount > currentBalance) {
-      addToast(`Số tiền rút không được vượt quá số dư khả dụng (${currentBalance.toLocaleString('vi-VN')} đ)`, 'error');
+      addToast(t('withdraw.overBalanceNotice', 'Số tiền rút không thể vượt quá số dư khả dụng ({amount} đ)').replace('{amount}', currentBalance.toLocaleString('vi-VN')), 'error');
       return;
     }
 
     if (!bankAccountNumber.trim()) {
-      addToast('Vui lòng nhập số tài khoản ngân hàng', 'error');
+      addToast(t('withdraw.enterAccountNumToast', 'Vui lòng nhập số tài khoản ngân hàng'), 'error');
       return;
     }
 
     if (!bankAccountName.trim()) {
-      addToast('Vui lòng nhập tên chủ tài khoản nhận', 'error');
+      addToast(t('withdraw.enterAccountNameToast', 'Vui lòng nhập tên chủ tài khoản nhận'), 'error');
+      return;
+    }
+
+    if (!bankName?.trim()) {
+      addToast(t('withdraw.enterBankNameToast', 'Vui lòng chọn hoặc nhập tên ngân hàng'), 'error');
       return;
     }
 
@@ -145,10 +150,18 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
         origin: { y: 0.6 }
       });
 
-      addToast(`Tạo yêu cầu rút ${numAmount.toLocaleString('vi-VN')} đ thành công!`, 'success');
+      addToast(t('withdraw.successToast', 'Tạo yêu cầu rút {amount} đ thành công!').replace('{amount}', numAmount.toLocaleString('vi-VN')), 'success');
     } catch (err) {
       setIsProcessing(false);
-      addToast(err.message || 'Rút tiền thất bại, vui lòng thử lại', 'error');
+      let errMsg = t('withdraw.failedToast', 'Rút tiền thất bại, vui lòng thử lại');
+      if (err.message === 'LOGIN_REQUIRED') errMsg = t('withdraw.loginRequiredError', 'Vui lòng đăng nhập để thực hiện');
+      else if (err.message === 'INVALID_AMOUNT') errMsg = t('withdraw.invalidAmountToast', 'Số tiền rút không hợp lệ');
+      else if (err.message === 'OVER_BALANCE') errMsg = t('withdraw.overBalanceNotice', 'Số tiền rút không thể vượt quá số dư khả dụng ({amount} đ)').replace('{amount}', currentBalance.toLocaleString('vi-VN'));
+      else if (err.message === 'MISSING_ACCOUNT_NUMBER') errMsg = t('withdraw.enterAccountNumToast', 'Vui lòng nhập số tài khoản ngân hàng');
+      else if (err.message === 'MISSING_ACCOUNT_NAME') errMsg = t('withdraw.enterAccountNameToast', 'Vui lòng nhập tên chủ tài khoản nhận');
+      else if (err.message === 'MISSING_BANK_NAME') errMsg = t('withdraw.enterBankNameToast', 'Vui lòng chọn hoặc nhập tên ngân hàng');
+      else if (err.message) errMsg = err.message;
+      addToast(errMsg, 'error');
     }
   };
 
@@ -238,7 +251,12 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
                 <span>{t('withdraw.receivingBank', 'Ngân hàng nhận:')}</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{successInfo?.bankName}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {(() => {
+                    const matched = POPULAR_BANKS.find(b => b.name === successInfo?.bankName);
+                    return matched ? t('bank.' + matched.code, matched.name) : successInfo?.bankName;
+                  })()}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
                 <span>{t('withdraw.accountNumber', 'Số tài khoản:')}</span>
@@ -363,7 +381,7 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                   color: 'var(--text-muted)',
                   fontSize: '0.95rem'
                 }}>
-                  VNĐ
+                  {t('common.vndUnit', 'VNĐ')}
                 </span>
               </div>
 
@@ -440,17 +458,17 @@ export const WithdrawModal = ({ isOpen, onClose, onNavigateWallet }) => {
                 >
                   {POPULAR_BANKS.map((b) => (
                     <option key={b.code} value={b.name}>
-                      {b.name}
+                      {t('bank.' + b.code, b.name)}
                     </option>
                   ))}
-                  <option value="Khác">Ngân hàng khác (Tự nhập)</option>
+                  <option value="Khác">{t('withdraw.otherBank', 'Ngân hàng khác (Tự nhập)')}</option>
                 </select>
                 {bankName === 'Khác' && (
                   <input
                     type="text"
                     className="form-control"
                     style={{ height: '38px', marginTop: '6px', fontSize: '0.85rem' }}
-                    placeholder="Nhập tên ngân hàng của bạn..."
+                    placeholder={t('withdraw.otherBankPlaceholder', 'Nhập tên ngân hàng của bạn...')}
                     onChange={(e) => setBankName(e.target.value)}
                   />
                 )}

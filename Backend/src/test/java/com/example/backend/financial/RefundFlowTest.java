@@ -80,10 +80,13 @@ class RefundFlowTest {
     }
 
     @Test
-    @DisplayName("1. Luồng hoàn tiền PaymentService: Hoàn 100% coin cho người thuê và trừ coin player")
+    @DisplayName("1. Luồng hoàn tiền PaymentService: Hoàn 100% coin cho người thuê và trừ coin player bằng lệnh nguyên tử")
     void testRefundPaymentSuccess() {
         when(paymentRepository.findById(500L)).thenReturn(Optional.of(hirePayment));
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentRepository.updatePaymentStatusAndDescriptionIfExpectedIn(
+                eq(500L), eq(Payment.PaymentStatus.REFUNDED), anyString(), any(java.time.LocalDateTime.class), any()
+        )).thenReturn(1);
+        when(userRepository.deductCoinSafely(playerUser.getId(), 50000L)).thenReturn(1);
 
         // Act
         Payment refunded = paymentService.refundPayment(500L, "Idol không xuất hiện theo giờ hẹn");
@@ -97,9 +100,8 @@ class RefundFlowTest {
         // Player bị trừ lại 50.000 coin (300k - 50k = 250k)
         assertEquals(250000L, playerUser.getCoin());
 
-        verify(userRepository, times(1)).save(renter);
-        verify(userRepository, times(1)).save(playerUser);
-        verify(paymentRepository, times(1)).save(hirePayment);
+        verify(userRepository, times(1)).addCoinSafely(renter.getId(), 50000L);
+        verify(userRepository, times(1)).deductCoinSafely(playerUser.getId(), 50000L);
     }
 
     @Test
@@ -136,5 +138,83 @@ class RefundFlowTest {
         assertFalse(released);
         verify(userRepository, never()).save(any(User.class));
     }
-}
+    @Test
+    @DisplayName("4. Bảo mật: Không được phép hoàn tiền giao dịch nạp tiền TOPUP")
+    void testRefundPaymentTopupBlocked() {
+        Payment topupPayment = new Payment();
+        topupPayment.setId(600L);
+        topupPayment.setUser(renter);
+        topupPayment.setCoin(100000L);
+        topupPayment.setStatus(Payment.PaymentStatus.COMPLETED);
+        topupPayment.setType(Payment.PaymentType.TOPUP);
 
+        when(paymentRepository.findById(600L)).thenReturn(Optional.of(topupPayment));
+
+        assertThrows(PaymentException.class, () -> {
+            paymentService.refundPayment(600L, "Thử hack hoàn tiền nạp");
+        });
+
+        verify(userRepository, never()).save(renter);
+    }
+
+    @Test
+    @DisplayName("5. Bảo mật: Không được phép hoàn tiền giao dịch rút tiền WITHDRAW đã COMPLETED")
+    void testRefundPaymentCompletedWithdrawBlocked() {
+        Payment withdrawPayment = new Payment();
+        withdrawPayment.setId(700L);
+        withdrawPayment.setUser(renter);
+        withdrawPayment.setCoin(100000L);
+        withdrawPayment.setStatus(Payment.PaymentStatus.COMPLETED);
+        withdrawPayment.setType(Payment.PaymentType.WITHDRAW);
+
+        when(paymentRepository.findById(700L)).thenReturn(Optional.of(withdrawPayment));
+
+        assertThrows(PaymentException.class, () -> {
+            paymentService.refundPayment(700L, "Thử hoàn tiền rút đã xong");
+        });
+
+        verify(userRepository, never()).save(renter);
+    }
+
+    @Test
+    @DisplayName("6. Hợp lệ: Từ chối yêu cầu rút tiền PENDING sẽ hoàn coin lại vào ví user bằng câu lệnh SQL nguyên tử")
+    void testRefundPendingWithdrawSuccess() {
+        Payment withdrawPayment = new Payment();
+        withdrawPayment.setId(800L);
+        withdrawPayment.setUser(renter);
+        withdrawPayment.setCoin(50000L);
+        withdrawPayment.setStatus(Payment.PaymentStatus.PENDING);
+        withdrawPayment.setType(Payment.PaymentType.WITHDRAW);
+
+        when(paymentRepository.findById(800L)).thenReturn(Optional.of(withdrawPayment));
+        when(paymentRepository.updatePaymentStatusAndDescriptionIfExpected(
+                eq(800L), eq(Payment.PaymentStatus.REFUNDED), anyString(), any(java.time.LocalDateTime.class), eq(Payment.PaymentStatus.PENDING)
+        )).thenReturn(1);
+
+        Payment result = paymentService.refundPayment(800L, "Thông tin ngân hàng không hợp lệ");
+
+        assertEquals(Payment.PaymentStatus.REFUNDED, result.getStatus());
+        assertEquals(150000L, renter.getCoin()); // 100k + 50k hoàn lại
+        verify(userRepository, times(1)).addCoinSafely(renter.getId(), 50000L);
+    }
+
+
+    @Test
+    @DisplayName("7. Bảo mật tài chính: Không thể hoàn tiền đơn HIRE nếu Idol không đủ số dư để khấu trừ (chống sinh xu từ không khí)")
+    void testRefundPaymentPlayerInsufficientBalanceBlocked() {
+        when(paymentRepository.findById(500L)).thenReturn(Optional.of(hirePayment));
+        when(paymentRepository.updatePaymentStatusAndDescriptionIfExpectedIn(
+                eq(500L), eq(Payment.PaymentStatus.REFUNDED), anyString(), any(java.time.LocalDateTime.class), any()
+        )).thenReturn(1);
+        // Mô phỏng idol đã tẩu tán hoặc rút hết xu -> deductCoinSafely trả về 0
+        when(userRepository.deductCoinSafely(playerUser.getId(), 50000L)).thenReturn(0);
+
+        PaymentException exception = assertThrows(PaymentException.class, () -> {
+            paymentService.refundPayment(500L, "Idol vi phạm");
+        });
+
+        assertTrue(exception.getMessage().contains("Số dư ví của Idol không đủ để thu hồi"));
+        // Renter tuyệt đối không được cộng xu từ không khí
+        verify(userRepository, never()).addCoinSafely(any(), any());
+    }
+}

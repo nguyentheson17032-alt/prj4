@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Gamepad2, Search, Plus } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import { StatusBadge } from './adminHelpers';
 
 export const GamesTab = ({ gamesList, setGamesList, loading }) => {
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formName, setFormName] = useState('');
@@ -46,11 +48,11 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
         availableRoles: rolesArray
       });
       setGamesList(prev => [...prev, created]);
-      addToast(`Đã thêm game "${formName}"`, 'success');
+      addToast(t('admin.toastGameAdded', 'Đã thêm game "{name}"').replace('{name}', formName), 'success');
       resetForm();
       setShowForm(false);
     } catch (err) {
-      addToast(err.response?.data || 'Không thể thêm game. Kiểm tra lại quyền Admin.', 'error');
+      addToast(err.response?.data || t('admin.toastGameAddFailed', 'Không thể thêm game. Kiểm tra lại quyền Admin.'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -59,14 +61,16 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
   return (
     <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Danh Mục Game ({gamesList.length})</h3>
+        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+          {t('admin.gamesCatalogTitle', 'Danh Mục Game ({count})').replace('{count}', gamesList.length)}
+        </h3>
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ position: 'relative' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder="Tìm game..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input className="form-control" style={{ paddingLeft: '32px', height: '36px', fontSize: '0.85rem', minWidth: '180px' }} placeholder={t('admin.searchGamePlaceholder', 'Tìm game...')} value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <button className="btn btn-primary" style={{ fontSize: '0.85rem' }} onClick={() => setShowForm(v => !v)}>
-            <Plus size={15} /> <span>Thêm game</span>
+            <Plus size={15} /> <span>{t('admin.addGame', 'Thêm game')}</span>
           </button>
         </div>
       </div>
@@ -74,15 +78,15 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
         <div style={{ marginBottom: '18px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '10px' }}>
             <div style={{ flex: 2, minWidth: '160px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tên game *</label>
-              <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="Ví dụ: PUBG Mobile" value={formName} onChange={e => setFormName(e.target.value)} />
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{t('admin.gameNameRequired', 'Tên game *')}</label>
+              <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder={t('admin.gameNamePlaceholder', 'Ví dụ: PUBG Mobile')} value={formName} onChange={e => setFormName(e.target.value)} />
             </div>
             <div style={{ flex: 3, minWidth: '180px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Mô tả</label>
-              <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="Mô tả ngắn về game..." value={formDescription} onChange={e => setFormDescription(e.target.value)} />
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{t('admin.description', 'Mô tả')}</label>
+              <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder={t('admin.gameDescPlaceholder', 'Mô tả ngắn về game...')} value={formDescription} onChange={e => setFormDescription(e.target.value)} />
             </div>
             <div style={{ minWidth: '130px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Thể loại</label>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{t('admin.gameCategory', 'Thể loại')}</label>
               <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={formCategory} onChange={e => setFormCategory(e.target.value)}>
                 <option value="MOBA">MOBA</option>
                 <option value="FPS">FPS</option>
@@ -90,11 +94,11 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
                 <option value="BATTLE_ROYALE">Battle Royale</option>
                 <option value="STRATEGY">Strategy</option>
                 <option value="SPORT">Sport</option>
-                <option value="OTHER">Khác</option>
+                <option value="OTHER">Other</option>
               </select>
             </div>
             <div style={{ minWidth: '120px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nền tảng</label>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{t('admin.gamePlatform', 'Nền tảng')}</label>
               <select className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} value={formPlatform} onChange={e => setFormPlatform(e.target.value)}>
                 <option value="MOBILE">Mobile</option>
                 <option value="PC">PC</option>
@@ -102,44 +106,44 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
               </select>
             </div>
             <div style={{ flex: 2, minWidth: '200px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Link ảnh bìa (URL)</label>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{t('admin.coverImageUrl', 'Link ảnh bìa (URL)')}</label>
               <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="https://..." value={formImageUrl} onChange={e => setFormImageUrl(e.target.value)} />
             </div>
             <div style={{ flex: 2, minWidth: '200px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Website chính thức (URL)</label>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{t('admin.officialWebsite', 'Website chính thức (URL)')}</label>
               <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="https://..." value={formWebsiteUrl} onChange={e => setFormWebsiteUrl(e.target.value)} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
             <div style={{ flex: 3, minWidth: '250px' }}>
               <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                🏆 Danh sách Rank <span style={{ fontWeight: 400 }}>(phân cách bằng dấu phẩy, thứ tự thấp→cao)</span>
+                {t('admin.ranksList', '🏆 Danh sách Rank')} <span style={{ fontWeight: 400 }}>{t('admin.ranksSub', '(phân cách bằng dấu phẩy, thứ tự thấp→cao)')}</span>
               </label>
-              <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="Ví dụ: Đồng, Bạc, Vàng, Bạch Kim, Kim Cương..." value={formRanks} onChange={e => setFormRanks(e.target.value)} />
+              <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder={t('admin.ranksPlaceholder', 'Ví dụ: Đồng, Bạc, Vàng, Bạch Kim, Kim Cương...')} value={formRanks} onChange={e => setFormRanks(e.target.value)} />
             </div>
             <div style={{ minWidth: '120px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Có vị trí/Role?</label>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>{t('admin.hasRolesLabel', 'Có vị trí/Role?')}</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '36px', cursor: 'pointer' }} onClick={() => setFormHasRoles(v => !v)}>
                 <div style={{ width: '36px', height: '20px', borderRadius: '10px', background: formHasRoles ? 'var(--primary)' : 'var(--border-color)', position: 'relative', transition: 'background 0.2s' }}>
                   <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: formHasRoles ? '18px' : '2px', transition: 'left 0.2s' }} />
                 </div>
-                <span style={{ fontSize: '0.85rem' }}>{formHasRoles ? 'Có' : 'Không'}</span>
+                <span style={{ fontSize: '0.85rem' }}>{formHasRoles ? t('admin.yes', 'Có') : t('admin.no', 'Không')}</span>
               </div>
             </div>
             {formHasRoles && (
               <div style={{ flex: 3, minWidth: '250px' }}>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                  🎮 Danh sách Vị Trí/Role <span style={{ fontWeight: 400 }}>(phân cách bằng dấu phẩy)</span>
+                  {t('admin.rolesList', '🎮 Danh sách Vị Trí/Role')} <span style={{ fontWeight: 400 }}>{t('admin.rolesSub', '(phân cách bằng dấu phẩy)')}</span>
                 </label>
-                <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder="Ví dụ: Top, Rừng, Mid, Xạ Thủ, Hỗ Trợ" value={formRoles} onChange={e => setFormRoles(e.target.value)} />
+                <input className="form-control" style={{ height: '36px', fontSize: '0.85rem' }} placeholder={t('admin.rolesPlaceholder', 'Ví dụ: Top, Rừng, Mid, Xạ Thủ, Hỗ Trợ')} value={formRoles} onChange={e => setFormRoles(e.target.value)} />
               </div>
             )}
             <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
               <button className="btn btn-primary" style={{ fontSize: '0.85rem', height: '36px' }} onClick={handleAdd} disabled={submitting || !formName.trim()}>
-                {submitting ? 'Đang lưu...' : 'Lưu game'}
+                {submitting ? t('admin.saving', 'Đang lưu...') : t('admin.saveGame', 'Lưu game')}
               </button>
               <button className="btn btn-secondary" style={{ fontSize: '0.85rem', height: '36px' }} onClick={() => { setShowForm(false); resetForm(); }}>
-                Hủy
+                {t('common.cancel', 'Hủy')}
               </button>
             </div>
           </div>
@@ -163,7 +167,9 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
               {selectedGame.websiteUrl && <a href={selectedGame.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', color: 'var(--primary)' }}>{selectedGame.websiteUrl}</a>}
               {selectedGame.availableRanks?.length > 0 && (
                 <div style={{ marginTop: '16px' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>🏆 DANH SÁCH RANK ({selectedGame.availableRanks.length})</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>
+                    {t('admin.ranksCatalogCount', '🏆 DANH SÁCH RANK ({count})').replace('{count}', selectedGame.availableRanks.length)}
+                  </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {selectedGame.availableRanks.map((r, i) => <span key={i} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '20px', background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.2)' }}>{r}</span>)}
                   </div>
@@ -171,21 +177,25 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
               )}
               {selectedGame.availableRoles?.length > 0 && (
                 <div style={{ marginTop: '16px' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>🎮 DANH SÁCH VỊ TRÍ/ROLE ({selectedGame.availableRoles.length})</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>
+                    {t('admin.rolesCatalogCount', '🎮 DANH SÁCH VỊ TRÍ/ROLE ({count})').replace('{count}', selectedGame.availableRoles.length)}
+                  </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {selectedGame.availableRoles.map((r, i) => <span key={i} style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '20px', background: 'rgba(99,102,241,0.12)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>{r}</span>)}
                   </div>
                 </div>
               )}
               {(!selectedGame.availableRanks?.length && !selectedGame.availableRoles?.length) && (
-                <div style={{ marginTop: '16px', fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Game này chưa có danh sách rank/role được cấu hình.</div>
+                <div style={{ marginTop: '16px', fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  {t('admin.noRanksOrRolesConfigured', 'Game này chưa có danh sách rank/role được cấu hình.')}
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
       {loading ? (
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>Đang tải...</p>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>{t('admin.loading', 'Đang tải...')}</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
           {filtered.map(g => (
@@ -204,8 +214,8 @@ export const GamesTab = ({ gamesList, setGamesList, loading }) => {
                   {g.category} · {g.platform}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {g.availableRanks?.length > 0 && <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.12)', color: '#fbbf24' }}>🏆 {g.availableRanks.length} rank</span>}
-                  {g.availableRoles?.length > 0 && <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>🎮 {g.availableRoles.length} role</span>}
+                  {g.availableRanks?.length > 0 && <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.12)', color: '#fbbf24' }}>{t('admin.ranksCountBadge', '🏆 {count} rank').replace('{count}', g.availableRanks.length)}</span>}
+                  {g.availableRoles?.length > 0 && <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>{t('admin.rolesCountBadge', '🎮 {count} role').replace('{count}', g.availableRoles.length)}</span>}
                 </div>
                 {g.status && <div style={{ marginTop: '6px' }}><StatusBadge status={g.status} /></div>}
               </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, RotateCcw, Eye, Check, X } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/apiService';
 import { getUserAvatar } from '../../utils/avatarUtils';
 import { StatusBadge } from './adminHelpers';
@@ -8,6 +9,7 @@ import { PlayerDetailModal, getPrimaryGame } from '../../components/modals/Playe
 
 export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
   const { addToast } = useToast();
+  const { t } = useLanguage();
   const [summaryData, setSummaryData] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -136,16 +138,16 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
     try {
       await api.approvePlayer(pid);
       setPlayersList(prev => prev.map(p => String(p.id) === String(pid) ? { ...p, status: 'AVAILABLE', adminStatus: 'APPROVED' } : p));
-      addToast('Đã phê duyệt Game thủ!', 'success');
-    } catch { addToast('Phê duyệt thất bại', 'error'); }
+      addToast(t('admin.toastApprovePlayerSuccess', 'Đã phê duyệt Game thủ!'), 'success');
+    } catch { addToast(t('admin.toastApprovePlayerError', 'Phê duyệt thất bại'), 'error'); }
   };
 
   const handleReject = async (pid) => {
     try {
       await api.rejectPlayer(pid);
       setPlayersList(prev => prev.filter(p => String(p.id) !== String(pid)));
-      addToast('Đã từ chối hồ sơ', 'info');
-    } catch { addToast('Thao tác thất bại', 'error'); }
+      addToast(t('admin.toastRejectPlayerSuccess', 'Đã từ chối hồ sơ'), 'info');
+    } catch { addToast(t('admin.toastActionFailed', 'Thao tác thất bại'), 'error'); }
   };
 
   return (
@@ -155,7 +157,9 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
         <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: '16px', padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }} />
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Hồ Sơ Chờ Duyệt ({pendingPlayers.length})</h3>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+              {t('admin.pendingApprovalsCount', 'Hồ Sơ Chờ Duyệt ({count})').replace('{count}', pendingPlayers.length)}
+            </h3>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
             {pendingPlayers.map(p => (
@@ -171,10 +175,10 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
                 {p.bio && <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.15)', padding: '8px', borderRadius: '8px', margin: '0 0 12px' }}>"{p.bio}"</p>}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button className="btn btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.82rem', background: '#10b981', borderColor: '#10b981' }} onClick={() => handleApprove(p.id)}>
-                    <Check size={14} /> <span>Phê duyệt</span>
+                    <Check size={14} /> <span>{t('admin.approve', 'Phê duyệt')}</span>
                   </button>
                   <button className="btn btn-outline" style={{ padding: '8px 12px', fontSize: '0.82rem', borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleReject(p.id)}>
-                    <X size={14} /> <span>Từ chối</span>
+                    <X size={14} /> <span>{t('admin.reject', 'Từ chối')}</span>
                   </button>
                 </div>
               </div>
@@ -189,10 +193,12 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px' }}>
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
-              Danh Sách Game Thủ ({filteredGrouped.length})
+              {t('admin.playersListTitle', 'Danh Sách Game Thủ ({count})').replace('{count}', filteredGrouped.length)}
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-              Đã tối ưu gộp {summaryData.length} hồ sơ theo {groupedPlayers.length} Game thủ
+              {t('admin.playersListSub', 'Đã tối ưu gộp {profiles} hồ sơ theo {players} Game thủ')
+                .replace('{profiles}', summaryData.length)
+                .replace('{players}', groupedPlayers.length)}
             </p>
           </div>
 
@@ -219,7 +225,7 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
                   width: '100%',
                   borderRadius: '10px'
                 }}
-                placeholder="Tìm game thủ, username, game..."
+                placeholder={t('admin.searchPlayerPlaceholder', 'Tìm game thủ, username, game...')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -271,7 +277,7 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
               value={gameFilter}
               onChange={(e) => setGameFilter(e.target.value)}
             >
-              <option value="ALL">🎮 Tất cả game</option>
+              <option value="ALL">{t('admin.allGamesFilter', '🎮 Tất cả game')}</option>
               {availableGameNames.map(g => (
                 <option key={g} value={g}>{g}</option>
               ))}
@@ -292,10 +298,10 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="AVAILABLE">🟢 Đang sẵn sàng</option>
-              <option value="BANNED">🔒 Đang bị khóa</option>
-              <option value="PENDING">⏳ Chờ duyệt</option>
+              <option value="ALL">{t('admin.allStatuses', 'Tất cả trạng thái')}</option>
+              <option value="AVAILABLE">{t('admin.statusAvailableOption', '🟢 Đang sẵn sàng')}</option>
+              <option value="BANNED">{t('admin.statusBannedOption', '🔒 Đang bị khóa')}</option>
+              <option value="PENDING">{t('admin.statusPendingOption', '⏳ Chờ duyệt')}</option>
             </select>
           </div>
 
@@ -313,10 +319,10 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
-              <option value="REVENUE_DESC">Doanh thu cao nhất</option>
-              <option value="ORDERS_DESC">Số đơn nhiều nhất</option>
-              <option value="RATING_DESC">Đánh giá cao nhất</option>
-              <option value="NAME_ASC">Tên game thủ (A-Z)</option>
+              <option value="REVENUE_DESC">{t('admin.sortRevenueDesc', 'Doanh thu cao nhất')}</option>
+              <option value="ORDERS_DESC">{t('admin.sortOrdersDesc', 'Số đơn nhiều nhất')}</option>
+              <option value="RATING_DESC">{t('admin.sortRatingDesc', 'Đánh giá cao nhất')}</option>
+              <option value="NAME_ASC">{t('admin.sortPlayerNameAsc', 'Tên game thủ (A-Z)')}</option>
             </select>
           </div>
 
@@ -329,34 +335,36 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
               onClick={handleResetFilters}
             >
               <RotateCcw size={13} />
-              <span>Xóa bộ lọc</span>
+              <span>{t('admin.clearFilters', 'Xóa bộ lọc')}</span>
             </button>
           )}
         </div>
 
         {/* Thanh tóm tắt kết quả theo bộ lọc */}
         <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
-          Đang hiển thị <strong>{filteredGrouped.length}</strong> / {groupedPlayers.length} game thủ
+          {t('admin.showingPlayersCount', 'Đang hiển thị {count} / {total} game thủ')
+            .replace('{count}', filteredGrouped.length)
+            .replace('{total}', groupedPlayers.length)}
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game thủ</th>
-                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Game đã đăng ký</th>
-                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Đánh giá</th>
-                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Tổng đơn</th>
-                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Doanh thu</th>
-                <th style={{ padding: '10px 14px', textAlign: 'left' }}>Trạng thái</th>
-                <th style={{ padding: '10px 14px', textAlign: 'center' }}>Thao tác</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>{t('admin.colPlayer', 'Game thủ')}</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>{t('admin.colRegisteredGames', 'Game đã đăng ký')}</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>{t('admin.colRating', 'Đánh giá')}</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>{t('admin.colTotalOrders', 'Tổng đơn')}</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>{t('admin.colRevenue', 'Doanh thu')}</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left' }}>{t('admin.colStatus', 'Trạng thái')}</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center' }}>{t('admin.colActions', 'Thao tác')}</th>
               </tr>
             </thead>
             <tbody>
               {summaryLoading ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('admin.loading', 'Đang tải...')}</td></tr>
               ) : filteredGrouped.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không có game thủ nào phù hợp</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('admin.noPlayersMatch', 'Không có game thủ nào phù hợp')}</td></tr>
               ) : (
                 filteredGrouped.map(p => {
                   const primaryGame = getPrimaryGame(p.games);
@@ -401,7 +409,7 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
                             </span>
                             {hasMultiple && (
                               <span
-                                title={`Đã đăng ký ${p.games.length} game. Nhấn "Xem chi tiết" để xem tất cả.`}
+                                title={t('admin.registeredGamesTooltip', 'Đã đăng ký {count} game. Nhấn "Xem chi tiết" để xem tất cả.').replace('{count}', p.games.length)}
                                 style={{
                                   color: 'var(--text-muted)',
                                   fontWeight: 800,
@@ -427,7 +435,9 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
                       </td>
 
                       {/* Tổng đơn */}
-                      <td style={{ padding: '14px', fontWeight: 600 }}>{p.totalOrders} đơn</td>
+                      <td style={{ padding: '14px', fontWeight: 600 }}>
+                        {t('admin.ordersCountUnit', '{count} đơn').replace('{count}', p.totalOrders)}
+                      </td>
 
                       {/* Doanh thu */}
                       <td style={{ padding: '14px', color: '#10b981', fontWeight: 700, whiteSpace: 'nowrap' }}>
@@ -453,10 +463,10 @@ export const PlayersTab = ({ playersList, setPlayersList, loading }) => {
                             display: 'inline-flex',
                             alignItems: 'center'
                           }}
-                          title="Xem toàn bộ thông tin chi tiết game thủ"
+                          title={t('admin.viewPlayerDetailTooltip', 'Xem toàn bộ thông tin chi tiết game thủ')}
                         >
                           <Eye size={13} />
-                          <span>Chi tiết</span>
+                          <span>{t('admin.detail', 'Chi tiết')}</span>
                         </button>
                       </td>
                     </tr>

@@ -718,7 +718,7 @@ export const ChatPage = ({ onHirePlayer }) => {
                   e.preventDefault();
                   handleSendMessage(e);
                 }}
-                title="Gửi tin nhắn"
+                title={t('chat.sendMessage', 'Gửi tin nhắn')}
               >
                 {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               </button>

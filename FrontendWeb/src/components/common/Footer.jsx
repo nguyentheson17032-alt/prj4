@@ -96,9 +96,9 @@ export const Footer = () => {
             © {new Date().getFullYear()} PlayZone Gaming Platform. {t('footer.allRightsReserved', 'Tất cả quyền được bảo lưu.')}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>Made with</span>
+            <span>{t('footer.madeWith', 'Được tạo với')}</span>
             <Heart size={14} fill="#ec4899" color="#ec4899" />
-            <span>{t('footer.madeWithForGamers', 'for Gamers')}</span>
+            <span>{t('footer.forGamers', 'dành cho Game thủ')}</span>
           </div>
         </div>
       </div>

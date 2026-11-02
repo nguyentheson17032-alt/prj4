@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Search, RotateCcw, Eye, X } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 import { OrderDetailModal } from '../../components/modals/OrderDetailModal';
 import { parseDateToDateObj, formatOrderDateTime, StatusBadge } from './adminHelpers';
 
 export const OrdersTab = ({ ordersList, loading }) => {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [gameFilter, setGameFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -112,10 +114,10 @@ export const OrdersTab = ({ ordersList, loading }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '18px' }}>
         <div>
           <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
-            Lịch Sử Đơn Hàng ({filtered.length})
+            {t('admin.orderHistoryTitle', 'Lịch Sử Đơn Hàng ({count})').replace('{count}', filtered.length)}
           </h3>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            Kiểm tra toàn bộ đơn đặt thuê Idol, trạng thái thanh toán và giải ngân
+            {t('admin.orderHistorySub', 'Kiểm tra toàn bộ đơn đặt thuê Idol, trạng thái thanh toán và giải ngân')}
           </p>
         </div>
 
@@ -142,7 +144,7 @@ export const OrdersTab = ({ ordersList, loading }) => {
                 width: '100%',
                 borderRadius: '10px'
               }}
-              placeholder="Tìm mã đơn, người thuê, idol, game..."
+              placeholder={t('admin.searchOrderPlaceholder', 'Tìm mã đơn, người thuê, idol, game...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -188,7 +190,7 @@ export const OrdersTab = ({ ordersList, loading }) => {
             value={gameFilter}
             onChange={(e) => setGameFilter(e.target.value)}
           >
-            <option value="ALL">🎮 Tất cả game</option>
+            <option value="ALL">{t('admin.allGamesFilter', '🎮 Tất cả game')}</option>
             {availableGameNames.map(g => (
               <option key={g} value={g}>{g}</option>
             ))}
@@ -203,12 +205,12 @@ export const OrdersTab = ({ ordersList, loading }) => {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="COMPLETED">🟢 Hoàn thành</option>
-            <option value="CONFIRMED">🔵 Đã xác nhận</option>
-            <option value="PENDING">⏳ Chờ xác nhận</option>
-            <option value="CANCELLED">🔴 Đã hủy</option>
-            <option value="REFUNDED">🟣 Đã hoàn tiền</option>
+            <option value="ALL">{t('admin.allStatuses', 'Tất cả trạng thái')}</option>
+            <option value="COMPLETED">{t('admin.statusCompleted', '🟢 Hoàn thành')}</option>
+            <option value="CONFIRMED">{t('admin.statusConfirmed', '🔵 Đã xác nhận')}</option>
+            <option value="PENDING">{t('admin.statusPendingAction', '⏳ Chờ xác nhận')}</option>
+            <option value="CANCELLED">{t('admin.statusCancelled', '🔴 Đã hủy')}</option>
+            <option value="REFUNDED">{t('admin.statusRefunded', '🟣 Đã hoàn tiền')}</option>
           </select>
         </div>
 
@@ -220,10 +222,10 @@ export const OrdersTab = ({ ordersList, loading }) => {
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
           >
-            <option value="ALL">📅 Tất cả thời gian</option>
-            <option value="TODAY">Hôm nay</option>
-            <option value="WEEK">7 ngày gần nhất</option>
-            <option value="MONTH">30 ngày qua</option>
+            <option value="ALL">{t('admin.allDates', '📅 Tất cả thời gian')}</option>
+            <option value="TODAY">{t('admin.todayFilter', 'Hôm nay')}</option>
+            <option value="WEEK">{t('admin.last7DaysFilter', '7 ngày gần nhất')}</option>
+            <option value="MONTH">{t('admin.last30DaysFilter', '30 ngày qua')}</option>
           </select>
         </div>
 
@@ -235,10 +237,10 @@ export const OrdersTab = ({ ordersList, loading }) => {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
-            <option value="NEWEST">Mới nhất</option>
-            <option value="OLDEST">Cũ nhất</option>
-            <option value="PRICE_DESC">Tổng tiền cao nhất</option>
-            <option value="PRICE_ASC">Tổng tiền thấp nhất</option>
+            <option value="NEWEST">{t('admin.sortNewest', 'Mới nhất')}</option>
+            <option value="OLDEST">{t('admin.sortOldest', 'Cũ nhất')}</option>
+            <option value="PRICE_DESC">{t('admin.sortPriceDesc', 'Tổng tiền cao nhất')}</option>
+            <option value="PRICE_ASC">{t('admin.sortPriceAsc', 'Tổng tiền thấp nhất')}</option>
           </select>
         </div>
 
@@ -251,16 +253,19 @@ export const OrdersTab = ({ ordersList, loading }) => {
             onClick={handleResetFilters}
           >
             <RotateCcw size={13} />
-            <span>Xóa bộ lọc</span>
+            <span>{t('admin.clearFilters', 'Xóa bộ lọc')}</span>
           </button>
         )}
       </div>
 
       {/* Thanh tóm tắt kết quả theo bộ lọc */}
       <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
-        Đang hiển thị <strong>{filtered.length}</strong> / {ordersList.length} đơn hàng
+        {t('admin.showingOrdersCount', 'Đang hiển thị {count} / {total} đơn hàng')
+          .replace('{count}', filtered.length)
+          .replace('{total}', ordersList.length)}
         <span style={{ margin: '0 8px', color: 'var(--border-color)' }}>|</span>
-        Doanh thu hoàn thành (đã lọc): <strong style={{ color: '#10b981' }}>{totalFilteredRevenue.toLocaleString('vi-VN')} đ</strong>
+        {t('admin.completedRevenueFiltered', 'Doanh thu hoàn thành (đã lọc): {amount} đ')
+          .replace('{amount}', totalFilteredRevenue.toLocaleString('vi-VN'))}
       </div>
 
       {/* Orders Table */}
@@ -268,20 +273,20 @@ export const OrdersTab = ({ ordersList, loading }) => {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Mã đơn</th>
-              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Người thuê</th>
-              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Game thủ</th>
-              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Tổng tiền</th>
-              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Thời gian</th>
-              <th style={{ padding: '12px 14px', textAlign: 'left' }}>Trạng thái</th>
-              <th style={{ padding: '12px 14px', textAlign: 'center' }}>Thao tác</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colOrderId', 'Mã đơn')}</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colRenter', 'Người thuê')}</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colPlayerTab', 'Game thủ')}</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colTotalPrice', 'Tổng tiền')}</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colDurationOrTime', 'Thời gian')}</th>
+              <th style={{ padding: '12px 14px', textAlign: 'left' }}>{t('admin.colStatus', 'Trạng thái')}</th>
+              <th style={{ padding: '12px 14px', textAlign: 'center' }}>{t('admin.colActions', 'Thao tác')}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Đang tải...</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('admin.loading', 'Đang tải...')}</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Không tìm thấy đơn hàng nào phù hợp</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{t('admin.noOrdersMatch', 'Không tìm thấy đơn hàng nào phù hợp')}</td></tr>
             ) : filtered.map(o => {
               const renterDisplayName = o.renterName || o.renterUsername || o.renter?.username || (o.renterId ? `User #${o.renterId}` : '—');
               const playerDisplayName = o.playerName || o.player?.username || (o.playerId ? `Player #${o.playerId}` : '—');
@@ -354,10 +359,10 @@ export const OrdersTab = ({ ordersList, loading }) => {
                         display: 'inline-flex',
                         alignItems: 'center'
                       }}
-                      title="Xem toàn bộ thông tin chi tiết đơn hàng"
+                      title={t('admin.viewOrderDetailTooltip', 'Xem toàn bộ thông tin chi tiết đơn hàng')}
                     >
                       <Eye size={13} />
-                      <span>Chi tiết</span>
+                      <span>{t('admin.detail', 'Chi tiết')}</span>
                     </button>
                   </td>
                 </tr>

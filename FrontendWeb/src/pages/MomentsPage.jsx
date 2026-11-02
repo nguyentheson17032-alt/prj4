@@ -19,12 +19,12 @@ import {
   AlertCircle,
   Search
 } from 'lucide-react';
-import api from '../api/apiService';
+import api, { formatRelativeTime } from '../api/apiService';
 import CreateMomentModal from '../components/modals/CreateMomentModal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
-import { GAME_TOPICS_20 } from '../constants/gamesList';
+import { GAME_TOPICS_20, getLocalizedGameName } from '../constants/gamesList';
 import '../styles/moments.css';
 
 export const MomentsPage = () => {
@@ -108,10 +108,14 @@ export const MomentsPage = () => {
     'lol': ['league of legends', 'liên minh', 'lmht'],
     'lmht': ['league of legends', 'liên minh', 'lol'],
     'lien minh': ['league of legends', 'liên minh', 'lol', 'lmht'],
-    'tft': ['đấu trường chân lý', 'dtcl', 'tft'],
-    'dtcl': ['đấu trường chân lý', 'dtcl', 'tft'],
-    'lq': ['liên quân', 'lien quan', 'aov'],
-    'lien quan': ['liên quân', 'lien quan', 'aov'],
+    'tft': ['đấu trường chân lý', 'dtcl', 'tft', 'teamfight tactics'],
+    'dtcl': ['đấu trường chân lý', 'dtcl', 'tft', 'teamfight tactics'],
+    'teamfight tactics': ['đấu trường chân lý', 'dtcl', 'tft', 'teamfight tactics'],
+    'league of legends': ['league of legends', 'liên minh', 'lol', 'lmht'],
+    'lq': ['liên quân', 'lien quan', 'aov', 'arena of valor'],
+    'lien quan': ['liên quân', 'lien quan', 'aov', 'arena of valor'],
+    'aov': ['liên quân', 'lien quan', 'aov', 'arena of valor'],
+    'arena of valor': ['liên quân', 'lien quan', 'aov', 'arena of valor'],
     'cs': ['counter-strike', 'cs2', 'csgo'],
     'cs2': ['counter-strike', 'cs2', 'csgo'],
     'ff': ['free fire'],
@@ -189,16 +193,17 @@ export const MomentsPage = () => {
     const q = gameSearchQuery.trim().toLowerCase();
     return GAME_TOPICS_20.filter(game => {
       const gName = game.name.toLowerCase();
-      if (gName.includes(q)) return true;
+      const locName = getLocalizedGameName(game.name, language).toLowerCase();
+      if (gName.includes(q) || locName.includes(q)) return true;
       if (game.category?.toLowerCase().includes(q)) return true;
       for (const [alias, targets] of Object.entries(GAME_ALIASES)) {
         if (q.includes(alias) || alias.includes(q)) {
-          if (targets.some(t => gName.includes(t))) return true;
+          if (targets.some(t => gName.includes(t) || locName.includes(t))) return true;
         }
       }
       return false;
     });
-  }, [gameSearchQuery, GAME_ALIASES]);
+  }, [gameSearchQuery, GAME_ALIASES, language]);
 
   const handleToggleLike = async (id) => {
     if (!isAuthenticated) {
@@ -502,7 +507,7 @@ export const MomentsPage = () => {
                   title={t('moments.clearGameFilter', 'Xóa bộ lọc game')}
                 >
                   <X size={13} />
-                  <span>{t('moments.clearGameFilter', 'Bỏ lọc')}{selectedGameFilter !== 'ALL' ? `: ${selectedGameFilter}` : ''}</span>
+                  <span>{t('moments.clearGameFilter', 'Bỏ lọc')}{selectedGameFilter !== 'ALL' ? `: ${getLocalizedGameName(selectedGameFilter, language)}` : ''}</span>
                 </button>
               )}
             </div>
@@ -533,7 +538,7 @@ export const MomentsPage = () => {
                 }}
               >
                 <span>{game.icon}</span>
-                <span>{game.name}</span>
+                <span>{getLocalizedGameName(game.name, language)}</span>
               </button>
             ))}
             {visibleGameTopics.length === 0 && gameSearchQuery && (
@@ -581,7 +586,7 @@ export const MomentsPage = () => {
               {activeTab === 'MY_POSTS'
                 ? t('moments.emptyMyPosts', 'Bạn Chưa Đăng Khoảnh Khắc Nào')
                 : (gameSearchQuery || selectedGameFilter !== 'ALL')
-                ? t('moments.emptyGameSearch', 'Không Tìm Thấy Khoảnh Khắc Cho Game "{game}"').replace('{game}', gameSearchQuery || selectedGameFilter)
+                ? t('moments.emptyGameSearch', 'Không Tìm Thấy Khoảnh Khắc Cho Game "{game}"').replace('{game}', gameSearchQuery || getLocalizedGameName(selectedGameFilter, language))
                 : t('moments.emptyAll', 'Chưa Có Khoảnh Khắc Nào')}
             </h3>
 
@@ -656,14 +661,14 @@ export const MomentsPage = () => {
                           {moment.author?.name}
                         </Link>
                         {moment.author?.isVip && (
-                          <span title="Idol Đã Xác Thực">
+                          <span title={t('moments.verifiedIdolTooltip', 'Idol Đã Xác Thực')}>
                             <Crown size={15} color="#fbbf24" fill="#fbbf24" />
                           </span>
                         )}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        <span>{moment.createdAt}</span>
+                        <span>{formatRelativeTime(moment.rawCreatedAt || moment.createdAt, language)}</span>
                         <span>•</span>
                         <span
                           style={{
@@ -678,7 +683,7 @@ export const MomentsPage = () => {
                           }}
                         >
                           <Gamepad2 size={12} />
-                          {moment.gameName}
+                          {getLocalizedGameName(moment.gameName, language)}
                         </span>
                       </div>
                     </div>

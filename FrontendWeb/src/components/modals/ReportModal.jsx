@@ -49,19 +49,19 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
       return;
     }
     if (!player?.id) {
-      addToast('Không tìm thấy thông tin người chơi để tố cáo!', 'error');
+      addToast(t('report.noPlayerToast', 'Không tìm thấy thông tin người chơi để tố cáo!'), 'error');
       return;
     }
     if (!reason) {
-      addToast('Vui lòng chọn lý do tố cáo!', 'warning');
+      addToast(t('report.selectReasonToast', 'Vui lòng chọn lý do tố cáo!'), 'warning');
       return;
     }
     if (!description.trim()) {
-      addToast('Vui lòng mô tả chi tiết vi phạm!', 'warning');
+      addToast(t('report.enterDescToast', 'Vui lòng mô tả chi tiết vi phạm!'), 'warning');
       return;
     }
     if (description.trim().length > 1000) {
-      addToast('Mô tả vi phạm không được vượt quá 1000 ký tự!', 'warning');
+      addToast(t('report.maxCharsToast', 'Mô tả vi phạm không được vượt quá 1000 ký tự!'), 'warning');
       return;
     }
 
@@ -75,19 +75,19 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
         evidenceUrl: evidenceUrl.trim() || null,
       });
       onReported?.(player.orderId, 'PENDING', player.id);
-      addToast('Tố cáo đã được gửi! Chúng tôi sẽ xem xét trong 24-48 giờ.', 'success');
+      addToast(t('report.successToast', 'Tố cáo đã được gửi! Chúng tôi sẽ xem xét trong 24-48 giờ.'), 'success');
       handleClose();
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data || '';
       if (typeof msg === 'string' && (msg.includes('already reported') || msg.includes('1 lần') || msg.includes('trước đó'))) {
-        addToast(msg || 'Bạn chỉ được tố cáo người chơi này 1 lần duy nhất!', 'warning');
+        addToast(msg || t('report.alreadyReportedToast', 'Bạn chỉ được tố cáo người chơi này 1 lần duy nhất!'), 'warning');
         onReported?.(player.orderId, 'REJECTED', player.id);
         handleClose();
       } else if (typeof msg === 'string' && msg.includes('đánh giá')) {
         addToast(msg, 'warning');
         handleClose();
       } else {
-        addToast(msg || 'Gửi tố cáo thất bại. Vui lòng thử lại!', 'error');
+        addToast(msg || t('report.failedToast', 'Gửi tố cáo thất bại. Vui lòng thử lại!'), 'error');
       }
     } finally {
       setSubmitting(false);
@@ -108,7 +108,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
             className="modal-close-btn"
             onClick={handleClose}
             style={{ position: 'absolute', top: '20px', right: '20px' }}
-            title="Đóng"
+            title={t('common.close', 'Đóng')}
           >
             <X size={18} />
           </button>
@@ -183,7 +183,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
                   )}
                   {player.orderId && (
                     <span style={{ color: '#38bdf8', fontWeight: 600 }}>
-                      Mã đơn #{player.orderId}
+                      {t('orders.orderId', 'Mã đơn:')} #{player.orderId}
                     </span>
                   )}
                 </div>
@@ -192,7 +192,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
 
             {player.orderPrice != null && (
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Số tiền thanh toán</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('report.paymentAmount', 'Số tiền thanh toán')}</div>
                 <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f43f5e' }}>
                   {Number(player.orderPrice).toLocaleString('vi-VN')} đ
                 </div>
@@ -216,7 +216,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
                     onClick={() => setReason(r.id)}
                   >
                     <IconComponent size={15} style={{ flexShrink: 0, color: isSelected ? '#f43f5e' : 'var(--text-muted)' }} />
-                    <span style={{ flex: 1 }}>{r.label}</span>
+                    <span style={{ flex: 1 }}>{t('report.reason_' + REPORT_REASONS.indexOf(r), r.label)}</span>
                     {isSelected && <CheckCircle2 size={14} color="#f43f5e" style={{ flexShrink: 0 }} />}
                   </div>
                 );
@@ -231,7 +231,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
                 {t('report.descLabel', 'Mô Tả Chi Tiết Vi Phạm *:')}
               </label>
               <span style={{ fontSize: '0.76rem', color: description.length > 900 ? '#f43f5e' : 'var(--text-muted)' }}>
-                {description.length}/1000 ký tự
+                {description.length}/1000 {t('common.characters', 'ký tự')}
               </span>
             </div>
             <textarea
@@ -261,8 +261,8 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 700, marginBottom: '8px' }}>
               <Link size={15} color="#38bdf8" />
-              <span>Đường dẫn bằng chứng (Google Drive, Ảnh, Video...)</span>
-              <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.78rem' }}>(tùy chọn)</span>
+              <span>{t('report.evidenceUrlLabel', 'Đường dẫn bằng chứng (Google Drive, Ảnh, Video...)')}</span>
+              <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.78rem' }}>({t('common.optional', 'tùy chọn')})</span>
             </label>
             <input
               type="url"
@@ -270,7 +270,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
               value={evidenceUrl}
               onChange={(e) => setEvidenceUrl(e.target.value)}
               maxLength={500}
-              placeholder="https://drive.google.com/... hoặc link ảnh, video đối soát"
+              placeholder={t('report.evidencePlaceholder', 'https://drive.google.com/... hoặc link ảnh, video đối soát')}
               style={{
                 width: '100%',
                 padding: '11px 14px',
@@ -298,7 +298,7 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
             >
               <span style={{ fontSize: '1rem' }}>💡</span>
               <div>
-                <strong style={{ color: '#38bdf8' }}>Khuyên dùng:</strong> Hãy tải hình ảnh, video bằng chứng lên <strong>Google Drive</strong> và mở quyền truy cập <span style={{ color: '#7dd3fc', fontWeight: 600 }}>"Bất kỳ ai có đường liên kết đều có thể xem"</span> để Quản Trị Viên đối soát và hoàn tiền nhanh nhất.
+                {t('report.evidenceTip', 'Hãy tải hình ảnh, video bằng chứng lên Google Drive và mở quyền truy cập "Bất kỳ ai có đường liên kết đều có thể xem" để Quản Trị Viên đối soát và hoàn tiền nhanh nhất.')}
               </div>
             </div>
           </div>
@@ -318,10 +318,10 @@ const ReportModal = ({ player, isOpen, onClose, onOpenAuth, onReported }) => {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', fontWeight: 700, color: '#f43f5e' }}>
               <ShieldCheck size={16} />
-              <span>Chính Sách Hoàn Tiền Bảo Vệ Khách Hàng</span>
+              <span>{t('report.policyTitle', 'Chính Sách Hoàn Tiền Bảo Vệ Khách Hàng')}</span>
             </div>
             <div>
-              Khi khiếu nại được Admin duyệt chấp thuận, số tiền hoàn sẽ được <strong>chuyển trực tiếp vào Số Dư Khả Dụng</strong> của bạn và khấu trừ từ số dư đang đóng băng của Idol.
+              {t('report.policyDesc', 'Khi khiếu nại được Admin duyệt chấp thuận, số tiền hoàn sẽ được chuyển trực tiếp vào Số Dư Khả Dụng của bạn và khấu trừ từ số dư đang đóng băng của Idol.')}
             </div>
           </div>
 

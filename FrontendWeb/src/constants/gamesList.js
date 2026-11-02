@@ -21,4 +21,52 @@ export const GAME_TOPICS_20 = [
   { id: 20, name: 'Minecraft', category: 'OTHER', icon: '🧱' }
 ];
 
+
+export const getLocalizedGameName = (name, lang = 'vi') => {
+  if (!name || typeof name !== 'string') return name || '';
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (lang === 'vi') {
+    if (lower === 'league of legends' || lower === 'lol' || lower === 'lmht') return 'Liên Minh Huyền Thoại';
+    if (lower === 'teamfight tactics' || lower === 'tft' || lower === 'dtcl') return 'Đấu Trường Chân Lý';
+    if (lower === 'arena of valor' || lower === 'aov') return 'Liên Quân Mobile';
+    return trimmed;
+  }
+
+  // lang === 'en'
+  if (lower === 'liên minh huyền thoại' || lower === 'lien minh huyen thoai' || lower === 'lmht' || lower === 'liên minh') {
+    return 'League of Legends';
+  }
+  if (lower === 'đấu trường chân lý' || lower === 'dau truong chan ly' || lower === 'dtcl' || lower === 'đấu trường') {
+    return 'Teamfight Tactics';
+  }
+  if (lower === 'liên quân mobile' || lower === 'lien quan mobile' || lower === 'liên quân' || lower === 'lien quan') {
+    return 'Arena of Valor';
+  }
+  if (lower === 'tốc chiến' || lower === 'toc chien' || lower === 'liên minh: tốc chiến') {
+    return 'Wild Rift';
+  }
+  return trimmed;
+};
+
+export const getCanonicalGameName = (name) => {
+  if (!name || typeof name !== 'string') return name || '';
+  const lower = name.trim().toLowerCase();
+  if (lower === 'liên minh huyền thoại' || lower === 'lien minh huyen thoai' || lower === 'lmht' || lower === 'liên minh' || lower === 'lol') {
+    return 'League of Legends';
+  }
+  if (lower === 'đấu trường chân lý' || lower === 'dau truong chan ly' || lower === 'dtcl' || lower === 'tft') {
+    return 'Teamfight Tactics';
+  }
+  if (lower === 'arena of valor' || lower === 'aov') {
+    return 'Liên Quân Mobile';
+  }
+  if (lower === 'tốc chiến' || lower === 'toc chien' || lower === 'liên minh: tốc chiến') {
+    return 'Wild Rift';
+  }
+  return name.trim();
+};
+
+
 export default GAME_TOPICS_20;

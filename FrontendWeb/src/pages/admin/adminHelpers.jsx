@@ -4,20 +4,21 @@ import {
   Sparkles, ShoppingBag, CreditCard, AlertTriangle
 } from 'lucide-react';
 import { getRefundPercentage } from '../../components/modals/OrderDetailModal';
+import { useLanguage } from '../../context/LanguageContext';
 
 // ─────────────────────────────────────────────
 // Sidebar nav items
 // ─────────────────────────────────────────────
 export const NAV_ITEMS = [
-  { id: 'overview', label: 'Tổng Quan', icon: LayoutDashboard },
-  { id: 'commission', label: 'Chiết Khấu (15%)', icon: Percent },
-  { id: 'users', label: 'Người Dùng', icon: Users },
-  { id: 'players', label: 'Game Thủ', icon: Gamepad2 },
-  { id: 'moments', label: 'Quản Lý Khoảnh Khắc', icon: Sparkles },
-  { id: 'orders', label: 'Đơn Hàng', icon: ShoppingBag },
-  { id: 'games', label: 'Danh Mục Game', icon: Gamepad2 },
-  { id: 'payments', label: 'Nạp / Rút Tiền', icon: CreditCard },
-  { id: 'reports', label: 'Khiếu Nại', icon: AlertTriangle },
+  { id: 'overview', label: 'Tổng Quan', labelKey: 'admin.navOverview', icon: LayoutDashboard },
+  { id: 'commission', label: 'Chiết Khấu (15%)', labelKey: 'admin.navCommission', icon: Percent },
+  { id: 'users', label: 'Người Dùng', labelKey: 'admin.navUsers', icon: Users },
+  { id: 'players', label: 'Game Thủ', labelKey: 'admin.navPlayers', icon: Gamepad2 },
+  { id: 'moments', label: 'Quản Lý Khoảnh Khắc', labelKey: 'admin.navMoments', icon: Sparkles },
+  { id: 'orders', label: 'Đơn Hàng', labelKey: 'admin.navOrders', icon: ShoppingBag },
+  { id: 'games', label: 'Danh Mục Game', labelKey: 'admin.navGames', icon: Gamepad2 },
+  { id: 'payments', label: 'Nạp / Rút Tiền', labelKey: 'admin.navPayments', icon: CreditCard },
+  { id: 'reports', label: 'Khiếu Nại', labelKey: 'admin.navReports', icon: AlertTriangle },
 ];
 
 // ─────────────────────────────────────────────
@@ -61,29 +62,32 @@ export const formatOrderDateTime = (dateVal) => {
 // Status badge helper
 // ─────────────────────────────────────────────
 export const StatusBadge = ({ status, order }) => {
+  const { t } = useLanguage();
   const map = {
-    PENDING: { label: 'Chờ duyệt', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-    COMPLETED: { label: 'Hoàn thành', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
-    AVAILABLE: { label: 'Sẵn sàng', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
-    BANNED: { label: 'Đã khóa', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
-    REJECTED: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
-    PLAYING: { label: 'Đang chơi', bg: 'rgba(6,182,212,0.15)', color: '#06b6d4' },
-    CONFIRMED: { label: 'Đã xác nhận', bg: 'rgba(6,182,212,0.15)', color: '#06b6d4' },
-    CANCELLED: { label: 'Đã hủy', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
-    CANCELED: { label: 'Đã hủy', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
-    EXPIRED: { label: 'Hết hạn xác nhận', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
-    REFUNDED: { label: 'Đã hoàn tiền', bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
-    processed: { label: 'Đã xử lý', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
-    pending: { label: 'Chờ xử lý', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-    rejected: { label: 'Từ chối', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
-    ACTIVE: { label: 'Đang hiển thị', bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
-    HIDDEN: { label: 'Đang ẩn', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
-    DELETED: { label: 'Đã xóa', bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    PENDING: { label: t('admin.statusPendingApproval', 'Chờ duyệt'), bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+    COMPLETED: { label: t('admin.statusCompleted', 'Hoàn thành'), bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    AVAILABLE: { label: t('admin.statusAvailable', 'Sẵn sàng'), bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    BANNED: { label: t('admin.statusBanned', 'Đã khóa'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    REJECTED: { label: t('admin.statusRejected', 'Từ chối'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    PLAYING: { label: t('admin.statusPlaying', 'Đang chơi'), bg: 'rgba(6,182,212,0.15)', color: '#06b6d4' },
+    CONFIRMED: { label: t('admin.statusConfirmed', 'Đã xác nhận'), bg: 'rgba(6,182,212,0.15)', color: '#06b6d4' },
+    CANCELLED: { label: t('admin.statusCancelled', 'Đã hủy'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    CANCELED: { label: t('admin.statusCancelled', 'Đã hủy'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    EXPIRED: { label: t('admin.statusExpired', 'Hết hạn xác nhận'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    REFUNDED: { label: t('admin.statusRefunded', 'Đã hoàn tiền'), bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
+    processed: { label: t('admin.statusProcessed', 'Đã xử lý'), bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    pending: { label: t('admin.statusPendingAction', 'Chờ xử lý'), bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+    rejected: { label: t('admin.statusRejected', 'Từ chối'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+    ACTIVE: { label: t('admin.statusActive', 'Đang hiển thị'), bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+    HIDDEN: { label: t('admin.statusHidden', 'Đang ẩn'), bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+    DELETED: { label: t('admin.statusDeleted', 'Đã xóa'), bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
   };
 
   const refundPct = (status === 'REFUNDED' || order?.status === 'REFUNDED') ? getRefundPercentage(order) : null;
   const s = map[status] || { label: status, bg: 'rgba(107,114,128,0.15)', color: '#6b7280' };
-  const label = (status === 'REFUNDED' && refundPct) ? `Đã hoàn tiền ${refundPct}%` : s.label;
+  const label = (status === 'REFUNDED' && refundPct) 
+    ? t('admin.refundedPercent', 'Đã hoàn tiền {percent}%').replace('{percent}', refundPct)
+    : s.label;
 
   return (
     <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: s.bg, color: s.color, whiteSpace: 'nowrap' }}>

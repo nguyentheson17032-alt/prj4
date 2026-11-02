@@ -70,7 +70,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Payment findByUserAndPlayerAndTypeAndStatus(User user, User player, Payment.PaymentType type, Payment.PaymentStatus status);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query("UPDATE Payment p SET p.status = :newStatus, p.completedAt = :completedAt WHERE p.id = :id AND p.status = :expectedStatus")
     int updatePaymentStatusIfExpected(
@@ -78,6 +78,36 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("newStatus") Payment.PaymentStatus newStatus,
             @Param("completedAt") LocalDateTime completedAt,
             @Param("expectedStatus") Payment.PaymentStatus expectedStatus);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("UPDATE Payment p SET p.status = :newStatus, p.description = :description, p.completedAt = :completedAt WHERE p.id = :id AND p.status = :expectedStatus")
+    int updatePaymentStatusAndDescriptionIfExpected(
+            @Param("id") Long id,
+            @Param("newStatus") Payment.PaymentStatus newStatus,
+            @Param("description") String description,
+            @Param("completedAt") LocalDateTime completedAt,
+            @Param("expectedStatus") Payment.PaymentStatus expectedStatus);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("UPDATE Payment p SET p.status = :newStatus, p.transactionId = :transactionId, p.completedAt = :completedAt WHERE p.id = :id AND p.status = :expectedStatus")
+    int updatePaymentStatusAndTransactionIdIfExpected(
+            @Param("id") Long id,
+            @Param("newStatus") Payment.PaymentStatus newStatus,
+            @Param("transactionId") String transactionId,
+            @Param("completedAt") LocalDateTime completedAt,
+            @Param("expectedStatus") Payment.PaymentStatus expectedStatus);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("UPDATE Payment p SET p.status = :newStatus, p.description = :description, p.completedAt = :completedAt WHERE p.id = :id AND p.status IN :expectedStatuses")
+    int updatePaymentStatusAndDescriptionIfExpectedIn(
+            @Param("id") Long id,
+            @Param("newStatus") Payment.PaymentStatus newStatus,
+            @Param("description") String description,
+            @Param("completedAt") LocalDateTime completedAt,
+            @Param("expectedStatuses") java.util.Collection<Payment.PaymentStatus> expectedStatuses);
 
     @Query("SELECT COALESCE(SUM(p.coin), 0) FROM Payment p WHERE p.user.id = :userId AND p.type = com.example.backend.entity.Payment$PaymentType.WITHDRAW AND p.status IN (com.example.backend.entity.Payment$PaymentStatus.COMPLETED, com.example.backend.entity.Payment$PaymentStatus.PENDING) AND p.createdAt BETWEEN :start AND :end")
     long sumTodayWithdrawalsByUserId(@Param("userId") Long userId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
